@@ -1,0 +1,36 @@
+{
+  "name": "@parallax/orchestrator",
+  "version": "0.0.1-alpha.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx watch src/index.ts",
+    "build": "rm -rf dist && tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@parallax/agent-adapters": "workspace:*",
+    "@parallax/common": "workspace:*",
+    "@fastify/cors": "11.2.0",
+    "@linear/sdk": "^30.0.0",
+    "better-sqlite3": "^11.8.1",
+    "chalk": "4",
+    "dotenv": "^16.4.7",
+    "fastify": "5.7.4",
+    "figlet": "1.10.0",
+    "js-yaml": "^4.1.0",
+    "log-update": "7.1.0",
+    "p-limit": "^6.1.0",
+    "simple-git": "^3.22.0",
+    "socket.io": "4.8.3",
+    "strip-ansi": "7.1.2",
+    "terminal-size": "4.0.1",
+    "uuid": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/figlet": "1.7.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/uuid": "^10.0.0"
+  }
+}

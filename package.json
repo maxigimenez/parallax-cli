@@ -1,0 +1,36 @@
+{
+  "name": "parallax",
+  "version": "0.0.1-alpha.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "parallax": "pnpm --filter @parallax/cli start",
+    "start": "/bin/sh -c 'pnpm --filter @parallax/orchestrator start & pnpm --filter @parallax/ui start; wait'",
+    "start:orchestrator": "pnpm --filter @parallax/orchestrator start",
+    "start:ui": "pnpm --filter @parallax/ui start",
+    "ui": "pnpm --filter ./packages/ui dev",
+    "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
+    "prepare:release": "sh ./scripts/prepare_release",
+    "release:pack": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm pack",
+    "release:publish": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm publish --access public"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@typescript-eslint/eslint-plugin": "8.56.1",
+    "@typescript-eslint/parser": "8.56.1",
+    "eslint": "10.0.2",
+    "eslint-plugin-prettier": "5.5.5",
+    "eslint-plugin-react": "7.37.5",
+    "globals": "17.3.0",
+    "prettier": "3.8.1",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "typescript-eslint": "8.56.1",
+    "vitest": "3.0.5"
+  },
+  "packageManager": "pnpm@10.29.2+sha512.bef43fa759d91fd2da4b319a5a0d13ef7a45bb985a3d7342058470f9d2051a3ba8674e629672654686ef9443ad13a82da2beb9eeb3e0221c87b8154fff9d74b8"
+}

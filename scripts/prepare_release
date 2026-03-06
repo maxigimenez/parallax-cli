@@ -1,0 +1,52 @@
+#!/usr/bin/env sh
+set -eu
+
+fail() {
+  echo "prepare_release error: $1" >&2
+  exit 1
+}
+
+require_file() {
+  [ -f "$1" ] || fail "missing file: $1"
+}
+
+require_no_match() {
+  pattern="$1"
+  target="$2"
+  if grep -R "$pattern" "$target" >/dev/null 2>&1; then
+    fail "found forbidden pattern '$pattern' in $target"
+  fi
+}
+
+# Build only runtime packages required by the npm release artifact.
+pnpm --filter @parallax/common build
+pnpm --filter @parallax/agent-adapters build
+pnpm --filter @parallax/cli build
+pnpm --filter @parallax/orchestrator build
+pnpm --filter @parallax/ui build
+require_file "packages/cli/dist/cli/src/index.js"
+require_file "packages/orchestrator/dist/orchestrator/src/index.js"
+require_no_match "@code-swarm/executor" "packages/orchestrator/dist"
+
+# Create a fresh deploy folder for the publishable package.
+rm -rf .release
+pnpm --filter ./packages/parallax deploy --legacy --prod .release
+
+# Break hardlinks produced by pnpm deploy so npm publish accepts the payload.
+tmp_dir="$(mktemp -d)"
+cp -R .release/. "$tmp_dir"
+rm -rf .release/*
+cp -R "$tmp_dir"/. .release
+rm -rf "$tmp_dir"
+
+# Verify release artifacts before publish.
+require_file ".release/bin/parallax.js"
+require_file ".release/node_modules/@parallax/cli/dist/cli/src/index.js"
+require_file ".release/node_modules/@parallax/orchestrator/dist/orchestrator/src/index.js"
+require_no_match "@code-swarm/executor" ".release/node_modules/@parallax/orchestrator/dist"
+
+# Validate npm tarball payload generation.
+(
+  cd .release
+  npm_config_cache=.npm-cache npm pack --dry-run >/dev/null
+)

@@ -1,0 +1,23 @@
+{
+  "name": "@parallax/cli",
+  "version": "0.0.1-alpha.2",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "parallax": "dist/cli/src/index.js"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "start": "tsx src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@parallax/common": "workspace:*",
+    "js-yaml": "^4.1.0",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.3.0"
+  }
+}

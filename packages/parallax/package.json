@@ -1,0 +1,55 @@
+{
+  "name": "parallax-ai",
+  "version": "0.0.1-alpha.2",
+  "type": "module",
+  "bin": {
+    "parallax": "bin/parallax.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "@parallax/agent-adapters": "workspace:*",
+    "@parallax/cli": "workspace:*",
+    "@parallax/common": "workspace:*",
+    "@parallax/orchestrator": "workspace:*",
+    "@parallax/ui": "workspace:*",
+    "@fastify/cors": "11.2.0",
+    "@linear/sdk": "^30.0.0",
+    "better-sqlite3": "^11.8.1",
+    "chalk": "4",
+    "dotenv": "^16.4.7",
+    "fastify": "5.7.4",
+    "figlet": "1.10.0",
+    "js-yaml": "^4.1.0",
+    "log-update": "7.1.0",
+    "p-limit": "^6.1.0",
+    "simple-git": "^3.22.0",
+    "socket.io": "4.8.3",
+    "strip-ansi": "7.1.2",
+    "terminal-size": "4.0.1",
+    "uuid": "^11.0.0"
+  },
+  "bundledDependencies": [
+    "@parallax/agent-adapters",
+    "@parallax/cli",
+    "@parallax/common",
+    "@parallax/orchestrator",
+    "@parallax/ui",
+    "@fastify/cors",
+    "@linear/sdk",
+    "better-sqlite3",
+    "chalk",
+    "dotenv",
+    "fastify",
+    "figlet",
+    "js-yaml",
+    "log-update",
+    "p-limit",
+    "simple-git",
+    "socket.io",
+    "strip-ansi",
+    "terminal-size",
+    "uuid"
+  ]
+}

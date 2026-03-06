@@ -1,0 +1,39 @@
+concurrency: 2
+logs: [info, success, warn, error]
+projects:
+  # - id: revora-mvp
+  #   workspaceDir: /Users/maxi/projects/revora/mvp
+  #   pullFrom:
+  #     provider: linear
+  #     filters:
+  #       team: REV
+  #       state: Todo
+  #       labels: [ai-ready]
+  #   agent:
+  #     provider: gemini
+  #     approvalMode: auto_edit
+  #     sandbox: true
+  #     allowedTools:
+  #       - read_file
+  #       - write_file
+  #       - run_shell_command
+  - id: www
+    workspaceDir: /Users/maxi/projects/www
+    pullFrom:
+      provider: github
+      filters:
+        owner: maxigimenez
+        repo: www
+        state: open
+        labels: [ai-ready]
+    agent:
+      provider: codex
+      model: gpt-5.3-codex
+      approvalMode: auto_edit
+      sandbox: true
+      allowedTools:
+        - read_file
+        - write_file
+        - run_shell_command
+      disableMcp: true
+
