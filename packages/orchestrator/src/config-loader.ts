@@ -1,7 +1,14 @@
 import fs from 'fs/promises'
 import yaml from 'js-yaml'
 import path from 'path'
-import { AppConfig, LogLevel, ProjectConfig } from '@parallax/common'
+import {
+  AppConfig,
+  DEFAULT_API_PORT,
+  DEFAULT_UI_PORT,
+  LogLevel,
+  ProjectConfig,
+  ServerConfig,
+} from '@parallax/common'
 
 const DEFAULT_CONFIG_NAMES = ['parallax.yml', '.parallax/config.yml', '.parallax/config.yaml']
 
@@ -99,6 +106,39 @@ function parseConcurrency(raw: unknown, source: string): number {
   }
 
   return raw
+}
+
+function parsePort(raw: unknown, label: string, fallback: number): number {
+  if (raw === undefined) {
+    return fallback
+  }
+
+  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 65535) {
+    throw new Error(`${label} must be an integer between 1 and 65535.`)
+  }
+
+  return raw
+}
+
+function parseServerConfig(raw: unknown, source: string): ServerConfig {
+  if (raw === undefined) {
+    return {
+      apiPort: DEFAULT_API_PORT,
+      uiPort: DEFAULT_UI_PORT,
+    }
+  }
+
+  assertObject(raw, `server in ${source}`)
+
+  const server = raw as Record<string, unknown>
+  const apiPort = parsePort(server.apiPort, `server.apiPort in ${source}`, DEFAULT_API_PORT)
+  const uiPort = parsePort(server.uiPort, `server.uiPort in ${source}`, DEFAULT_UI_PORT)
+
+  if (apiPort === uiPort) {
+    throw new Error(`server.apiPort and server.uiPort in ${source} must be different.`)
+  }
+
+  return { apiPort, uiPort }
 }
 
 function parseProject(raw: unknown, source: string): ProjectConfig {
@@ -236,6 +276,7 @@ async function validateConfig(raw: Partial<AppConfig>, source: string): Promise<
   return {
     concurrency: parseConcurrency(raw.concurrency, source),
     logs: parseLogs(raw.logs, source),
+    server: parseServerConfig(raw.server, source),
     projects,
   }
 }

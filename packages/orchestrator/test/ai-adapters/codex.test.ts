@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { CodexAdapter } from '../src/codex-adapter.js'
+import { CodexAdapter } from '../../src/ai-adapters/codex-adapter.js'
 import { PlanResultStatus } from '@parallax/common'
 
 describe('CodexAdapter plan mode', () => {
@@ -93,6 +93,8 @@ describe('CodexAdapter plan mode', () => {
     const project = {
       agent: {
         model: 'codex-fast',
+        approvalMode: 'auto_edit',
+        sandbox: true,
         extraArgs: ['--foo', 'bar'],
       },
     } as any
@@ -101,9 +103,42 @@ describe('CodexAdapter plan mode', () => {
 
     const command = mockExecutor.executeCommand.mock.calls[0][0]
     expect(command).toEqual(
-      expect.arrayContaining(['codex', 'exec', '--model', 'codex-fast', '--foo', 'bar', '--'])
+      expect.arrayContaining([
+        'codex',
+        'exec',
+        '--model',
+        'codex-fast',
+        '--full-auto',
+        '--foo',
+        'bar',
+        '--',
+      ])
     )
     expect(command[command.length - 1]).toContain('You are executing an implementation plan.')
+  })
+
+  it('maps default approval and disabled sandbox to codex runtime flags', async () => {
+    const mockExecutor = {
+      executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: 'done' }),
+    }
+
+    const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
+    const task = { id: 'task-200', externalId: 'REV-200', title: 'Execution', description: 'Do work' } as any
+    const project = {
+      agent: {
+        approvalMode: 'default',
+        sandbox: false,
+      },
+    } as any
+
+    await adapter.runTask(task, '/tmp/repo', project, 'approved plan')
+
+    const command = mockExecutor.executeCommand.mock.calls[0][0]
+    expect(command).toEqual(
+      expect.arrayContaining([
+        '--dangerously-bypass-approvals-and-sandbox',
+      ])
+    )
   })
 
   it('adds codex MCP disable overrides when disableMcp is enabled', async () => {
@@ -230,6 +265,7 @@ describe('CodexAdapter plan mode', () => {
 
     const adapter = new CodexAdapter(mockExecutor as any, localLogger as any)
     const task = {
+      id: 'task-108',
       externalId: 'REV-108',
       title: 'Stderr filtering',
       description: 'Noise reduction',
@@ -241,8 +277,8 @@ describe('CodexAdapter plan mode', () => {
     expect(localLogger.error).not.toHaveBeenCalled()
     expect(localLogger.info).not.toHaveBeenCalledWith(
       'OpenAI Codex v0.110.0 (research preview)',
-      task.externalId
+      task.id
     )
-    expect(localLogger.warn).toHaveBeenCalledWith('actual warning from codex', task.externalId)
+    expect(localLogger.warn).toHaveBeenCalledWith('actual warning from codex', task.id)
   })
 })

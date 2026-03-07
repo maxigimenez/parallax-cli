@@ -4,7 +4,6 @@ import type { TaskInfo } from '@/hooks/useParallax'
 import type { AppConfig, ProjectConfig } from '@parallax/common'
 import { Github, Settings } from 'lucide-react'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
-import { projectColor } from '@/lib/task-helpers'
 
 interface TaskSidebarProps {
   selectedTaskId: string | null
@@ -23,6 +22,14 @@ const STATUS_ORDER: TaskStatus[] = [
   TASK_STATUS.FAILED,
   TASK_STATUS.DONE,
 ]
+
+const STATUS_DOT_COLOR: Record<TaskStatus, string> = {
+  [TASK_STATUS.QUEUED]: '#71717a',
+  [TASK_STATUS.RUNNING]: '#3b82f6',
+  [TASK_STATUS.CANCELED]: '#eab308',
+  [TASK_STATUS.FAILED]: '#ef4444',
+  [TASK_STATUS.DONE]: '#22c55e',
+}
 
 export function TaskSidebar({
   selectedTaskId,
@@ -107,7 +114,6 @@ export function TaskSidebar({
           </div>
           <div className="h-[calc(100%-232px)] overflow-y-auto">
             {tasks.map((task) => {
-              const color = projectColor(task.projectId || 'unknown')
               const selected = selectedTaskId === task.id
               return (
                 <button
@@ -121,7 +127,7 @@ export function TaskSidebar({
                   <div className="mb-1 flex items-center gap-2">
                     <span
                       className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: STATUS_DOT_COLOR[task.status] }}
                       aria-hidden
                     />
                     <p className="truncate text-sm font-medium text-zinc-100">{task.id}</p>

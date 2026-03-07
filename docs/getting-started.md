@@ -58,6 +58,9 @@ Provider credentials:
 Example:
 
 ```yaml
+server:
+  apiPort: 3000
+  uiPort: 8080
 concurrency: 2
 logs: [info, success, warn, error]
 projects:
@@ -96,7 +99,8 @@ parallax start --data-dir ./.parallax
 
 Default URL:
 
-- `http://localhost:3000`
+- API: `http://localhost:3000`
+- UI: `http://localhost:8080`
 
 LAN access:
 

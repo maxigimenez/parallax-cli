@@ -2,13 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { createTaskId } from '../src/task-id'
 
 describe('createTaskId', () => {
-  it('returns a compact 12-char hex id', () => {
-    const id = createTaskId()
-    expect(id).toMatch(/^[a-f0-9]{12}$/)
+  it('returns a deterministic hash id', () => {
+    const id = createTaskId('core', 'ENG-123')
+    expect(id).toBe('903440922f42')
   })
 
-  it('returns unique ids across quick calls', () => {
-    const ids = new Set(Array.from({ length: 100 }, () => createTaskId()))
-    expect(ids.size).toBe(100)
+  it('returns the same id for the same project and external id', () => {
+    expect(createTaskId('core', 'ENG-123')).toBe(createTaskId('core', 'ENG-123'))
+  })
+
+  it('returns different ids across projects', () => {
+    expect(createTaskId('core', 'ENG-123')).not.toBe(createTaskId('ops', 'ENG-123'))
+  })
+
+  it('returns a fixed-length hex id', () => {
+    expect(createTaskId('core', 'ENG-123')).toMatch(/^[a-f0-9]{12}$/)
   })
 })

@@ -11,6 +11,10 @@ describe('task helpers', () => {
       {
         concurrency: 1,
         logs: ['info'],
+        server: {
+          apiPort: 3000,
+          uiPort: 8080,
+        },
         projects: [
           {
             id: 'p1',

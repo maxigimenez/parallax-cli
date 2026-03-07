@@ -37,6 +37,14 @@ projects:
 - default: `["info", "success", "warn", "error"]`
 - duplicate values are removed
 
+### `server` (optional)
+
+- type: object
+- defaults:
+  - `apiPort: 3000`
+  - `uiPort: 8080`
+- `apiPort` and `uiPort` must be different integers in the range `1..65535`
+
 ## Project fields
 
 ### `id` (required)
@@ -103,6 +111,9 @@ Provider-specific requirement:
 ## Full example: Linear
 
 ```yaml
+server:
+  apiPort: 3000
+  uiPort: 8080
 concurrency: 2
 logs: [info, success, warn, error]
 projects:
@@ -124,6 +135,9 @@ projects:
 ## Full example: GitHub
 
 ```yaml
+server:
+  apiPort: 3000
+  uiPort: 8080
 concurrency: 1
 projects:
   - id: ui-repo
@@ -147,3 +161,4 @@ projects:
 - `Unsupported agent provider`
 - `Duplicate project id`
 - `concurrency ... must be an integer between 1 and 16`
+- `server.apiPort and server.uiPort ... must be different`

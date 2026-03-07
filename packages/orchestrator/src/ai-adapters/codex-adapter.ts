@@ -33,11 +33,25 @@ export class CodexAdapter extends BaseAgentAdapter {
     super(executor, logger)
   }
 
+  private resolveSandboxMode(project: ProjectConfig): 'workspace-write' | 'danger-full-access' {
+    return project.agent.sandbox === false ? 'danger-full-access' : 'workspace-write'
+  }
+
   private buildCommand(task: Task, project: ProjectConfig, prompt: string): string[] {
     const command = ['codex', 'exec']
+    const sandboxMode = this.resolveSandboxMode(project)
+    const autoEdit = project.agent.approvalMode === 'auto_edit'
 
     if (project.agent.model) {
       command.push('--model', project.agent.model)
+    }
+
+    if (project.agent.sandbox === false) {
+      command.push('--dangerously-bypass-approvals-and-sandbox')
+    } else if (autoEdit) {
+      command.push('--full-auto')
+    } else {
+      command.push('--sandbox', sandboxMode)
     }
 
     if (project.agent.extraArgs?.length) {
@@ -56,8 +70,8 @@ export class CodexAdapter extends BaseAgentAdapter {
     command.push('--', prompt)
 
     this.logger.info(
-      `Codex command profile: model=${project.agent.model || 'default'}`,
-      task.externalId
+      `Codex command profile: model=${project.agent.model || 'default'}, approval=${autoEdit ? 'auto_edit' : 'default'}, sandbox=${sandboxMode}`,
+      task.id
     )
 
     return command
@@ -76,21 +90,21 @@ export class CodexAdapter extends BaseAgentAdapter {
 
       const lowerLine = line.toLowerCase()
       if (lowerLine.includes('retry') || lowerLine.includes('warning')) {
-        this.logger.warn(line, task.externalId)
+        this.logger.warn(line, task.id)
       } else if (
         lowerLine.includes('error') ||
         lowerLine.includes('failed') ||
         lowerLine.includes('fatal') ||
         lowerLine.includes('exception')
       ) {
-        this.logger.error(line, task.externalId)
+        this.logger.error(line, task.id)
       } else {
-        this.logger.info(line, task.externalId)
+        this.logger.info(line, task.id)
       }
       return
     }
 
-    this.logger.info(line, task.externalId)
+    this.logger.info(line, task.id)
   }
 
   private isCodexBannerLine(line: string): boolean {

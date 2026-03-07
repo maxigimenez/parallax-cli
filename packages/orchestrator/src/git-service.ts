@@ -1,8 +1,9 @@
 import { simpleGit, SimpleGit } from 'simple-git'
-import { Task, ProjectConfig, HostExecutor } from '@parallax/common'
+import { Task, ProjectConfig } from '@parallax/common'
+import { HostExecutor } from '@parallax/common/executor'
 import fs from 'fs/promises'
 import path from 'path'
-import { PARALLAX_MANAGED_LABEL } from './github-constants.js'
+import { PARALLAX_MANAGED_LABEL } from './github/constants.js'
 
 export class GitService {
   constructor(private executor: HostExecutor) {}

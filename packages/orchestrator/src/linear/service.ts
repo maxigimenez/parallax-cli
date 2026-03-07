@@ -1,5 +1,5 @@
 import { Task, ProjectConfig } from '@parallax/common'
-import { createTaskId } from './task-id.js'
+import { createTaskId } from '../task-id.js'
 
 type GraphqlResponse<T> = {
   data?: T
@@ -26,10 +26,7 @@ export class LinearService {
     this.endpoint = endpoint
   }
 
-  private async request<T>(
-    query: string,
-    variables?: Record<string, unknown>
-  ): Promise<T> {
+  private async request<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     const response = await fetch(this.endpoint, {
       method: 'POST',
       headers: {
@@ -62,20 +59,17 @@ export class LinearService {
     }
 
     const { filters } = project.pullFrom
-    const filter: any = {}
+    const filter: Record<string, unknown> = {}
 
     if (filters.team) {
       filter.team = { key: { eq: filters.team } }
     }
-
     if (filters.state) {
       filter.state = { name: { eq: filters.state } }
     }
-
     if (filters.labels?.length) {
       filter.labels = { name: { in: filters.labels } }
     }
-
     if (filters.project) {
       filter.project = { name: { eq: filters.project } }
     }
@@ -96,18 +90,16 @@ export class LinearService {
       { filter }
     )
 
-    return data.issues.nodes.map((issue) => {
-      return {
-        id: createTaskId(),
-        externalId: issue.identifier,
-        title: issue.title,
-        description: issue.description || '',
-        status: 'PENDING',
-        projectId: project.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
-    })
+    return data.issues.nodes.map((issue) => ({
+      id: createTaskId(project.id, issue.identifier),
+      externalId: issue.identifier,
+      title: issue.title,
+      description: issue.description || '',
+      status: 'PENDING',
+      projectId: project.id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }))
   }
 
   async markAsInProgress(externalId: string) {
@@ -138,7 +130,9 @@ export class LinearService {
       { teamKey, issueNumber: issueNumberParsed }
     )
     const issue = issueData.issues.nodes[0]
-    if (!issue) return
+    if (!issue) {
+      return
+    }
 
     const viewerData = await this.request<{ viewer: { id: string } }>(
       `
@@ -169,7 +163,9 @@ export class LinearService {
     )
 
     const inProgressState = workflowData.workflowStates.nodes[0]
-    if (!inProgressState) return
+    if (!inProgressState) {
+      return
+    }
 
     await this.request(
       `

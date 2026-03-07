@@ -1,5 +1,6 @@
-import { HostExecutor, ProjectConfig } from '@parallax/common'
-import { PARALLAX_MANAGED_LABEL } from './github-constants.js'
+import { ProjectConfig } from '@parallax/common'
+import { HostExecutor } from '@parallax/common/executor'
+import { PARALLAX_MANAGED_LABEL } from './constants.js'
 
 export interface ManagedPullRequest {
   number: number
@@ -165,9 +166,7 @@ export class GitHubPullRequestService {
         continue
       }
 
-      const timestamp = latestComment.updatedAt
-
-      latestFeedbackAt = maxTimestamp(latestFeedbackAt, timestamp)
+      latestFeedbackAt = maxTimestamp(latestFeedbackAt, latestComment.updatedAt)
       const location = latestComment.path
         ? `${latestComment.path}${latestComment.line ? `:${latestComment.line}` : ''}`
         : 'unknown location'
@@ -190,8 +189,8 @@ export class GitHubPullRequestService {
     }
   }
 
-  private async fetchJson<T>(cwd: string, path: string): Promise<T> {
-    const result = await this.executor.executeCommand(['gh', 'api', path], { cwd })
+  private async fetchJson<T>(cwd: string, apiPath: string): Promise<T> {
+    const result = await this.executor.executeCommand(['gh', 'api', apiPath], { cwd })
 
     if (result.exitCode !== 0) {
       throw new Error(`GitHub CLI failed while fetching PR review data: ${result.output}`)
@@ -274,41 +273,33 @@ export class GitHubPullRequestService {
       }
     `.trim()
 
+    const variables = JSON.stringify({
+      owner,
+      repo,
+      number: pullRequestNumber,
+    })
+
     const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'api',
-        'graphql',
-        '-F',
-        `owner=${owner}`,
-        '-F',
-        `repo=${repo}`,
-        '-F',
-        `number=${pullRequestNumber}`,
-        '-f',
-        `query=${query}`,
-      ],
+      ['gh', 'api', 'graphql', '-f', `query=${query}`, '-f', `variables=${variables}`],
       { cwd }
     )
 
     if (result.exitCode !== 0) {
-      throw new Error(`GitHub CLI failed while fetching PR review data: ${result.output}`)
+      throw new Error(`GitHub CLI failed while querying PR review data: ${result.output}`)
     }
 
     return JSON.parse(result.output || '{}') as PullRequestGraphQLResponse
   }
 }
 
-const normalizeBody = (body?: string) => (body || '').replace(/\s+/g, ' ').trim()
+function normalizeBody(body?: string): string {
+  return body?.replace(/\s+/g, ' ').trim() || ''
+}
 
-const maxTimestamp = (current: string, next?: string) => {
-  if (!next) {
+function maxTimestamp(current: string, candidate?: string): string {
+  if (!candidate) {
     return current
   }
 
-  if (!current || next > current) {
-    return next
-  }
-
-  return current
+  return !current || candidate > current ? candidate : current
 }

@@ -45,16 +45,6 @@ importers:
         specifier: 3.0.5
         version: 3.0.5(@types/node@25.3.0)(jsdom@20.0.3)(lightningcss@1.31.1)
 
-  packages/agent-adapters:
-    dependencies:
-      '@parallax/common':
-        specifier: workspace:*
-        version: link:../common
-    devDependencies:
-      '@types/node':
-        specifier: 25.3.0
-        version: 25.3.0
-
   packages/cli:
     dependencies:
       '@parallax/common':
@@ -125,9 +115,6 @@ importers:
       '@fastify/cors':
         specifier: 11.2.0
         version: 11.2.0
-      '@parallax/agent-adapters':
-        specifier: workspace:*
-        version: link:../agent-adapters
       '@parallax/common':
         specifier: workspace:*
         version: link:../common
@@ -177,9 +164,6 @@ importers:
       '@fastify/cors':
         specifier: 11.2.0
         version: 11.2.0
-      '@parallax/agent-adapters':
-        specifier: workspace:*
-        version: link:../agent-adapters
       '@parallax/cli':
         specifier: workspace:*
         version: link:../cli

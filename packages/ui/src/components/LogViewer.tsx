@@ -70,13 +70,20 @@ export function LogViewer({
     'all'
   )
   const [editablePlan, setEditablePlan] = useState((planMarkdown || planResult || planPrompt || '').trim())
-  const [saving, setSaving] = useState(false)
+  const [approvePending, setApprovePending] = useState(false)
+  const [rejectPending, setRejectPending] = useState(false)
+  const [retryPending, setRetryPending] = useState(false)
+  const [cancelPending, setCancelPending] = useState(false)
 
   const provider = resolveProjectProvider(config, projectId)
   const actionGuard = planActionsState(planState)
 
   useEffect(() => {
     setEditablePlan((planMarkdown || planResult || planPrompt || '').trim())
+    setApprovePending(false)
+    setRejectPending(false)
+    setRetryPending(false)
+    setCancelPending(false)
   }, [taskId, planMarkdown, planPrompt, planResult])
 
   const filteredLogs = useMemo(() => {
@@ -90,11 +97,11 @@ export function LogViewer({
     if (!onApprovePlan || !actionGuard.canEdit) {
       return
     }
-    setSaving(true)
+    setApprovePending(true)
     try {
       await onApprovePlan(taskId, 'operator', editablePlan)
     } finally {
-      setSaving(false)
+      setApprovePending(false)
     }
   }
 
@@ -102,16 +109,43 @@ export function LogViewer({
     if (!onRejectPlan || !actionGuard.canEdit) {
       return
     }
-    setSaving(true)
+    setRejectPending(true)
     try {
       await onRejectPlan(taskId)
     } finally {
-      setSaving(false)
+      setRejectPending(false)
     }
   }
 
-  const canCancel = (status === 'queued' || status === 'running') && Boolean(onCancel)
-  const canRetry = (status === 'failed' || status === 'canceled') && Boolean(onRetry)
+  const onRetryClick = async () => {
+    if (!onRetry || retryPending) {
+      return
+    }
+    setRetryPending(true)
+    try {
+      await onRetry(taskId)
+    } finally {
+      setRetryPending(false)
+    }
+  }
+
+  const onCancelClick = async () => {
+    if (!onCancel || cancelPending) {
+      return
+    }
+    setCancelPending(true)
+    try {
+      await onCancel(taskId)
+    } finally {
+      setCancelPending(false)
+    }
+  }
+
+  const planActionPending = approvePending || rejectPending
+  const canCancel =
+    (status === 'queued' || status === 'running') && Boolean(onCancel) && !cancelPending
+  const canRetry =
+    (status === 'failed' || status === 'canceled') && Boolean(onRetry) && !retryPending
   const cancelReason = canCancel ? '' : 'Cancel is only available for queued or running tasks.'
   const retryReason = canRetry ? '' : 'Retry is available only for failed or canceled tasks.'
 
@@ -132,10 +166,10 @@ export function LogViewer({
                 <TooltipTrigger asChild>
                   <button
                     disabled={!canRetry}
-                    onClick={() => onRetry?.(taskId)}
+                    onClick={onRetryClick}
                     className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-200 hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Retry
+                    {retryPending ? 'Retrying...' : 'Retry'}
                   </button>
                 </TooltipTrigger>
                 {!canRetry && <TooltipContent>{retryReason}</TooltipContent>}
@@ -144,10 +178,10 @@ export function LogViewer({
                 <TooltipTrigger asChild>
                   <button
                     disabled={!canCancel}
-                    onClick={() => onCancel?.(taskId)}
+                    onClick={onCancelClick}
                     className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-200 hover:border-zinc-500 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Cancel
+                    {cancelPending ? 'Cancelling...' : 'Cancel'}
                   </button>
                 </TooltipTrigger>
                 {!canCancel && <TooltipContent>{cancelReason}</TooltipContent>}
@@ -219,9 +253,7 @@ export function LogViewer({
                     ? 'text-red-300'
                     : entry.level === 'warning'
                       ? 'text-amber-300'
-                      : entry.level === 'info'
-                        ? 'text-emerald-300'
-                        : 'text-cyan-300'
+                      : 'text-zinc-300'
                 }`}
               >
                 <span className="text-zinc-500">{new Date(entry.timestamp).toLocaleTimeString()}</span>{' '}
@@ -247,11 +279,11 @@ export function LogViewer({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    disabled={!actionGuard.canEdit || saving}
+                    disabled={!actionGuard.canEdit || planActionPending}
                     onClick={onApprove}
                     className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-2 text-xs text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Approve
+                    {approvePending ? 'Approving...' : 'Approve'}
                   </button>
                 </TooltipTrigger>
                 {!actionGuard.canEdit && <TooltipContent>{actionGuard.reason}</TooltipContent>}
@@ -259,11 +291,11 @@ export function LogViewer({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    disabled={!actionGuard.canEdit || saving}
+                    disabled={!actionGuard.canEdit || planActionPending}
                     onClick={onReject}
                     className="rounded border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    Reject
+                    {rejectPending ? 'Rejecting...' : 'Reject'}
                   </button>
                 </TooltipTrigger>
                 {!actionGuard.canEdit && <TooltipContent>{actionGuard.reason}</TooltipContent>}

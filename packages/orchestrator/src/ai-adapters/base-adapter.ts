@@ -3,9 +3,9 @@ import {
   Logger,
   ProjectConfig,
   AgentResult,
-  LocalExecutor,
   PlanResult,
 } from '@parallax/common'
+import { LocalExecutor } from '@parallax/common/executor'
 
 export abstract class BaseAgentAdapter {
   constructor(
@@ -14,7 +14,7 @@ export abstract class BaseAgentAdapter {
   ) {}
 
   async setupWorkspace(task: Task, workingDir: string): Promise<void> {
-    this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.externalId)
+    this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
   }
 
   abstract runTask(

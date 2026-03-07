@@ -66,12 +66,12 @@ export class GeminiAdapter extends BaseAgentAdapter {
         lowerLine.includes('quota') ||
         lowerLine.includes('retrying')
       ) {
-        this.logger.warn(line, task.externalId)
+        this.logger.warn(line, task.id)
       } else {
-        this.logger.error(line, task.externalId)
+        this.logger.error(line, task.id)
       }
     } else {
-      this.logger.info(line, task.externalId)
+      this.logger.info(line, task.id)
     }
   }
 
@@ -101,7 +101,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
 
     this.logger.info(
       `Gemini command profile: approval=${approvalMode}, sandbox=${project.agent.sandbox !== false ? 'on' : 'off'}`,
-      task.externalId
+      task.id
     )
 
     return command

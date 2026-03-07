@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GitHubPullRequestService } from '../src/github-pr-service'
+import { GitHubPullRequestService } from '../src/github/pull-request-service'
 
 const executeCommandMock = vi.fn()
 

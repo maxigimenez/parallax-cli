@@ -29,6 +29,9 @@ pnpm build
 ## Configuration (`parallax.yml`)
 
 ```yaml
+server:
+  apiPort: 3000
+  uiPort: 8080
 concurrency: 2
 logs: [info, success, warn, error]
 projects:
@@ -51,7 +54,7 @@ projects:
 
 ```bash
 pnpm parallax --version
-pnpm parallax start --config ./parallax.yml --data-dir ./.parallax
+pnpm parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
 pnpm parallax start --data-dir ./.parallax
 pnpm parallax stop --data-dir ./.parallax
 pnpm parallax preflight
@@ -63,7 +66,7 @@ pnpm parallax logs --task ENG-123
 
 Commands:
 
-- `parallax start [--config <path>] [--data-dir <path>]`
+- `parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]`
 - `parallax stop [--data-dir <path>] [--force]`
 - `parallax preflight`
 - `parallax pending [--api <base>] [--config <path>] [--data-dir <path>] [--approve <id|all>] [--reject <id> --reason <text>] [--json]`

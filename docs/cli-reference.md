@@ -26,7 +26,7 @@ Notes:
 Start orchestrator in background.
 
 ```bash
-parallax start [--config <path>] [--data-dir <path>]
+parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]
 ```
 
 Config behavior:
@@ -37,7 +37,7 @@ Config behavior:
 Examples:
 
 ```bash
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
 parallax start --data-dir ./.parallax
 ```
 

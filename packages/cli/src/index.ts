@@ -5,7 +5,7 @@ import fsSync from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import { TaskPlanState } from '@parallax/common'
+import { DEFAULT_API_PORT, DEFAULT_UI_PORT, TaskPlanState, type ServerConfig } from '@parallax/common'
 
 type TaskPendingState = {
   id: string
@@ -63,7 +63,7 @@ type RunningState = {
 }
 
 const DEFAULT_DATA_DIR = path.join(process.cwd(), '.parallax')
-const DEFAULT_API_BASE = 'http://localhost:3000'
+const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
 const DEFAULT_CONFIG_PATH = path.resolve(process.cwd(), 'parallax.yml')
 const MANIFEST_FILE = 'running.json'
 const __filename = fileURLToPath(import.meta.url)
@@ -108,11 +108,17 @@ function parseArg(args: string[], key: string): string | undefined {
     return args[valueIdx + 1]
   }
 
+  const inlineEntry = args.find((entry) => entry.startsWith(`${keyWithPrefix}=`))
+  if (inlineEntry) {
+    return inlineEntry.slice(keyWithPrefix.length + 1)
+  }
+
   return undefined
 }
 
 function hasFlag(args: string[], key: string): boolean {
-  return args.includes(`--${key}`)
+  const keyWithPrefix = `--${key}`
+  return args.includes(keyWithPrefix) || args.some((entry) => entry.startsWith(`${keyWithPrefix}=`))
 }
 
 function parseArgValue(args: string[], key: string): string {
@@ -206,6 +212,74 @@ export function parseConfigProjectIds(raw: string, source: string): Set<string> 
   return new Set(projects)
 }
 
+export function parseServerPortsFromConfig(raw: string, source: string): ServerConfig {
+  const parsed = (loadYamlModule().load(raw) as { server?: unknown }) || {}
+  const server = parsed.server
+
+  if (server === undefined) {
+    return {
+      apiPort: DEFAULT_API_PORT,
+      uiPort: DEFAULT_UI_PORT,
+    }
+  }
+
+  if (!server || typeof server !== 'object' || Array.isArray(server)) {
+    throw new Error(`Invalid server config at ${source}.`)
+  }
+
+  const apiPort = (server as { apiPort?: unknown }).apiPort
+  const uiPort = (server as { uiPort?: unknown }).uiPort
+
+  const parsePort = (value: unknown, label: string, fallback: number) => {
+    if (value === undefined) {
+      return fallback
+    }
+
+    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
+      throw new Error(`${label} in ${source} must be an integer between 1 and 65535.`)
+    }
+
+    return value
+  }
+
+  const resolved = {
+    apiPort: parsePort(apiPort, 'server.apiPort', DEFAULT_API_PORT),
+    uiPort: parsePort(uiPort, 'server.uiPort', DEFAULT_UI_PORT),
+  }
+
+  if (resolved.apiPort === resolved.uiPort) {
+    throw new Error(`server.apiPort and server.uiPort in ${source} must be different.`)
+  }
+
+  return resolved
+}
+
+async function resolveServerPorts(configPath: string): Promise<ServerConfig> {
+  const raw = await fs.readFile(configPath, 'utf8')
+  return parseServerPortsFromConfig(raw, configPath)
+}
+
+async function resolveDefaultApiBase(dataDir?: string, configPath?: string): Promise<string> {
+  if (configPath && (await ensureFileExists(configPath))) {
+    const server = await resolveServerPorts(configPath)
+    return `http://localhost:${server.apiPort}`
+  }
+
+  if (dataDir) {
+    try {
+      const manifest = await loadRunningState(dataDir)
+      if (await ensureFileExists(manifest.configPath)) {
+        const server = await resolveServerPorts(manifest.configPath)
+        return `http://localhost:${server.apiPort}`
+      }
+    } catch {
+      // Fall back to defaults when no running manifest exists.
+    }
+  }
+
+  return DEFAULT_API_BASE
+}
+
 export function scopePendingTasks(
   tasks: TaskPendingState[],
   allowedProjectIds: Set<string> | undefined
@@ -268,7 +342,7 @@ export function parseStopOptions(args: string[]): StopCommandOptions {
 function printUsage(): void {
   const text = `Usage:
   parallax --version
-  parallax start [--config <path>] [--data-dir <path>]
+  parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]
   parallax pending [--api <base>] [--config <path>] [--data-dir <path>] [--approve <id|all>] [--reject <id> --reason <text>] [--json]
   parallax preflight
   parallax retry <task-id> [--api <base>] [--mode <full|execution>]
@@ -286,7 +360,7 @@ Commands:
   logs       Tail task logs from orchestrator API.
 
 Examples:
-  parallax start --config ./parallax.yml --data-dir ./.parallax
+  parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
   parallax start --data-dir ./.parallax
   parallax pending --approve all
   parallax preflight
@@ -422,6 +496,30 @@ function buildEnvConfig(configPath: string | undefined, dataDir: string) {
   env.PARALLAX_DB_PATH = path.join(dataDir, 'parallax.db')
 
   return env
+}
+
+async function resolveEnvFilePath(args: string[], configPath: string): Promise<string | undefined> {
+  const explicitEnvFile = parseOptionalArg(args, 'env-file')
+  if (explicitEnvFile) {
+    const resolved = resolvePath(explicitEnvFile)
+    if (!(await ensureFileExists(resolved))) {
+      throw new Error(`Env file not found: ${resolved}`)
+    }
+
+    return resolved
+  }
+
+  const configRelativeEnv = path.resolve(path.dirname(configPath), '.env')
+  if (await ensureFileExists(configRelativeEnv)) {
+    return configRelativeEnv
+  }
+
+  const cwdEnv = path.resolve(process.cwd(), '.env')
+  if (await ensureFileExists(cwdEnv)) {
+    return cwdEnv
+  }
+
+  return undefined
 }
 
 async function validateConfigFile(configPath: string): Promise<void> {
@@ -569,11 +667,17 @@ async function runStart(args: string[]) {
   }
 
   await validateConfigFile(configPath)
+  const server = await resolveServerPorts(configPath)
+  const envFilePath = await resolveEnvFilePath(args, configPath)
 
   const env = buildEnvConfig(configPath, dataDir)
   let orchestratorPid = 0
+  let uiPid = 0
+  const workspaceDevMode = process.env.NODE_ENV === 'dev'
   const orchestratorStdoutPath = path.join(dataDir, 'orchestrator.stdout.log')
   const orchestratorStderrPath = path.join(dataDir, 'orchestrator.stderr.log')
+  const uiStdoutPath = path.join(dataDir, 'ui.stdout.log')
+  const uiStderrPath = path.join(dataDir, 'ui.stderr.log')
   const frames = ['|', '/', '-', '\\']
   let frameIndex = 0
   const spinnerEnabled = Boolean(process.stdout.isTTY)
@@ -585,32 +689,83 @@ async function runStart(args: string[]) {
       }, 100)
     : undefined
   if (!spinnerEnabled) {
-    console.log('Starting orchestrator and waiting for API...')
+    console.log(
+      workspaceDevMode
+        ? 'Starting orchestrator and UI in development mode...'
+        : 'Starting orchestrator and waiting for API...'
+    )
   }
 
   try {
-    const orchestratorEntry = resolveOrchestratorEntryPoint()
-    orchestratorPid = spawnDetached(
-      process.execPath,
-      [orchestratorEntry],
-      process.cwd(),
-      env,
-      {
-        stdoutPath: orchestratorStdoutPath,
-        stderrPath: orchestratorStderrPath,
-      }
-    )
+    if (workspaceDevMode) {
+      orchestratorPid = spawnDetached(
+        process.execPath,
+        [
+          ...(envFilePath ? [`--env-file=${envFilePath}`] : []),
+          '--import',
+          'tsx',
+          path.resolve(ROOT_DIR, 'packages/orchestrator/src/index.ts'),
+        ],
+        ROOT_DIR,
+        {
+          ...env,
+          PARALLAX_UI_DEV: '1',
+        },
+        {
+          stdoutPath: orchestratorStdoutPath,
+          stderrPath: orchestratorStderrPath,
+        }
+      )
+      uiPid = spawnDetached(
+        'pnpm',
+        [
+          '--filter',
+          '@parallax/ui',
+          'start',
+          '--',
+          '--host',
+          '0.0.0.0',
+          '--port',
+          String(server.uiPort),
+        ],
+        ROOT_DIR,
+        {
+          VITE_PARALLAX_API_BASE: `http://localhost:${server.apiPort}`,
+        },
+        {
+          stdoutPath: uiStdoutPath,
+          stderrPath: uiStderrPath,
+        }
+      )
+    } else {
+      const orchestratorEntry = resolveOrchestratorEntryPoint()
+      orchestratorPid = spawnDetached(
+        process.execPath,
+        [...(envFilePath ? [`--env-file=${envFilePath}`] : []), orchestratorEntry],
+        process.cwd(),
+        env,
+        {
+          stdoutPath: orchestratorStdoutPath,
+          stderrPath: orchestratorStderrPath,
+        }
+      )
+    }
+
     if (orchestratorPid <= 0) {
       throw new Error('Failed to spawn orchestrator process.')
     }
+    if (workspaceDevMode && uiPid <= 0) {
+      throw new Error('Failed to spawn UI process.')
+    }
 
-    const apiUrl = `${DEFAULT_API_BASE}/tasks`
+    const apiUrl = `http://localhost:${server.apiPort}/tasks`
     await waitForUrlHealth(apiUrl, 'Orchestrator API')
+    await waitForUrlHealth(`http://localhost:${server.uiPort}`, 'Parallax UI')
     if (timer) {
       clearInterval(timer)
       process.stdout.write('\r')
     }
-    console.log('Orchestrator API is ready.')
+    console.log('Parallax API and UI are ready.')
 
     const manifestPath = path.join(dataDir, MANIFEST_FILE)
     await fs.writeFile(
@@ -621,6 +776,7 @@ async function runStart(args: string[]) {
           configPath,
           dataDir,
           orchestratorPid,
+          uiPid: uiPid || undefined,
         },
         null,
         2
@@ -629,8 +785,8 @@ async function runStart(args: string[]) {
 
     console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
     console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
-    console.log(`${DIM}Dashboard:${RESET} http://localhost:3000`)
-    console.log(`${DIM}API:${RESET} http://localhost:3000`)
+    console.log(`${DIM}Dashboard:${RESET} http://localhost:${server.uiPort}`)
+    console.log(`${DIM}API:${RESET} http://localhost:${server.apiPort}`)
     console.log('')
   } catch (error) {
     if (timer) {
@@ -643,6 +799,7 @@ async function runStart(args: string[]) {
     const stderrTail = await readFileTail(orchestratorStderrPath)
 
     await stopProcessBestEffort(orchestratorPid, 'orchestrator', true)
+    await stopProcessBestEffort(uiPid, 'ui', true)
 
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(
@@ -650,15 +807,24 @@ async function runStart(args: string[]) {
 
 Startup diagnostics:
 - orchestrator PID: ${orchestratorPid || 'n/a'}
+- ui PID: ${uiPid || 'n/a'}
 - process alive at failure: ${processAlive ? 'yes' : 'no'}
 - stdout log: ${orchestratorStdoutPath}
 - stderr log: ${orchestratorStderrPath}
+- ui stdout log: ${uiStdoutPath}
+- ui stderr log: ${uiStderrPath}
 
 Recent stderr:
 ${stderrTail}
 
 Recent stdout:
-${stdoutTail}`
+${stdoutTail}
+
+Recent UI stderr:
+${await readFileTail(uiStderrPath)}
+
+Recent UI stdout:
+${await readFileTail(uiStdoutPath)}`
     )
   }
 }
@@ -704,8 +870,8 @@ async function runPending(args: string[]) {
   const options = parsePendingOptions(args)
 
   const dataDir = resolvePath(options.dataDir)
-  const apiBase = options.apiBase
   const configPath = options.configPath ? resolvePath(options.configPath) : undefined
+  const apiBase = options.apiBase || (await resolveDefaultApiBase(dataDir, configPath))
 
   if (options.reject && !options.reason) {
     throw new Error('Reject action requires --reason.')
@@ -800,7 +966,7 @@ export function parseLogsOptions(args: string[]): LogsCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args, 'api') || DEFAULT_API_BASE,
+    apiBase: parseOptionalArg(args, 'api') || '',
     taskId: taskId || undefined,
     since,
   }
@@ -808,6 +974,7 @@ export function parseLogsOptions(args: string[]): LogsCommandOptions {
 
 async function runLogs(args: string[]) {
   const options = parseLogsOptions(args)
+  const apiBase = options.apiBase || (await resolveDefaultApiBase(DEFAULT_DATA_DIR))
   let cursor = options.since ?? 0
   let seenAtCursor = new Set<string>()
 
@@ -821,7 +988,7 @@ async function runLogs(args: string[]) {
     }
 
     const response = await fetchJson<{ logs: TaskLogsApiRecord[] }>(
-      `${options.apiBase}/logs?${params.toString()}`
+      `${apiBase}/logs?${params.toString()}`
     )
     for (const entry of response.logs) {
       const signature = `${entry.timestamp}|${entry.level}|${entry.icon}|${entry.message}`
@@ -861,7 +1028,7 @@ export function parseRetryOptions(args: string[]): RetryCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args.slice(1), 'api') || DEFAULT_API_BASE,
+    apiBase: parseOptionalArg(args.slice(1), 'api') || '',
     taskId,
     mode: rawMode,
   }
@@ -869,7 +1036,8 @@ export function parseRetryOptions(args: string[]): RetryCommandOptions {
 
 async function runRetry(args: string[]) {
   const options = parseRetryOptions(args)
-  await postJson(`${options.apiBase}/tasks/${encodeURIComponent(options.taskId)}/retry`, {
+  const apiBase = options.apiBase || (await resolveDefaultApiBase(DEFAULT_DATA_DIR))
+  await postJson(`${apiBase}/tasks/${encodeURIComponent(options.taskId)}/retry`, {
     mode: options.mode,
   })
   console.log(`Retried: ${options.taskId} (mode=${options.mode})`)
@@ -882,14 +1050,15 @@ export function parseCancelOptions(args: string[]): CancelCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args.slice(1), 'api') || DEFAULT_API_BASE,
+    apiBase: parseOptionalArg(args.slice(1), 'api') || '',
     taskId,
   }
 }
 
 async function runCancel(args: string[]) {
   const options = parseCancelOptions(args)
-  await postJson(`${options.apiBase}/tasks/${encodeURIComponent(options.taskId)}/cancel`, {})
+  const apiBase = options.apiBase || (await resolveDefaultApiBase(DEFAULT_DATA_DIR))
+  await postJson(`${apiBase}/tasks/${encodeURIComponent(options.taskId)}/cancel`, {})
   console.log(`Canceled: ${options.taskId}`)
 }
 
@@ -1062,7 +1231,7 @@ export function parsePendingOptions(args: string[]): PendingCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args, 'api') || DEFAULT_API_BASE,
+    apiBase: parseOptionalArg(args, 'api') || '',
     dataDir: parseOptionalArg(args, 'data-dir') || DEFAULT_DATA_DIR,
     configPath: parseOptionalArg(args, 'config'),
     approve,

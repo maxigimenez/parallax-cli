@@ -6,7 +6,6 @@ Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 
 - `packages/orchestrator`: polling, task state machine, API.
 - `packages/ui`: dashboard and task observability.
-- `packages/agent-adapters`: Gemini and Codex plan/execute adapters.
 - `packages/common`: shared models and execution interfaces.
 - `packages/cli`: control CLI (`parallax start|stop|provision|pending|logs`).
 
@@ -17,15 +16,30 @@ Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 - Add unit tests for behavior changes.
 - Keep prompt surfaces bounded to their action (plan vs execution).
 - Avoid hidden compatibility behavior. If required configuration is missing, fail fast with a clear error.
+- Use `pnpm parallax <command>` for local manual testing so development matches the published npm package entrypoint.
 
 ## Workflow
 
 ```bash
 pnpm install
+pnpm parallax preflight
 pnpm test
 pnpm build
 pnpm lint
 ```
+
+### Local runtime
+
+Use the CLI entrypoint for all local runtime checks:
+
+```bash
+pnpm parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
+pnpm parallax pending --data-dir ./.parallax
+pnpm parallax logs --data-dir ./.parallax
+pnpm parallax stop --data-dir ./.parallax
+```
+
+Do not start the orchestrator or UI directly from package-level scripts for normal development flows.
 
 ### CLI test guidance
 

@@ -20,7 +20,6 @@ require_no_match() {
 
 # Build only runtime packages required by the npm release artifact.
 pnpm --filter @parallax/common build
-pnpm --filter @parallax/agent-adapters build
 pnpm --filter @parallax/cli build
 pnpm --filter @parallax/orchestrator build
 pnpm --filter @parallax/ui build
@@ -157,7 +156,6 @@ PY
 require_file ".release/bin/parallax.js"
 require_file ".release/node_modules/@parallax/cli/dist/cli/src/index.js"
 require_file ".release/node_modules/@parallax/orchestrator/dist/orchestrator/src/index.js"
-require_file ".release/node_modules/@parallax/agent-adapters/dist/agent-adapters/src/index.js"
 require_file ".release/node_modules/js-yaml/index.js"
 require_file ".release/node_modules/yocto-queue/index.js"
 require_no_match "@code-swarm/executor" ".release/node_modules/@parallax/orchestrator/dist"

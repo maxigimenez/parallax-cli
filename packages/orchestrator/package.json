@@ -9,7 +9,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@parallax/agent-adapters": "workspace:*",
     "@parallax/common": "workspace:*",
     "@fastify/cors": "11.2.0",
     "chalk": "4",

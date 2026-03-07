@@ -6,7 +6,7 @@
     "moduleResolution": "NodeNext",
     "paths": {
       "@parallax/common": ["packages/common/src/index.ts"],
-      "@parallax/agent-adapters": ["packages/agent-adapters/src/index.ts"],
+      "@parallax/common/executor": ["packages/common/src/executor.ts"],
       "@parallax/orchestrator": ["packages/orchestrator/src/index.ts"],
       "@parallax/ui": ["packages/ui/src/main.tsx"]
     },

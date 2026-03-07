@@ -1,5 +1,6 @@
-import { Task, ProjectConfig, HostExecutor } from '@parallax/common'
-import { createTaskId } from './task-id.js'
+import { Task, ProjectConfig } from '@parallax/common'
+import { HostExecutor } from '@parallax/common/executor'
+import { createTaskId } from '../task-id.js'
 
 interface GitHubIssueSummary {
   number: number
@@ -81,7 +82,7 @@ export class GitHubService {
     const issues = JSON.parse(result.output || '[]') as GitHubIssueSummary[]
 
     return issues.map((issue) => ({
-      id: createTaskId(),
+      id: createTaskId(project.id, `${owner}/${repo}#${issue.number}`),
       externalId: `${owner}/${repo}#${issue.number}`,
       title: issue.title,
       description: issue.body || '',

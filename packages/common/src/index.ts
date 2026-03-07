@@ -77,10 +77,19 @@ export interface ProjectConfig {
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'success'
 
+export interface ServerConfig {
+  apiPort: number
+  uiPort: number
+}
+
+export const DEFAULT_API_PORT = 3000
+export const DEFAULT_UI_PORT = 8080
+
 export interface AppConfig {
   projects: ProjectConfig[]
   concurrency: number
   logs: LogLevel[] // Replaces logLevel
+  server: ServerConfig
 }
 
 export interface AgentResult {
@@ -108,11 +117,3 @@ export interface Logger {
   warn: (msg: string, taskId?: string) => void
   error: (msg: string, taskId?: string) => void
 }
-
-export function createTaskId(): string {
-  const random = Math.random().toString(36).slice(2, 8)
-  const timestamp = Date.now().toString(36).slice(-4)
-  return `${timestamp}${random}`.slice(0, 10)
-}
-
-export * from './executor.js'

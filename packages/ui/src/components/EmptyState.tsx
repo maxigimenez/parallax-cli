@@ -1,5 +1,10 @@
 import { WifiOff } from 'lucide-react'
 
+const API_BASE =
+  window.__PARALLAX_RUNTIME_CONFIG__?.apiBase ||
+  import.meta.env.VITE_PARALLAX_API_BASE ||
+  'http://localhost:3000'
+
 interface EmptyStateProps {
   view: 'tasks' | 'settings'
   isConnected: boolean
@@ -15,7 +20,7 @@ export function EmptyState({ view, isConnected, hasTasks, waitingTasks }: EmptyS
           <WifiOff className="mx-auto mb-3 h-7 w-7 text-red-400" />
           <h2 className="mb-2 text-sm font-semibold text-red-300">Orchestrator Offline</h2>
           <p className="text-xs text-zinc-400">
-            Could not connect to the Parallax backend on `http://localhost:3000`.
+            Could not connect to the Parallax backend on <code>{API_BASE}</code>.
           </p>
         </div>
       </div>

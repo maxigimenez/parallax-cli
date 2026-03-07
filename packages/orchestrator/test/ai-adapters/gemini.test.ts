@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { GeminiAdapter } from '../src/gemini-adapter.js'
+import { GeminiAdapter } from '../../src/ai-adapters/gemini-adapter.js'
 import { PlanResultStatus } from '@parallax/common'
 
 describe('GeminiAdapter', () => {

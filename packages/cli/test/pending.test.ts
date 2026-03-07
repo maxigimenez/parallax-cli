@@ -133,7 +133,7 @@ describe('CLI pending scope and approval helpers', () => {
     const options = parseRetryOptions(['eng-123'])
     expect(options.taskId).toBe('eng-123')
     expect(options.mode).toBe('full')
-    expect(options.apiBase).toBe('http://localhost:3000')
+    expect(options.apiBase).toBe('')
   })
 
   it('parses retry options with explicit execution mode', () => {

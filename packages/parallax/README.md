@@ -24,6 +24,9 @@ parallax start --config ./parallax.yml
 ## Example `parallax.yml` (GitHub pull source)
 
 ```yaml
+server:
+  apiPort: 3000
+  uiPort: 8080
 concurrency: 1
 logs: [info, success, warn, error]
 projects:

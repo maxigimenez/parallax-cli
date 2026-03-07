@@ -9,7 +9,6 @@
     "bin"
   ],
   "dependencies": {
-    "@parallax/agent-adapters": "workspace:*",
     "@parallax/cli": "workspace:*",
     "@parallax/common": "workspace:*",
     "@parallax/orchestrator": "workspace:*",
@@ -28,7 +27,6 @@
     "uuid": "11.0.0"
   },
   "bundledDependencies": [
-    "@parallax/agent-adapters",
     "@parallax/cli",
     "@parallax/common",
     "@parallax/orchestrator",
