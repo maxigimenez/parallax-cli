@@ -36,6 +36,7 @@ import {
 import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') })
 
@@ -962,12 +963,24 @@ async function main() {
 
   const currentFilePath = fileURLToPath(import.meta.url)
   const orchestratorDistDir = path.dirname(currentFilePath)
-  const bundledUiDist = path.resolve(orchestratorDistDir, '../../ui/dist')
+  const require = createRequire(import.meta.url)
+  let bundledUiDist: string | undefined
+  try {
+    bundledUiDist = path.dirname(require.resolve('@parallax/ui/dist/index.html'))
+  } catch {
+    bundledUiDist = undefined
+  }
   const workspaceUiDist = path.resolve(process.cwd(), '../ui/dist')
   const envUiDist = process.env.PARALLAX_UI_DIST
     ? path.resolve(process.env.PARALLAX_UI_DIST)
     : undefined
-  const uiDistCandidates = [envUiDist, bundledUiDist, workspaceUiDist].filter(Boolean) as string[]
+  const legacyBundledUiDist = path.resolve(orchestratorDistDir, '../../ui/dist')
+  const uiDistCandidates = [
+    envUiDist,
+    bundledUiDist,
+    legacyBundledUiDist,
+    workspaceUiDist,
+  ].filter(Boolean) as string[]
   const uiDistPath = uiDistCandidates.find((candidate) => fs.existsSync(candidate))
 
   if (uiDistPath) {

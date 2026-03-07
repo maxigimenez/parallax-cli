@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import { DatabaseSync } from 'node:sqlite'
 import { Task, TaskPlanState, TaskStatus } from '@parallax/common'
 import path from 'path'
 
@@ -9,7 +9,7 @@ const dbPath = process.env.PARALLAX_DB_PATH
     ? path.resolve(process.env.PARALLAX_DATA_DIR, 'parallax.db')
     : defaultDbPath
 
-const db = new Database(dbPath === 'memory' ? ':memory:' : dbPath)
+const db = new DatabaseSync(dbPath === 'memory' ? ':memory:' : dbPath)
 
 // Initialize schema
 db.exec(`
@@ -142,7 +142,7 @@ export const dbService = {
   },
 
   listTasks(): Task[] {
-    return db.prepare('SELECT * FROM tasks ORDER BY updatedAt DESC').all() as Task[]
+    return db.prepare('SELECT * FROM tasks ORDER BY updatedAt DESC').all() as unknown as Task[]
   },
 
   getLogsByTaskExternalId(taskExternalId: string) {
@@ -159,7 +159,7 @@ export const dbService = {
   },
 
   getPendingTasks(): Task[] {
-    return db.prepare("SELECT * FROM tasks WHERE status = 'PENDING'").all() as Task[]
+    return db.prepare("SELECT * FROM tasks WHERE status = 'PENDING'").all() as unknown as Task[]
   },
 
   updateTaskStatus(id: string, status: TaskStatus) {
@@ -255,7 +255,7 @@ export const dbService = {
 
   updateTaskReviewState(id: string, reviewState: Task['reviewState']) {
     db.prepare('UPDATE tasks SET reviewState = ?, updatedAt = ? WHERE id = ?').run(
-      reviewState,
+      reviewState ?? 'NONE',
       Date.now(),
       id
     )

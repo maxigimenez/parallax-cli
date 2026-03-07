@@ -1,6 +1,5 @@
 import chalk from 'chalk'
 import stripAnsi from 'strip-ansi'
-import figlet from 'figlet'
 import { LogLevel, Logger } from '@parallax/common'
 import { Server as SocketServer } from 'socket.io'
 import { dbService } from './database.js'
@@ -96,7 +95,7 @@ export const clearTaskState = (taskId: string) => {
 }
 
 export const printHeader = () => {
-  console.log('\n' + chalk.cyan(figlet.textSync('Parallax', { font: 'Slant' })))
+  console.log(`\n${chalk.cyan('parallax_')}`)
   console.log(chalk.dim('─'.repeat(process.stdout.columns || 80)))
 }
 

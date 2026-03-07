@@ -1,6 +1,6 @@
 {
   "name": "parallax",
-  "version": "0.0.1-alpha.2",
+  "version": "0.0.1-alpha.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,6 +15,7 @@
     "ui": "pnpm --filter ./packages/ui dev",
     "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
     "prepare:release": "sh ./scripts/prepare_release",
+    "release": "cd .release && npm_config_cache=.npm-cache npm publish --tag alpha --access public",
     "release:pack": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm pack",
     "release:publish": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm publish --access public"
   },

@@ -2,6 +2,10 @@
 
 ## 1. Install
 
+Requirements:
+
+- Node.js `>= 22`
+
 Install Parallax globally:
 
 ```bash
@@ -24,6 +28,7 @@ parallax preflight
 
 `preflight` checks:
 
+- Node.js version (`>= 22`)
 - `git` CLI
 - `pnpm` CLI
 - `gh` CLI

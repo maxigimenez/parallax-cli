@@ -5,7 +5,6 @@ import fsSync from 'node:fs'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
-import yaml from 'js-yaml'
 import { TaskPlanState } from '@parallax/common'
 
 type TaskPendingState = {
@@ -72,6 +71,18 @@ const __dirname = path.dirname(__filename)
 
 const CLI_VERSION = '0.0.1'
 const ROOT_DIR = findWorkspaceRoot(__dirname)
+const requireFromCli = createRequire(import.meta.url)
+
+function loadYamlModule() {
+  try {
+    return requireFromCli('js-yaml') as { load: (input: string) => unknown }
+  } catch (error) {
+    throw new Error(
+      'Missing runtime dependency "js-yaml". Reinstall parallax-ai (npm i -g parallax-ai@alpha).',
+      { cause: error }
+    )
+  }
+}
 
 function findWorkspaceRoot(startDir: string): string {
   let current = startDir
@@ -170,7 +181,7 @@ function parseRunningState(raw: string, source: string): RunningState {
 }
 
 export function parseConfigProjectIds(raw: string, source: string): Set<string> {
-  const parsed = (yaml.load(raw) as { projects?: unknown }) || {}
+  const parsed = (loadYamlModule().load(raw) as { projects?: unknown }) || {}
   if (
     !parsed ||
     typeof parsed !== 'object' ||
@@ -373,14 +384,13 @@ function spawnDetached(
 }
 
 function resolveOrchestratorEntryPoint(): string {
-  const require = createRequire(import.meta.url)
   const packageCandidates = [
     '@parallax/orchestrator/dist/orchestrator/src/index.js',
     '@parallax/orchestrator/dist/index.js',
   ]
   for (const candidate of packageCandidates) {
     try {
-      return require.resolve(candidate)
+      return requireFromCli.resolve(candidate)
     } catch {
       // try next candidate
     }
@@ -416,7 +426,7 @@ function buildEnvConfig(configPath: string | undefined, dataDir: string) {
 
 async function validateConfigFile(configPath: string): Promise<void> {
   const raw = await fs.readFile(configPath, 'utf8')
-  const parsed = (yaml.load(raw) || {}) as { projects?: unknown }
+  const parsed = (loadYamlModule().load(raw) || {}) as { projects?: unknown }
 
   if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
     throw new Error(`Invalid parallax config at ${configPath}`)
@@ -535,14 +545,24 @@ async function readFileTail(filePath: string, maxLines: number = 30): Promise<st
 }
 
 async function runStart(args: string[]) {
+  const CYAN = '\x1b[36m'
+  const BLUE = '\x1b[34m'
+  const GREEN = '\x1b[32m'
+  const DIM = '\x1b[2m'
+  const RESET = '\x1b[0m'
+
   const configArg = hasFlag(args, 'config') ? parseArgValue(args, 'config') : undefined
   const dataDir = resolvePath(parseOptionalArg(args, 'data-dir') || DEFAULT_DATA_DIR)
 
   await fs.mkdir(dataDir, { recursive: true })
 
   const configPath = configArg ? resolvePath(configArg) : DEFAULT_CONFIG_PATH
-  console.log(`Config path: ${configPath}`)
-  console.log(`Data dir: ${dataDir}`)
+
+  console.log('')
+  console.log(`${CYAN}⏳ Initializing Parallax...${RESET}`)
+  console.log(`${BLUE}📄 Config:${RESET} ${DIM}${configPath}${RESET}`)
+  console.log(`${BLUE}📁 Data Dir:${RESET} ${DIM}${dataDir}${RESET}`)
+  console.log('')
 
   if (!(await ensureFileExists(configPath))) {
     throw new Error(`Config path not found: ${configPath}`)
@@ -607,12 +627,11 @@ async function runStart(args: string[]) {
       )
     )
 
-    console.log('Parallax started in background.')
-    console.log(`Config: ${configPath}`)
-    console.log(`Data dir: ${dataDir}`)
-    console.log(`Orchestrator PID: ${orchestratorPid}`)
-    console.log('Dashboard: http://localhost:3000')
-    console.log('API: http://localhost:3000')
+    console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
+    console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
+    console.log(`${DIM}Dashboard:${RESET} http://localhost:3000`)
+    console.log(`${DIM}API:${RESET} http://localhost:3000`)
+    console.log('')
   } catch (error) {
     if (timer) {
       clearInterval(timer)
@@ -921,6 +940,11 @@ function printVerifyChecks(checks: VerifyCheck[]) {
   }
 }
 
+function isSupportedNodeVersion(version: string): boolean {
+  const major = Number.parseInt(version.replace(/^v/, '').split('.')[0] || '0', 10)
+  return Number.isFinite(major) && major >= 22
+}
+
 async function runPreflight(args: string[]) {
   parsePreflightOptions(args)
   const checks: VerifyCheck[] = []
@@ -940,11 +964,32 @@ async function runPreflight(args: string[]) {
   }
 
   try {
+    const nodeOk = isSupportedNodeVersion(process.version)
+    checks.push({
+      name: 'Node.js >= 22',
+      ok: nodeOk,
+      required: true,
+      detail: nodeOk ? undefined : `Current: ${process.version}`,
+    })
+
     const gitOk = await commandExists('git')
     checks.push({ name: 'git CLI', ok: gitOk, required: true })
 
     const pnpmOk = await commandExists('pnpm')
     checks.push({ name: 'pnpm CLI', ok: pnpmOk, required: true })
+
+    let yamlOk = true
+    try {
+      loadYamlModule()
+    } catch {
+      yamlOk = false
+    }
+    checks.push({
+      name: 'Runtime dependency: js-yaml',
+      ok: yamlOk,
+      required: true,
+      detail: yamlOk ? undefined : 'Reinstall parallax-ai globally.',
+    })
 
     const ghOk = await commandExists('gh')
     checks.push({ name: 'gh CLI', ok: ghOk, required: true })

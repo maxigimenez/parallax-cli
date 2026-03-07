@@ -39,11 +39,129 @@ rm -rf .release/*
 cp -R "$tmp_dir"/. .release
 rm -rf "$tmp_dir"
 
+# Materialize all symlinks inside node_modules into real files/directories so
+# npm global installs don't end up with dangling pnpm-style links.
+python3 - <<'PY'
+import os
+import shutil
+
+root = '.release/node_modules'
+if not os.path.isdir(root):
+    raise SystemExit(0)
+
+def list_symlinks(base: str):
+    results = []
+    for current, dirs, files in os.walk(base, followlinks=False):
+        for name in dirs + files:
+            candidate = os.path.join(current, name)
+            if os.path.islink(candidate):
+                results.append(candidate)
+    return results
+
+materialized = 0
+while True:
+    symlinks = list_symlinks(root)
+    if not symlinks:
+        break
+
+    changed = 0
+    for path in symlinks:
+        target = os.path.realpath(path)
+        if not os.path.exists(target):
+            raise RuntimeError(f'dangling symlink: {path} -> {os.readlink(path)}')
+
+        os.unlink(path)
+        if os.path.isdir(target):
+            shutil.copytree(target, path, symlinks=False)
+        else:
+            shutil.copy2(target, path, follow_symlinks=True)
+        materialized += 1
+        changed += 1
+
+    if changed == 0:
+        break
+
+remaining = len(list_symlinks(root))
+if remaining:
+    raise RuntimeError(f'failed to materialize all symlinks ({remaining} remain)')
+
+print(f'prepare_release: materialized {materialized} symlink(s)')
+PY
+
+# Hoist transitive runtime dependencies exposed in .pnpm/node_modules so
+# ESM resolution works after npm packs/extracts the release payload.
+python3 - <<'PY'
+import os
+import shutil
+
+root = '.release/node_modules'
+hoist_root = os.path.join(root, '.pnpm', 'node_modules')
+if not os.path.isdir(hoist_root):
+    raise SystemExit(0)
+
+hoisted = 0
+for name in os.listdir(hoist_root):
+    source = os.path.join(hoist_root, name)
+    target = os.path.join(root, name)
+
+    if name.startswith('@'):
+        os.makedirs(target, exist_ok=True)
+        for scoped_name in os.listdir(source):
+            scoped_source = os.path.join(source, scoped_name)
+            scoped_target = os.path.join(target, scoped_name)
+            if os.path.exists(scoped_target):
+                continue
+            if os.path.isdir(scoped_source):
+                shutil.copytree(scoped_source, scoped_target, symlinks=False)
+            else:
+                shutil.copy2(scoped_source, scoped_target, follow_symlinks=True)
+            hoisted += 1
+        continue
+
+    if os.path.exists(target):
+        continue
+    if os.path.isdir(source):
+        shutil.copytree(source, target, symlinks=False)
+    else:
+        shutil.copy2(source, target, follow_symlinks=True)
+    hoisted += 1
+
+print(f'prepare_release: hoisted {hoisted} transitive package(s)')
+PY
+
+# Prune non-runtime files from bundled dependencies to reduce publish size.
+find .release/node_modules/.pnpm -type d \
+  \( -name test -o -name tests -o -name __tests__ -o -name docs -o -name examples -o -name benchmark -o -name benchmarks -o -name .github -o -name .vscode \) \
+  -prune -exec rm -rf {} +
+find .release/node_modules/.pnpm -type f -name '*.map' -delete
+find .release/node_modules/.pnpm -maxdepth 1 -mindepth 1 -type d -name '@types+*' -exec rm -rf {} +
+rm -rf .release/node_modules/@types
+python3 - <<'PY'
+import os
+
+root = '.release/node_modules'
+removed = 0
+for current, dirs, files in os.walk(root, followlinks=False):
+    for name in dirs + files:
+        path = os.path.join(current, name)
+        if os.path.islink(path):
+            target = os.readlink(path)
+            resolved = os.path.join(os.path.dirname(path), target)
+            if not os.path.exists(resolved):
+                os.unlink(path)
+                removed += 1
+print(f'prepare_release: removed {removed} dangling symlink(s)')
+PY
+
 # Verify release artifacts before publish.
 require_file ".release/bin/parallax.js"
 require_file ".release/node_modules/@parallax/cli/dist/cli/src/index.js"
 require_file ".release/node_modules/@parallax/orchestrator/dist/orchestrator/src/index.js"
+require_file ".release/node_modules/@parallax/agent-adapters/dist/agent-adapters/src/index.js"
+require_file ".release/node_modules/js-yaml/index.js"
+require_file ".release/node_modules/yocto-queue/index.js"
 require_no_match "@code-swarm/executor" ".release/node_modules/@parallax/orchestrator/dist"
+require_no_match "\"better-sqlite3\"" ".release/package.json"
 
 # Validate npm tarball payload generation.
 (

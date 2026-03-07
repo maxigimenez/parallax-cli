@@ -1,32 +1,38 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { LinearService } from '../src/linear-service'
 
-const issuesMock = vi.fn()
-
-vi.mock('@linear/sdk', () => {
-  return {
-    LinearClient: vi.fn().mockImplementation(() => {
-      return {
-        issues: issuesMock.mockResolvedValue({
-          nodes: [
-            {
-              identifier: 'TEST-1',
-              title: 'Test Issue',
-              description: 'Description',
-            },
-          ],
-        }),
-      }
-    }),
-  }
-})
+const fetchMock = vi.fn()
+const originalFetch = global.fetch
 
 describe('LinearService', () => {
   beforeEach(() => {
-    issuesMock.mockClear()
+    fetchMock.mockClear()
+    global.fetch = fetchMock as any
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
   })
 
   it('should fetch and map issues correctly', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          issues: {
+            nodes: [
+              {
+                id: 'lin_1',
+                identifier: 'TEST-1',
+                title: 'Test Issue',
+                description: 'Description',
+              },
+            ],
+          },
+        },
+      }),
+    })
+
     const service = new LinearService('fake-key')
     const project = {
       id: 'p1',
@@ -44,12 +50,14 @@ describe('LinearService', () => {
     expect(tasks).toHaveLength(1)
     expect(tasks[0].externalId).toBe('TEST-1')
     expect(tasks[0].status).toBe('PENDING')
-    expect(issuesMock).toHaveBeenCalledWith({
-      filter: {
-        team: { key: { eq: 'TEST' } },
-        state: { name: { eq: 'Todo' } },
-        labels: { name: { in: ['ai-ready'] } },
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith('https://api.linear.app/graphql', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'fake-key',
       },
+      body: expect.stringContaining('"team":{"key":{"eq":"TEST"}}'),
     })
   })
 
@@ -64,6 +72,6 @@ describe('LinearService', () => {
     } as any)
 
     expect(tasks).toEqual([])
-    expect(issuesMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

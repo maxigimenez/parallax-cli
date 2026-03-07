@@ -2,6 +2,10 @@
 
 ## `parallax preflight` fails
 
+### Node.js version check failed
+
+Use Node.js `>= 22` (recommended: latest LTS), then rerun `parallax preflight`.
+
 ### `gh auth status` failed
 
 Run:
