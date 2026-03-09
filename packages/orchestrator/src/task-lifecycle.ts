@@ -1,4 +1,4 @@
-import { TaskPlanState, TaskStatus } from '@parallax/common'
+import { TASK_STATUS, TaskPlanState, TaskStatus } from '@parallax/common'
 import { dbService } from './database.js'
 import {
   clearTaskState,
@@ -17,12 +17,12 @@ function persistStatus(taskId: string, status: TaskStatus) {
 
 export const taskLifecycle = {
   queue(taskId: string, message: string) {
-    persistStatus(taskId, 'PENDING')
+    persistStatus(taskId, TASK_STATUS.PENDING)
     setTaskQueued(taskId, message)
   },
 
   run(taskId: string, message: string) {
-    persistStatus(taskId, 'IN_PROGRESS')
+    persistStatus(taskId, TASK_STATUS.IN_PROGRESS)
     setTaskRunning(taskId, message)
   },
 
@@ -30,17 +30,17 @@ export const taskLifecycle = {
     if (planState) {
       dbService.updateTaskPlanState(taskId, planState)
     }
-    persistStatus(taskId, 'FAILED')
+    persistStatus(taskId, TASK_STATUS.FAILED)
     setTaskFailed(taskId, message)
   },
 
   cancel(taskId: string, message: string) {
-    persistStatus(taskId, 'CANCELED')
+    persistStatus(taskId, TASK_STATUS.CANCELED)
     setTaskCanceled(taskId, message)
   },
 
   complete(taskId: string, message: string) {
-    persistStatus(taskId, 'COMPLETED')
+    persistStatus(taskId, TASK_STATUS.COMPLETED)
     setTaskDone(taskId, message)
     setTimeout(() => {
       clearTaskState(taskId)

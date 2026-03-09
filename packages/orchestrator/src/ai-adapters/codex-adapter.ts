@@ -1,4 +1,5 @@
 import {
+  APPROVAL_MODE,
   Task,
   ProjectConfig,
   AgentResult,
@@ -40,7 +41,7 @@ export class CodexAdapter extends BaseAgentAdapter {
   private buildCommand(task: Task, project: ProjectConfig, prompt: string): string[] {
     const command = ['codex', 'exec']
     const sandboxMode = this.resolveSandboxMode(project)
-    const autoEdit = project.agent.approvalMode === 'auto_edit'
+    const autoEdit = project.agent.approvalMode === APPROVAL_MODE.AUTO_EDIT
 
     if (project.agent.model) {
       command.push('--model', project.agent.model)
@@ -70,7 +71,7 @@ export class CodexAdapter extends BaseAgentAdapter {
     command.push('--', prompt)
 
     this.logger.info(
-      `Codex command profile: model=${project.agent.model || 'default'}, approval=${autoEdit ? 'auto_edit' : 'default'}, sandbox=${sandboxMode}`,
+      `Codex command profile: model=${project.agent.model ?? 'default'}, approval=${project.agent.approvalMode}, sandbox=${sandboxMode}`,
       task.id
     )
 

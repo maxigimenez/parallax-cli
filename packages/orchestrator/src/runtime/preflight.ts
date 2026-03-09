@@ -1,11 +1,13 @@
-import { AppConfig } from '@parallax/common'
+import { AppConfig, PULL_PROVIDER } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 
 export async function validateRuntimeRequirements(
   config: AppConfig,
   executor: HostExecutor
 ): Promise<void> {
-  const requiresLinear = config.projects.some((project) => project.pullFrom.provider === 'linear')
+  const requiresLinear = config.projects.some(
+    (project) => project.pullFrom.provider === PULL_PROVIDER.LINEAR
+  )
   const requiresGitHub = config.projects.length > 0
 
   if (requiresLinear && !process.env.LINEAR_API_KEY) {

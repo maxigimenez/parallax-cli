@@ -16,9 +16,13 @@ describe('task store reducers', () => {
           id: 'eng-123-f495c0bc',
           externalId: 'ENG-123',
           title: 'Fix pipeline',
+          description: 'Fix pipeline task',
+          projectId: 'p1',
           msg: 'queued',
           startTime: 1,
           status: 'PENDING',
+          executionAttempts: 0,
+          reviewState: 'NONE',
           logs: [],
         },
       ]
@@ -30,7 +34,26 @@ describe('task store reducers', () => {
   })
 
   it('deduplicates repeated log events', () => {
-    const once = applyTaskLogEvent({}, {
+    const initial = replaceTasksFromApi(
+      {},
+      [
+        {
+          id: 'eng-123-f495c0bc',
+          externalId: 'ENG-123',
+          title: 'Fix pipeline',
+          description: 'Fix pipeline task',
+          projectId: 'p1',
+          msg: 'queued',
+          startTime: 1,
+          status: 'PENDING',
+          executionAttempts: 0,
+          reviewState: 'NONE',
+          logs: [],
+        },
+      ]
+    )
+
+    const once = applyTaskLogEvent(initial, {
       taskId: 'eng-123-f495c0bc',
       msg: 'Starting execution',
       icon: 'ℹ',
@@ -50,7 +73,26 @@ describe('task store reducers', () => {
   })
 
   it('updates task status from socket events', () => {
-    const next = applyTaskStatusEvent({}, { taskId: 'eng-123-f495c0bc', status: 'done' })
+    const initial = replaceTasksFromApi(
+      {},
+      [
+        {
+          id: 'eng-123-f495c0bc',
+          externalId: 'ENG-123',
+          title: 'Fix pipeline',
+          description: 'Fix pipeline task',
+          projectId: 'p1',
+          msg: 'queued',
+          startTime: 1,
+          status: 'PENDING',
+          executionAttempts: 0,
+          reviewState: 'NONE',
+          logs: [],
+        },
+      ]
+    )
+
+    const next = applyTaskStatusEvent(initial, { taskId: 'eng-123-f495c0bc', status: 'done' })
     expect(next['eng-123-f495c0bc']?.status).toBe(TASK_STATUS.DONE)
   })
 
@@ -59,9 +101,15 @@ describe('task store reducers', () => {
       {
         'eng-123-f495c0bc': {
           id: 'eng-123-f495c0bc',
+          externalId: 'ENG-123',
+          title: 'Fix pipeline',
+          description: 'Fix pipeline task',
+          projectId: 'p1',
           msg: 'done',
           startTime: 1,
           status: TASK_STATUS.DONE,
+          executionAttempts: 0,
+          reviewState: 'NONE',
           logs: [],
         },
       },

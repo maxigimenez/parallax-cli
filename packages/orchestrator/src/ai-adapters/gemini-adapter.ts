@@ -1,11 +1,4 @@
-import {
-  Task,
-  ProjectConfig,
-  AgentResult,
-  Logger,
-  PlanResult,
-  PlanResultStatus,
-} from '@parallax/common'
+import { Task, ProjectConfig, AgentResult, Logger, PlanResult, PlanResultStatus } from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
 
 interface ParsedPlanOutput {
@@ -82,10 +75,10 @@ export class GeminiAdapter extends BaseAgentAdapter {
       command.push('--model', project.agent.model)
     }
 
-    const approvalMode = project.agent.approvalMode || 'auto_edit'
+    const approvalMode = project.agent.approvalMode
     command.push('--approval-mode', approvalMode)
 
-    if (project.agent.sandbox !== false) {
+    if (project.agent.sandbox) {
       command.push('--sandbox')
     }
 
@@ -100,7 +93,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
     command.push('--prompt', prompt)
 
     this.logger.info(
-      `Gemini command profile: approval=${approvalMode}, sandbox=${project.agent.sandbox !== false ? 'on' : 'off'}`,
+      `Gemini command profile: approval=${approvalMode}, sandbox=${project.agent.sandbox ? 'on' : 'off'}`,
       task.id
     )
 

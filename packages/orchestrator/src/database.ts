@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite'
-import { Task, TaskPlanState, TaskStatus } from '@parallax/common'
+import { TASK_REVIEW_STATE, TASK_STATUS, Task, TaskPlanState, TaskStatus } from '@parallax/common'
 import path from 'path'
 
 const defaultDbPath = path.resolve(process.cwd(), 'parallax.db')
@@ -105,7 +105,7 @@ export const dbService = {
       prUrl: null,
       prNumber: null,
       lastReviewEventAt: null,
-      reviewState: 'NONE',
+      reviewState: TASK_REVIEW_STATE.NONE,
       planState: TaskPlanState.PLAN_GENERATING,
       planMarkdown: null,
       planPrompt: null,
@@ -159,7 +159,9 @@ export const dbService = {
   },
 
   getPendingTasks(): Task[] {
-    return db.prepare("SELECT * FROM tasks WHERE status = 'PENDING'").all() as unknown as Task[]
+    return db
+      .prepare('SELECT * FROM tasks WHERE status = ?')
+      .all(TASK_STATUS.PENDING) as unknown as Task[]
   },
 
   updateTaskStatus(id: string, status: TaskStatus) {
@@ -201,11 +203,11 @@ export const dbService = {
         WHERE id = ?
       `
     ).run(
-      details.planState || null,
-      details.planMarkdown || null,
-      details.planPrompt || null,
-      details.planResult || null,
-      details.lastAgent || null,
+      details.planState ?? null,
+      details.planMarkdown ?? null,
+      details.planPrompt ?? null,
+      details.planResult ?? null,
+      details.lastAgent ?? null,
       Date.now(),
       id
     )
@@ -214,7 +216,7 @@ export const dbService = {
   approveTaskPlan(id: string, approvedBy?: string) {
     db.prepare(
       'UPDATE tasks SET planState = ?, approvedBy = ?, approvedAt = ?, updatedAt = ? WHERE id = ?'
-    ).run(TaskPlanState.PLAN_APPROVED, approvedBy || null, Date.now(), Date.now(), id)
+    ).run(TaskPlanState.PLAN_APPROVED, approvedBy ?? null, Date.now(), Date.now(), id)
   },
 
   rejectTaskPlan(id: string) {
@@ -242,7 +244,14 @@ export const dbService = {
   ) {
     db.prepare(
       'UPDATE tasks SET branchName = ?, prUrl = ?, prNumber = ?, reviewState = ?, updatedAt = ? WHERE id = ?'
-    ).run(details.branchName, details.prUrl, details.prNumber, 'WAITING_FOR_REVIEW', Date.now(), id)
+    ).run(
+      details.branchName,
+      details.prUrl,
+      details.prNumber,
+      TASK_REVIEW_STATE.WAITING_FOR_REVIEW,
+      Date.now(),
+      id
+    )
   },
 
   updateTaskReviewEventAt(id: string, timestamp: string) {
@@ -255,7 +264,7 @@ export const dbService = {
 
   updateTaskReviewState(id: string, reviewState: Task['reviewState']) {
     db.prepare('UPDATE tasks SET reviewState = ?, updatedAt = ? WHERE id = ?').run(
-      reviewState ?? 'NONE',
+      reviewState ?? TASK_REVIEW_STATE.NONE,
       Date.now(),
       id
     )
@@ -297,7 +306,7 @@ export const dbService = {
   clearTaskPullRequestInfo(id: string) {
     db.prepare(
       'UPDATE tasks SET branchName = NULL, prUrl = NULL, prNumber = NULL, lastReviewEventAt = NULL, reviewState = ?, updatedAt = ? WHERE id = ?'
-    ).run('NONE', Date.now(), id)
+    ).run(TASK_REVIEW_STATE.NONE, Date.now(), id)
   },
 
   resetTaskForFullRetry(id: string) {

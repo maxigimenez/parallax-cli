@@ -1,8 +1,10 @@
 import path from 'path'
 import {
+  AGENT_PROVIDER,
   PlanResult,
   PlanResultStatus,
   ProjectConfig,
+  TASK_REVIEW_STATE,
   Task,
   TaskPlanState,
 } from '@parallax/common'
@@ -14,6 +16,7 @@ import { dbService } from '../database.js'
 import { taskLifecycle } from '../task-lifecycle.js'
 import { ExternalServices, markTaskInProgress } from '../runtime/provider-services.js'
 import {
+  assertPlanPrompt,
   buildReviewFeedbackPreview,
   getNextPlanState,
   getTaskPlanPrompt,
@@ -36,13 +39,13 @@ export function createAgentAdapter(
 ): BaseAgentAdapter {
   const provider = project.agent.provider
 
-  if (provider === 'codex') {
+  if (provider === AGENT_PROVIDER.CODEX) {
     return new CodexAdapter(executor, currentLog)
   }
-  if (provider === 'gemini') {
+  if (provider === AGENT_PROVIDER.GEMINI) {
     return new GeminiAdapter(executor, currentLog)
   }
-  if (provider === 'claude-code') {
+  if (provider === AGENT_PROVIDER.CLAUDE_CODE) {
     throw new Error('Agent provider "claude-code" is not implemented yet.')
   }
 
@@ -104,8 +107,8 @@ async function persistPlanResult(task: Task, project: ProjectConfig, planResult:
   const nextState = getNextPlanState(planResult.status as PlanResultStatus)
   dbService.updateTaskPlanOutput(task.id, {
     planState: nextState,
-    planMarkdown: planResult.planMarkdown || null,
-    planPrompt: getTaskPlanPrompt(task),
+    planMarkdown: planResult.planMarkdown ?? null,
+    planPrompt: assertPlanPrompt(planResult.planPrompt, task.id),
     planResult: planResult.output,
     lastAgent: project.agent.provider,
   })
@@ -119,7 +122,7 @@ async function persistPlanResult(task: Task, project: ProjectConfig, planResult:
     return
   }
 
-  taskLifecycle.fail(task.id, planResult.error || 'Plan generation failed')
+  taskLifecycle.fail(task.id, planResult.error ?? 'Plan generation failed')
 }
 
 export async function processTask(
@@ -239,7 +242,7 @@ export async function processPullRequestReview(
 ) {
   logger.info(`Starting PR review follow-up for ${review.prUrl}`, task.id)
   taskLifecycle.run(task.id, `Starting PR review follow-up for ${review.prUrl}`)
-  dbService.updateTaskReviewState(task.id, 'REVIEW_PENDING')
+  dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVIEW_PENDING)
   dbService.updateTaskReviewEventAt(task.id, review.latestFeedbackAt)
 
   let worktreePath: string | undefined
@@ -256,7 +259,7 @@ export async function processPullRequestReview(
     }
 
     logger.info(`Review feedback preview: ${buildReviewFeedbackPreview(review.feedback)}`, task.id)
-    dbService.updateTaskReviewState(task.id, 'SYNCING_MAIN')
+    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.SYNCING_MAIN)
     worktreePath = await gitService.createWorktreeForExistingBranch(
       reviewTask,
       project,
@@ -267,7 +270,7 @@ export async function processPullRequestReview(
 
     const mergeResult = await gitService.mergeMainIntoBranch(worktreePath)
     if (mergeResult.conflicted) {
-      dbService.updateTaskReviewState(task.id, 'RESOLVING_CONFLICTS')
+      dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.RESOLVING_CONFLICTS)
       logger.warn(
         'Merge conflicts detected while syncing with main. Asking AI to resolve them.',
         task.id
@@ -287,7 +290,7 @@ export async function processPullRequestReview(
     }
 
     throwIfCancellationRequested(task.id, canceledTasks)
-    dbService.updateTaskReviewState(task.id, 'APPLYING_REVIEW')
+    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.APPLYING_REVIEW)
     const reviewFixResult = await adapter.runReviewFixPass(reviewTask, worktreePath, project, review)
     throwIfCancellationRequested(task.id, canceledTasks)
     if (!reviewFixResult.success) {
@@ -304,7 +307,7 @@ export async function processPullRequestReview(
     }
 
     logger.success(`PR Updated: ${review.prUrl}`, task.id)
-    dbService.updateTaskReviewState(task.id, 'REVISION_PUSHED')
+    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVISION_PUSHED)
     taskLifecycle.complete(task.id, `PR Updated: ${review.prUrl}`)
   } catch (error: any) {
     if (error instanceof TaskCanceledError) {

@@ -1,87 +1,103 @@
-import { useMemo } from 'react';
-import { TaskSidebar } from '@/components/TaskSidebar';
-import { LogViewer } from '@/components/LogViewer';
-import { SettingsViewer } from '@/components/SettingsViewer';
-import { EmptyState } from '@/components/EmptyState';
-import { useParallax } from '@/hooks/useParallax';
-import { TASK_STATUS } from '@/lib/task-constants';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { EmptyState } from '@/components/EmptyState'
+import { LogViewer } from '@/components/LogViewer'
+import { SettingsViewer } from '@/components/SettingsViewer'
+import { TaskSidebar } from '@/components/TaskSidebar'
+import { useParallax } from '@/hooks/useParallax'
+import { TASK_STATUS } from '@/lib/task-constants'
+
+const TASK_VIEW = 'tasks'
+const SETTINGS_VIEW = 'settings'
+const SUMMARY_TAB = 'summary'
+
+type ActiveView = typeof TASK_VIEW | typeof SETTINGS_VIEW
+type ActiveTab = typeof SUMMARY_TAB | 'logs' | 'plan'
+
+function resolveActiveView(view: string | null): ActiveView {
+  return view === SETTINGS_VIEW ? SETTINGS_VIEW : TASK_VIEW
+}
+
+function resolveActiveTab(tab: string | null): ActiveTab {
+  return tab === 'logs' || tab === 'plan' ? tab : SUMMARY_TAB
+}
 
 const Index = () => {
-  const {
-    tasks,
-    config,
-    isConnected,
-    retryTask,
-    cancelTask,
-    approvePlan,
-    rejectPlan,
-  } = useParallax();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { tasks, config, isConnected, error, retryTask, cancelTask, approvePlan, rejectPlan } =
+    useParallax()
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const activeView = (searchParams.get('view') === 'settings' ? 'settings' : 'tasks') as
-    | 'tasks'
-    | 'settings';
-  const selectedTaskId = searchParams.get('task');
-  const rawTab = searchParams.get('tab');
-  const activeTab = rawTab === 'logs' || rawTab === 'plan' ? rawTab : 'summary';
+  const activeView = resolveActiveView(searchParams.get('view'))
+  const selectedTaskId = searchParams.get('task')
+  const activeTab = resolveActiveTab(searchParams.get('tab'))
 
-  const handleSelectTask = (id: string) => {
-    const next = new URLSearchParams(searchParams);
-    next.set('task', id);
-    if (!next.get('tab')) {
-      next.set('tab', 'summary');
-    }
-    setSearchParams(next, { replace: true });
-  };
+  if (error) {
+    throw error
+  }
 
-  const handleViewChange = (view: 'tasks' | 'settings') => {
-    const next = new URLSearchParams(searchParams);
-    next.set('view', view);
-    next.delete('task');
-    next.delete('tab');
-    setSearchParams(next, { replace: true });
-  };
-
-  const handleTabChange = (tab: 'summary' | 'logs' | 'plan') => {
-    const next = new URLSearchParams(searchParams);
-    next.set('tab', tab);
-    setSearchParams(next, { replace: true });
-  };
-
-  const safeSelectedTaskId = useMemo(() => {
+  const selectedEntityId = useMemo(() => {
     if (!selectedTaskId) {
-      return null;
+      return null
     }
 
     if (selectedTaskId.startsWith('project-')) {
-      return selectedTaskId;
+      return selectedTaskId
     }
 
-    return tasks[selectedTaskId] ? selectedTaskId : null;
-  }, [selectedTaskId, tasks]);
+    if (!tasks[selectedTaskId]) {
+      throw new Error(`Selected task "${selectedTaskId}" is not available in the UI store.`)
+    }
+
+    return selectedTaskId
+  }, [selectedTaskId, tasks])
+
+  const selectedTask =
+    selectedEntityId && !selectedEntityId.startsWith('project-') ? tasks[selectedEntityId] : null
+
+  const handleSelectTask = (id: string) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('task', id)
+    if (!next.get('tab')) {
+      next.set('tab', SUMMARY_TAB)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  const handleViewChange = (view: ActiveView) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('view', view)
+    next.delete('task')
+    next.delete('tab')
+    setSearchParams(next, { replace: true })
+  }
+
+  const handleTabChange = (tab: ActiveTab) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', tab)
+    setSearchParams(next, { replace: true })
+  }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-[#060606]">
-      <div className="flex-1 flex min-h-0 min-w-0 flex-col">
-        {activeView === 'tasks' && safeSelectedTaskId && !safeSelectedTaskId.startsWith('project-') ? (
+    <div className="flex h-screen overflow-hidden bg-[#060606]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {activeView === TASK_VIEW && selectedTask ? (
           <LogViewer
-            taskId={safeSelectedTaskId}
-            title={tasks[safeSelectedTaskId]?.title}
-            msg={tasks[safeSelectedTaskId]?.msg}
-            description={tasks[safeSelectedTaskId]?.description}
-            projectId={tasks[safeSelectedTaskId]?.projectId}
-            logs={tasks[safeSelectedTaskId]?.logs || []}
-            status={tasks[safeSelectedTaskId]?.status || 'queued'}
-            branchName={tasks[safeSelectedTaskId]?.branchName}
-            prUrl={tasks[safeSelectedTaskId]?.prUrl}
-            prNumber={tasks[safeSelectedTaskId]?.prNumber}
-            lastReviewEventAt={tasks[safeSelectedTaskId]?.lastReviewEventAt}
-            reviewState={tasks[safeSelectedTaskId]?.reviewState}
-            planState={tasks[safeSelectedTaskId]?.planState}
-            planMarkdown={tasks[safeSelectedTaskId]?.planMarkdown}
-            planPrompt={tasks[safeSelectedTaskId]?.planPrompt}
-            planResult={tasks[safeSelectedTaskId]?.planResult}
+            taskId={selectedTask.id}
+            title={selectedTask.title}
+            msg={selectedTask.msg}
+            description={selectedTask.description}
+            projectId={selectedTask.projectId}
+            logs={selectedTask.logs}
+            status={selectedTask.status}
+            branchName={selectedTask.branchName}
+            prUrl={selectedTask.prUrl}
+            prNumber={selectedTask.prNumber}
+            lastReviewEventAt={selectedTask.lastReviewEventAt}
+            reviewState={selectedTask.reviewState}
+            planState={selectedTask.planState}
+            planMarkdown={selectedTask.planMarkdown}
+            planPrompt={selectedTask.planPrompt}
+            planResult={selectedTask.planResult}
             config={config}
             onRetry={retryTask}
             onCancel={cancelTask}
@@ -90,8 +106,12 @@ const Index = () => {
             activeTab={activeTab}
             onTabChange={handleTabChange}
           />
-        ) : (activeView === 'settings' || safeSelectedTaskId?.startsWith('project-')) && safeSelectedTaskId ? (
-          <SettingsViewer projectIndex={parseInt(safeSelectedTaskId.replace('project-', ''))} config={config} />
+        ) : (activeView === SETTINGS_VIEW || selectedEntityId?.startsWith('project-')) &&
+          selectedEntityId ? (
+          <SettingsViewer
+            projectIndex={Number.parseInt(selectedEntityId.replace('project-', ''), 10)}
+            config={config}
+          />
         ) : (
           <EmptyState
             view={activeView}
@@ -103,7 +123,7 @@ const Index = () => {
       </div>
 
       <TaskSidebar
-        selectedTaskId={safeSelectedTaskId}
+        selectedTaskId={selectedEntityId}
         onSelectTask={handleSelectTask}
         activeView={activeView}
         onViewChange={handleViewChange}
@@ -112,7 +132,7 @@ const Index = () => {
         isConnected={isConnected}
       />
     </div>
-  );
-};
+  )
+}
 
-export default Index;
+export default Index

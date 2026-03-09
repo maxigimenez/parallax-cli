@@ -1,4 +1,4 @@
-import { Task, ProjectConfig } from '@parallax/common'
+import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 import { createTaskId } from '../task-id.js'
 
@@ -62,7 +62,7 @@ export class GitHubService {
   }
 
   async fetchNewIssues(project: ProjectConfig): Promise<Task[]> {
-    if (project.pullFrom.provider !== 'github') {
+    if (project.pullFrom.provider !== PULL_PROVIDER.GITHUB) {
       return []
     }
 
@@ -85,8 +85,8 @@ export class GitHubService {
       id: createTaskId(project.id, `${owner}/${repo}#${issue.number}`),
       externalId: `${owner}/${repo}#${issue.number}`,
       title: issue.title,
-      description: issue.body || '',
-      status: 'PENDING',
+      description: issue.body ?? '',
+      status: TASK_STATUS.PENDING,
       projectId: project.id,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -94,7 +94,7 @@ export class GitHubService {
   }
 
   async markAsInProgress(externalId: string, project: ProjectConfig) {
-    if (project.pullFrom.provider !== 'github') {
+    if (project.pullFrom.provider !== PULL_PROVIDER.GITHUB) {
       return
     }
 

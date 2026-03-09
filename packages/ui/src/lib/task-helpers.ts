@@ -1,4 +1,4 @@
-import type { AppConfig } from '@parallax/common'
+import type { AppConfig, TaskPlanState } from '@parallax/common'
 import { PLAN_EDITABLE_STATES, PROJECT_COLOR_PALETTE } from './task-constants'
 
 export function projectColor(projectId: string): string {
@@ -13,15 +13,23 @@ export function projectColor(projectId: string): string {
 }
 
 export function resolveProjectProvider(config: AppConfig | null, projectId?: string): string {
-  if (!config || !projectId) {
-    return 'unknown'
+  if (!config) {
+    throw new Error('Parallax config is not loaded.')
+  }
+
+  if (!projectId) {
+    throw new Error('Task is missing projectId.')
   }
 
   const project = config.projects.find((candidate) => candidate.id === projectId)
-  return project?.pullFrom?.provider || 'unknown'
+  if (!project) {
+    throw new Error(`Project "${projectId}" is not present in config.`)
+  }
+
+  return project.pullFrom.provider
 }
 
-export function planActionsState(planState?: string) {
+export function planActionsState(planState?: TaskPlanState) {
   if (!planState) {
     return { canEdit: false, reason: 'Plan is not available for this task.' }
   }

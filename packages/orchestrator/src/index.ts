@@ -1,12 +1,11 @@
-import path from 'path'
 import pLimit from 'p-limit'
 import { Server as SocketServer } from 'socket.io'
 import { dbService } from './database.js'
 import { GitService } from './git-service.js'
 import { BaseAgentAdapter } from './ai-adapters/index.js'
 import { loadConfig } from './config-loader.js'
-import { logger, printHeader, setIo, setLogLevels } from './logger.js'
-import { ProjectConfig, TaskPlanState } from '@parallax/common'
+import { logger, setIo, setLogLevels } from './logger.js'
+import { ProjectConfig, TASK_REVIEW_STATE, TASK_STATUS, TaskPlanState, sleep } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
 import { createApiServer } from './runtime/api-server.js'
@@ -29,10 +28,6 @@ import { taskLifecycle } from './task-lifecycle.js'
 
 const activeWorktrees = new Map<string, string>()
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 async function startRuntimeServers(
   config: Awaited<ReturnType<typeof loadConfig>>,
   gitService: GitService,
@@ -51,21 +46,16 @@ async function startRuntimeServers(
   const io = new SocketServer(fastify.server, { cors: { origin: '*' } })
   setIo(io)
 
-  const uiDistPath = resolveUiDistPath()
-  if (process.env.PARALLAX_UI_DEV === '1') {
-    logger.info(
-      `UI dev mode enabled. Start the UI separately on http://localhost:${config.server.uiPort}`
-    )
+  if (process.env.NODE_ENV === 'dev') {
     return
   }
 
+  const uiDistPath = resolveUiDistPath()
   if (uiDistPath) {
     await startUiServer(uiDistPath, config.server.uiPort, config.server.apiPort)
     logger.info(`UI server ready on http://localhost:${config.server.uiPort}`)
     return
   }
-
-  logger.warn('UI dist not found. API will run without a standalone dashboard.')
 }
 
 async function pollProjects(
@@ -78,13 +68,10 @@ async function pollProjects(
   limit: ReturnType<typeof pLimit>
 ) {
   for (const project of config.projects) {
-    console.log('DEBUG = ', project)
     try {
       const adapter = getAdapterForProject(project)
       const issues = await fetchProjectTasks(project, services)
-      console.log('DEBUG issues= ', issues)
       const newIssues = issues.filter((task) => !dbService.getTaskByExternalId(task.externalId))
-      console.log('DEBUG newIssues= ', newIssues)
 
       if (newIssues.length > 0) {
         logger.info(`New tasks found for ${project.id}; syncing repository main branch.`)
@@ -104,7 +91,7 @@ async function pollProjects(
         .filter((task) => task.projectId === project.id && !activeTasks.has(task.id))
 
       for (const task of pending) {
-        if (canceledTasks.has(task.id) || task.status === 'CANCELED') {
+        if (canceledTasks.has(task.id) || task.status === TASK_STATUS.CANCELED) {
           continue
         }
 
@@ -181,7 +168,7 @@ async function pollProjects(
         if (
           !task ||
           activeTasks.has(task.id) ||
-          task.status === 'CANCELED' ||
+          task.status === TASK_STATUS.CANCELED ||
           canceledTasks.has(task.id)
         ) {
           continue
@@ -198,7 +185,7 @@ async function pollProjects(
         }
 
         activeTasks.add(task.id)
-        dbService.updateTaskReviewState(task.id, 'REVIEW_PENDING')
+        dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVIEW_PENDING)
         taskLifecycle.queue(task.id, 'Queued for PR review follow-up')
         limit(async () => {
           try {
@@ -229,7 +216,6 @@ async function pollProjects(
 async function main() {
   const config = await loadConfig()
   setLogLevels(config.logs)
-  printHeader()
 
   const executor = new HostExecutor()
   await validateRuntimeRequirements(config, executor)

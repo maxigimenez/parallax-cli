@@ -2,10 +2,14 @@ import fs from 'fs/promises'
 import yaml from 'js-yaml'
 import path from 'path'
 import {
+  AGENT_PROVIDER,
+  APPROVAL_MODE,
   AppConfig,
   DEFAULT_API_PORT,
   DEFAULT_UI_PORT,
+  LOG_LEVEL,
   LogLevel,
+  PULL_PROVIDER,
   ProjectConfig,
   ServerConfig,
 } from '@parallax/common'
@@ -52,8 +56,9 @@ export async function loadConfig(): Promise<AppConfig> {
   return validateConfig(parsed, configPath)
 }
 
-const ALLOWED_LOG_LEVELS: LogLevel[] = ['info', 'success', 'warn', 'error']
-const ALLOWED_AGENT_PROVIDERS = ['codex', 'gemini'] as const
+const ALLOWED_LOG_LEVELS: LogLevel[] = Object.values(LOG_LEVEL)
+const ALLOWED_AGENT_PROVIDERS = [AGENT_PROVIDER.CODEX, AGENT_PROVIDER.GEMINI] as const
+const ALLOWED_PULL_PROVIDERS = [PULL_PROVIDER.LINEAR, PULL_PROVIDER.GITHUB] as const
 
 function assertObject(value: unknown, label: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -156,14 +161,14 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
     pullFrom.provider,
     `project.pullFrom.provider for "${id}" in ${source}`
   )
-  if (provider !== 'linear' && provider !== 'github') {
+  if (!ALLOWED_PULL_PROVIDERS.includes(provider as ProjectConfig['pullFrom']['provider'])) {
     throw new Error(`Unsupported pull provider "${provider}" for project "${id}" in ${source}.`)
   }
 
   const pullFromFilters = pullFrom.filters
   assertObject(pullFromFilters, `project.pullFrom.filters for "${id}" in ${source}`)
   const filters = pullFromFilters as ProjectConfig['pullFrom']['filters']
-  if (provider === 'github') {
+  if (provider === PULL_PROVIDER.GITHUB) {
     assertNonEmptyString(filters.owner, `project.pullFrom.filters.owner for "${id}" in ${source}`)
     assertNonEmptyString(filters.repo, `project.pullFrom.filters.repo for "${id}" in ${source}`)
   }
@@ -188,8 +193,8 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
   const approvalModeRaw = agent.approvalMode
   if (
     approvalModeRaw !== undefined &&
-    approvalModeRaw !== 'default' &&
-    approvalModeRaw !== 'auto_edit'
+    approvalModeRaw !== APPROVAL_MODE.DEFAULT &&
+    approvalModeRaw !== APPROVAL_MODE.AUTO_EDIT
   ) {
     throw new Error(
       `project.agent.approvalMode for "${id}" in ${source} must be "default" or "auto_edit".`
@@ -230,15 +235,15 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
     id,
     workspaceDir,
     pullFrom: {
-      provider,
+      provider: provider as ProjectConfig['pullFrom']['provider'],
       filters,
     },
     agent: {
       provider: agentProvider,
       model: assertOptionalString(agent.model, `project.agent.model for "${id}" in ${source}`),
-      approvalMode: approvalModeRaw as ProjectConfig['agent']['approvalMode'],
-      sandbox: sandboxRaw as boolean | undefined,
-      disableMcp: disableMcpRaw as boolean | undefined,
+      approvalMode: (approvalModeRaw ?? APPROVAL_MODE.DEFAULT) as ProjectConfig['agent']['approvalMode'],
+      sandbox: (sandboxRaw ?? true) as boolean,
+      disableMcp: (disableMcpRaw ?? false) as boolean,
       allowedTools,
       extraArgs,
     },

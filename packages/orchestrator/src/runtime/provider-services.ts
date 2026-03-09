@@ -1,4 +1,4 @@
-import { ProjectConfig, Task } from '@parallax/common'
+import { PULL_PROVIDER, ProjectConfig, Task } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitHubPullRequestService } from '../github/pull-request-service.js'
 import { GitHubService } from '../github/service.js'
@@ -36,7 +36,7 @@ export async function fetchProjectTasks(
 ): Promise<Task[]> {
   const provider = getPullProvider(project)
 
-  if (provider === 'linear') {
+  if (provider === PULL_PROVIDER.LINEAR) {
     if (!services.linearService) {
       throw new Error('LINEAR_API_KEY missing from environment.')
     }
@@ -57,7 +57,7 @@ export async function markTaskInProgress(
 ) {
   const provider = getPullProvider(project)
 
-  if (provider === 'linear') {
+  if (provider === PULL_PROVIDER.LINEAR) {
     if (!services.linearService) {
       throw new Error('LINEAR_API_KEY missing from environment.')
     }

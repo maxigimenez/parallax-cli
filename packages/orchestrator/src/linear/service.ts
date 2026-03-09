@@ -1,4 +1,4 @@
-import { Task, ProjectConfig } from '@parallax/common'
+import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
 import { createTaskId } from '../task-id.js'
 
 type GraphqlResponse<T> = {
@@ -42,7 +42,7 @@ export class LinearService {
 
     const body = (await response.json()) as GraphqlResponse<T>
     if (body.errors && body.errors.length > 0) {
-      const message = body.errors.map((err) => err.message || 'unknown').join('; ')
+      const message = body.errors.map((err) => err.message ?? 'unknown').join('; ')
       throw new Error(`Linear API GraphQL error: ${message}`)
     }
 
@@ -54,7 +54,7 @@ export class LinearService {
   }
 
   async fetchNewIssues(project: ProjectConfig): Promise<Task[]> {
-    if (project.pullFrom.provider !== 'linear') {
+    if (project.pullFrom.provider !== PULL_PROVIDER.LINEAR) {
       return []
     }
 
@@ -94,8 +94,8 @@ export class LinearService {
       id: createTaskId(project.id, issue.identifier),
       externalId: issue.identifier,
       title: issue.title,
-      description: issue.description || '',
-      status: 'PENDING',
+      description: issue.description ?? '',
+      status: TASK_STATUS.PENDING,
       projectId: project.id,
       createdAt: Date.now(),
       updatedAt: Date.now(),

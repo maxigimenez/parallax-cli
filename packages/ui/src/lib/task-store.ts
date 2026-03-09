@@ -51,32 +51,33 @@ function mergeTaskLogs(existing: TaskLogEntry[], incoming: TaskLogEntry[]) {
 }
 
 export function normalizeTaskStatus(status: string): TaskStatus {
-  if (status === 'IN_PROGRESS' || status === 'running') {
+  if (status === 'IN_PROGRESS' || status === TASK_STATUS.RUNNING) {
     return TASK_STATUS.RUNNING
   }
-  if (status === 'COMPLETED' || status === 'done') {
+  if (status === 'COMPLETED' || status === TASK_STATUS.DONE) {
     return TASK_STATUS.DONE
   }
-  if (status === 'FAILED' || status === 'failed') {
+  if (status === 'FAILED' || status === TASK_STATUS.FAILED) {
     return TASK_STATUS.FAILED
   }
-  if (status === 'CANCELED' || status === 'canceled') {
+  if (status === 'CANCELED' || status === TASK_STATUS.CANCELED) {
     return TASK_STATUS.CANCELED
   }
-  return TASK_STATUS.QUEUED
+
+  if (status === 'PENDING' || status === TASK_STATUS.QUEUED) {
+    return TASK_STATUS.QUEUED
+  }
+
+  throw new Error(`Unsupported task status "${status}".`)
 }
 
-function ensureTask(tasks: Record<string, TaskInfo>, taskId: string, overrides: Partial<TaskInfo> = {}) {
-  return (
-    tasks[taskId] || {
-      id: taskId,
-      msg: '',
-      startTime: Date.now(),
-      status: TASK_STATUS.QUEUED,
-      logs: [],
-      ...overrides,
-    }
-  )
+function requireTask(tasks: Record<string, TaskInfo>, taskId: string): TaskInfo {
+  const task = tasks[taskId]
+  if (!task) {
+    throw new Error(`Task "${taskId}" is not available in the UI store.`)
+  }
+
+  return task
 }
 
 export function replaceTasksFromApi(
@@ -90,7 +91,7 @@ export function replaceTasksFromApi(
     next[task.id] = {
       ...task,
       status: normalizeTaskStatus(task.status),
-      logs: mergeTaskLogs(previousTask?.logs || [], task.logs || []),
+      logs: mergeTaskLogs(previousTask?.logs ?? [], task.logs ?? []),
     }
   }
 
@@ -102,7 +103,7 @@ export function upsertTaskState(
   taskId: string,
   patch: Partial<TaskInfo>
 ): Record<string, TaskInfo> {
-  const current = ensureTask(previous, taskId, patch)
+  const current = requireTask(previous, taskId)
   return {
     ...previous,
     [taskId]: {
@@ -116,10 +117,7 @@ export function applyTaskLogEvent(
   previous: Record<string, TaskInfo>,
   event: LogEvent
 ): Record<string, TaskInfo> {
-  const task = ensureTask(previous, event.taskId, {
-    msg: event.msg,
-    status: TASK_STATUS.RUNNING,
-  })
+  const task = requireTask(previous, event.taskId)
   const incoming: TaskLogEntry = {
     message: event.msg,
     icon: event.icon,
@@ -145,9 +143,7 @@ export function applyTaskStatusEvent(
   previous: Record<string, TaskInfo>,
   event: StatusEvent
 ): Record<string, TaskInfo> {
-  const task = ensureTask(previous, event.taskId, {
-    msg: event.status,
-  })
+  const task = requireTask(previous, event.taskId)
 
   return {
     ...previous,

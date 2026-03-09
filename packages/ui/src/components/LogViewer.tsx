@@ -6,9 +6,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { AppConfig } from '@parallax/common'
+import type { AppConfig, TaskPlanState, TaskReviewState } from '@parallax/common'
 import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
-import { TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
+import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
 
 interface LogViewerProps {
   taskId: string
@@ -27,8 +27,8 @@ interface LogViewerProps {
   prUrl?: string
   prNumber?: number
   lastReviewEventAt?: string
-  reviewState?: string
-  planState?: string
+  reviewState: TaskReviewState
+  planState?: TaskPlanState
   planMarkdown?: string
   planPrompt?: string
   planResult?: string
@@ -143,9 +143,13 @@ export function LogViewer({
 
   const planActionPending = approvePending || rejectPending
   const canCancel =
-    (status === 'queued' || status === 'running') && Boolean(onCancel) && !cancelPending
+    (status === TASK_STATUS.QUEUED || status === TASK_STATUS.RUNNING) &&
+    Boolean(onCancel) &&
+    !cancelPending
   const canRetry =
-    (status === 'failed' || status === 'canceled') && Boolean(onRetry) && !retryPending
+    (status === TASK_STATUS.FAILED || status === TASK_STATUS.CANCELED) &&
+    Boolean(onRetry) &&
+    !retryPending
   const cancelReason = canCancel ? '' : 'Cancel is only available for queued or running tasks.'
   const retryReason = canRetry ? '' : 'Retry is available only for failed or canceled tasks.'
 

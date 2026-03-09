@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AGENT_PROVIDER, APPROVAL_MODE, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
 import { planActionsState, projectColor, resolveProjectProvider } from '@/lib/task-helpers'
 
 describe('task helpers', () => {
@@ -10,7 +11,7 @@ describe('task helpers', () => {
     const provider = resolveProjectProvider(
       {
         concurrency: 1,
-        logs: ['info'],
+        logs: [LOG_LEVEL.INFO],
         server: {
           apiPort: 3000,
           uiPort: 8080,
@@ -19,19 +20,24 @@ describe('task helpers', () => {
           {
             id: 'p1',
             workspaceDir: '/tmp',
-            pullFrom: { provider: 'github', filters: {} },
-            agent: { provider: 'codex' },
+            pullFrom: { provider: PULL_PROVIDER.GITHUB, filters: {} },
+            agent: {
+              provider: AGENT_PROVIDER.CODEX,
+              approvalMode: APPROVAL_MODE.DEFAULT,
+              sandbox: true,
+              disableMcp: false,
+            },
           },
         ],
       },
       'p1'
     )
 
-    expect(provider).toBe('github')
+    expect(provider).toBe(PULL_PROVIDER.GITHUB)
   })
 
   it('allows plan actions only for approval states', () => {
-    expect(planActionsState('PLAN_READY').canEdit).toBe(true)
-    expect(planActionsState('PLAN_APPROVED').canEdit).toBe(false)
+    expect(planActionsState(TaskPlanState.PLAN_READY).canEdit).toBe(true)
+    expect(planActionsState(TaskPlanState.PLAN_APPROVED).canEdit).toBe(false)
   })
 })

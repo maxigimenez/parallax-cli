@@ -2,7 +2,6 @@ import Fastify from 'fastify'
 import fs from 'node:fs'
 import fsPromises from 'node:fs/promises'
 import path from 'path'
-import { fileURLToPath } from 'node:url'
 import { createRequire } from 'node:module'
 
 const STATIC_MIME: Record<string, string> = {
@@ -31,25 +30,21 @@ function injectUiRuntimeConfig(html: string, apiPort: number): string {
 }
 
 export function resolveUiDistPath(): string | undefined {
-  const currentFilePath = fileURLToPath(import.meta.url)
-  const orchestratorDistDir = path.dirname(currentFilePath)
   const require = createRequire(import.meta.url)
-  let bundledUiDist: string | undefined
-  try {
-    bundledUiDist = path.dirname(require.resolve('@parallax/ui/dist/index.html'))
-  } catch {
-    bundledUiDist = undefined
-  }
-
-  const workspaceUiDist = path.resolve(process.cwd(), '../ui/dist')
   const envUiDist = process.env.PARALLAX_UI_DIST
     ? path.resolve(process.env.PARALLAX_UI_DIST)
     : undefined
-  const legacyBundledUiDist = path.resolve(orchestratorDistDir, '../../ui/dist')
 
-  return [envUiDist, bundledUiDist, legacyBundledUiDist, workspaceUiDist]
-    .filter(Boolean)
-    .find((candidate) => fs.existsSync(candidate as string)) as string | undefined
+  try {
+    const bundledUiDist = path.dirname(require.resolve('@parallax/ui/dist/index.html'))
+    return envUiDist && fs.existsSync(envUiDist) ? envUiDist : bundledUiDist
+  } catch {
+    if (envUiDist && fs.existsSync(envUiDist)) {
+      return envUiDist
+    }
+
+    return undefined
+  }
 }
 
 export async function startUiServer(uiDistPath: string, uiPort: number, apiPort: number) {

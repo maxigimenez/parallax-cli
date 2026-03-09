@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { io } from 'socket.io-client'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
-import type { AppConfig } from '@parallax/common'
+import { io } from 'socket.io-client'
+import type { AppConfig, TaskPlanState, TaskReviewState } from '@parallax/common'
+import { getRequiredApiBase } from '@/lib/runtime-config'
 import { TASK_STATUS, type TaskStatus } from '@/lib/task-constants'
 import {
   applyTaskLogEvent,
@@ -13,19 +14,19 @@ import {
 
 export interface TaskInfo {
   id: string
-  externalId?: string
-  title?: string
-  description?: string
-  projectId?: string
+  externalId: string
+  title: string
+  description: string
+  projectId: string
   msg: string
   startTime: number
   status: TaskStatus
-  planState?: string
+  planState?: TaskPlanState
   planMarkdown?: string
   planPrompt?: string
   planResult?: string
   lastAgent?: string
-  executionAttempts?: number
+  executionAttempts: number
   approvedBy?: string
   approvedAt?: number
   logs: Array<{
@@ -38,21 +39,18 @@ export interface TaskInfo {
   prUrl?: string
   prNumber?: number
   lastReviewEventAt?: string
-  reviewState?: string
+  reviewState: TaskReviewState
 }
 
-const API_BASE =
-  window.__PARALLAX_RUNTIME_CONFIG__?.apiBase ||
-  import.meta.env.VITE_PARALLAX_API_BASE ||
-  'http://localhost:3000'
-
 export function useParallax() {
+  const apiBase = getRequiredApiBase()
   const [tasks, setTasks] = useState<Record<string, TaskInfo>>({})
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [isConnected, setIsConnected] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
   const retryTask = async (taskId: string) => {
-    await axios.post(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/retry`)
+    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/retry`)
     setTasks((prev) =>
       upsertTaskState(prev, taskId, {
         msg: 'Queued for manual retry',
@@ -63,7 +61,7 @@ export function useParallax() {
   }
 
   const cancelTask = async (taskId: string) => {
-    await axios.post(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/cancel`)
+    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/cancel`)
     setTasks((prev) =>
       upsertTaskState(prev, taskId, {
         msg: 'Cancellation requested',
@@ -73,7 +71,7 @@ export function useParallax() {
   }
 
   const approvePlan = async (taskId: string, approver?: string, planMarkdown?: string) => {
-    await axios.post(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/approve`, {
+    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/approve`, {
       approver,
       planMarkdown,
     })
@@ -86,7 +84,7 @@ export function useParallax() {
   }
 
   const rejectPlan = async (taskId: string, reason?: string) => {
-    await axios.post(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/reject`, { reason })
+    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/reject`, { reason })
     setTasks((prev) =>
       upsertTaskState(prev, taskId, {
         msg: 'Plan rejected.',
@@ -96,59 +94,62 @@ export function useParallax() {
   }
 
   useEffect(() => {
-    const socket = io(API_BASE)
+    let socket: ReturnType<typeof io> | undefined
 
-    // Initial fetch
     const fetchData = async () => {
-      try {
-        const [tasksRes, configRes] = await Promise.all([
-          axios.get(`${API_BASE}/tasks`),
-          axios.get(`${API_BASE}/config`)
-        ])
+      const [tasksRes, configRes] = await Promise.all([
+        axios.get(`${apiBase}/tasks`),
+        axios.get(`${apiBase}/config`),
+      ])
 
-        const incoming = tasksRes.data as Array<
-          Omit<TaskInfo, 'status'> & {
-            status: string
-            logs?: TaskInfo['logs']
-          }
-        >
-        setTasks((prev) => replaceTasksFromApi(prev, incoming))
-        setConfig(configRes.data as AppConfig)
-      } catch (error) {
-        console.error('Failed to fetch initial data', error)
-      }
+      const incoming = tasksRes.data as Array<
+        Omit<TaskInfo, 'status'> & {
+          status: string
+          logs?: TaskInfo['logs']
+        }
+      >
+
+      setConfig(configRes.data as AppConfig)
+      setTasks((prev) => replaceTasksFromApi(prev, incoming))
+      setError(null)
     }
 
-    fetchData()
+    void fetchData()
+      .then(() => {
+        socket = io(apiBase)
+        socket.on('connect', () => setIsConnected(true))
+        socket.on('disconnect', () => setIsConnected(false))
+        socket.on('log', (data) => {
+          setTasks((prev) => applyTaskLogEvent(prev, data))
+        })
+        socket.on('task_status', (data) => {
+          setTasks((prev) => applyTaskStatusEvent(prev, data))
+        })
+        socket.on('task_removed', (data) => {
+          setTasks((prev) => removeTaskState(prev, data.taskId))
+        })
+      })
+      .catch((value) => {
+        setError(value instanceof Error ? value : new Error(String(value)))
+      })
+
     const refreshInterval = window.setInterval(() => {
-      void fetchData()
+      void fetchData().catch((value) => {
+        setError(value instanceof Error ? value : new Error(String(value)))
+      })
     }, 10000)
-
-    socket.on('connect', () => setIsConnected(true))
-    socket.on('disconnect', () => setIsConnected(false))
-
-    socket.on('log', (data) => {
-      setTasks((prev) => applyTaskLogEvent(prev, data))
-    })
-
-    socket.on('task_status', (data) => {
-      setTasks((prev) => applyTaskStatusEvent(prev, data))
-    })
-
-    socket.on('task_removed', (data) => {
-      setTasks((prev) => removeTaskState(prev, data.taskId))
-    })
 
     return () => {
       window.clearInterval(refreshInterval)
-      socket.disconnect()
+      socket?.disconnect()
     }
-  }, [])
+  }, [apiBase])
 
   return {
     tasks,
     config,
     isConnected,
+    error,
     retryTask,
     cancelTask,
     approvePlan,

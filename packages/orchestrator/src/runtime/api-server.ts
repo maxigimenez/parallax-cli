@@ -1,18 +1,25 @@
 import cors from '@fastify/cors'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { AppConfig, Task, TaskPlanState } from '@parallax/common'
+import { AppConfig, TASK_STATUS, TaskPlanState } from '@parallax/common'
 import { dbService } from '../database.js'
-import { clearTaskState, getTaskLogs, getTaskStatuses } from '../logger.js'
+import { clearTaskState } from '../logger.js'
 import { GitService } from '../git-service.js'
 import { taskLifecycle } from '../task-lifecycle.js'
-import { deriveTaskMessage, isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
+import { isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
+import { splitUnifiedDiffByFile } from './api/diff-utils.js'
+import {
+  parseNonNegativeInteger,
+  parseOptionalTaskId,
+  parsePositiveInteger,
+  parseRetryMode,
+  type RetryMode,
+} from './api/request-parsers.js'
+import { serializeTaskForApi } from './api/task-response.js'
 
 type TaskDiffFile = {
   path: string
   status: 'A' | 'M' | 'D' | 'R'
 }
-
-type RetryMode = 'full' | 'execution'
 
 type ApiServerDependencies = {
   config: AppConfig
@@ -22,56 +29,21 @@ type ApiServerDependencies = {
   activeWorktrees: Map<string, string>
 }
 
-function splitUnifiedDiffByFile(
-  diffText: string
-): Map<string, { patch: string; status: TaskDiffFile['status'] }> {
-  const result = new Map<string, { patch: string; status: TaskDiffFile['status'] }>()
-  if (!diffText.trim()) {
-    return result
+function resolveTaskProject(config: AppConfig, projectId: string) {
+  const project = config.projects.find((candidate) => candidate.id === projectId)
+  if (!project) {
+    throw new Error(`Project ${projectId} not found in config`)
   }
 
-  const chunks = diffText.split(/^diff --git /m).filter((chunk) => chunk.trim())
-  for (const rawChunk of chunks) {
-    const chunk = `diff --git ${rawChunk}`
-    const headerMatch = chunk.match(/^diff --git a\/(.+?) b\/(.+)$/m)
-    if (!headerMatch) {
-      continue
-    }
-
-    const path = headerMatch[2].trim()
-    let status: TaskDiffFile['status'] = 'M'
-    if (/^new file mode\s/m.test(chunk)) {
-      status = 'A'
-    } else if (/^deleted file mode\s/m.test(chunk)) {
-      status = 'D'
-    } else if (/^rename from\s/m.test(chunk) || /^rename to\s/m.test(chunk)) {
-      status = 'R'
-    }
-
-    result.set(path, { patch: chunk.trim(), status })
-  }
-
-  return result
+  return project
 }
 
-function normalizeTaskForApi(task: Task): Task {
-  return {
-    ...task,
-    planState: normalizePlanState(task),
-    executionAttempts: task.executionAttempts || 0,
-  }
-}
-
-function parseRetryMode(value: string | undefined): RetryMode {
-  if (!value) {
-    return 'full'
-  }
-
-  if (value === 'full' || value === 'execution') {
-    return value
-  }
-
-  throw new Error(`Invalid retry mode '${value}'. Use 'full' or 'execution'.`)
+function isTerminalTaskStatus(status: string) {
+  return (
+    status === TASK_STATUS.COMPLETED ||
+    status === TASK_STATUS.FAILED ||
+    status === TASK_STATUS.CANCELED
+  )
 }
 
 export async function createApiServer(
@@ -82,43 +54,16 @@ export async function createApiServer(
 
   await fastify.register(cors, { origin: '*' })
 
-  fastify.get('/tasks', async () =>
-    dbService.listTasks().map((task) => {
-      const liveInfo = getTaskStatuses().get(task.id)
-      const normalized = normalizeTaskForApi(task)
-
-      return {
-        ...normalized,
-        msg: liveInfo?.msg || deriveTaskMessage(task),
-        startTime: liveInfo?.startTime || task.updatedAt,
-        status:
-          liveInfo?.status ||
-          (task.status === 'IN_PROGRESS'
-            ? 'running'
-            : task.status === 'COMPLETED'
-              ? 'done'
-              : task.status === 'FAILED'
-                ? 'failed'
-                : task.status === 'CANCELED'
-                  ? 'canceled'
-                  : 'queued'),
-        logs: getTaskLogs().get(task.id) || dbService.getLogsByTaskExternalId(task.id),
-        branchName: task.branchName,
-        prUrl: task.prUrl,
-        prNumber: task.prNumber,
-        lastReviewEventAt: task.lastReviewEventAt,
-        reviewState: task.reviewState || 'NONE',
-      }
-    })
-  )
+  fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
 
   fastify.get('/tasks/pending-plans', async () =>
     dbService
       .listTasks()
       .filter(
-        (task) => task.status === 'PENDING' && isPlanAwaitingApproval(normalizePlanState(task))
+        (task) =>
+          task.status === TASK_STATUS.PENDING && isPlanAwaitingApproval(normalizePlanState(task))
       )
-      .map((task) => normalizeTaskForApi(task))
+      .map((task) => serializeTaskForApi(task))
   )
 
   fastify.get('/config', async () => config)
@@ -130,22 +75,16 @@ export async function createApiServer(
       limit?: string
     }
 
-    const parsedSince = since ? Number.parseInt(since, 10) : 0
-    if (!Number.isFinite(parsedSince) || parsedSince < 0) {
-      return reply.status(400).send({ error: 'since must be a non-negative integer.' })
-    }
-
-    const parsedLimit = limit ? Number.parseInt(limit, 10) : 200
-    if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
-      return reply.status(400).send({ error: 'limit must be a positive integer.' })
-    }
-
-    return {
-      logs: dbService.listTaskLogs({
-        since: parsedSince,
-        taskExternalId: taskId?.trim() || undefined,
-        limit: parsedLimit,
-      }),
+    try {
+      return {
+        logs: dbService.listTaskLogs({
+          since: parseNonNegativeInteger(since, 'since', 0),
+          taskExternalId: parseOptionalTaskId(taskId),
+          limit: parsePositiveInteger(limit, 'limit', 200),
+        }),
+      }
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
@@ -156,29 +95,29 @@ export async function createApiServer(
       return reply.status(404).send({ error: 'Task not found' })
     }
 
-    const project = config.projects.find((candidate) => candidate.id === task.projectId)
-    if (!project) {
-      return reply.status(404).send({ error: `Project ${task.projectId} not found in config` })
+    let project
+    try {
+      project = resolveTaskProject(config, task.projectId)
+    } catch (error) {
+      return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     const liveWorktree = activeWorktrees.get(task.id)
     if (liveWorktree) {
-      const files = await gitService.getWorktreeChangedFiles(liveWorktree)
-      return { files }
+      return { files: await gitService.getWorktreeChangedFiles(liveWorktree) }
     }
 
     if (!task.prNumber && !task.branchName) {
       return { files: [] as TaskDiffFile[] }
     }
 
-    const unifiedDiff = await gitService.getTaskUnifiedDiff(project, task)
-    const parsed = splitUnifiedDiffByFile(unifiedDiff)
-    const files: TaskDiffFile[] = Array.from(parsed.entries()).map(([path, meta]) => ({
-      path,
-      status: meta.status,
-    }))
-
-    return { files }
+    const parsed = splitUnifiedDiffByFile(await gitService.getTaskUnifiedDiff(project, task))
+    return {
+      files: Array.from(parsed.entries()).map(([path, meta]) => ({
+        path,
+        status: meta.status,
+      })),
+    }
   })
 
   fastify.get('/tasks/:taskId/diff', async (request, reply) => {
@@ -189,15 +128,16 @@ export async function createApiServer(
       return reply.status(404).send({ error: 'Task not found' })
     }
 
-    const project = config.projects.find((candidate) => candidate.id === task.projectId)
-    if (!project) {
-      return reply.status(404).send({ error: `Project ${task.projectId} not found in config` })
+    let project
+    try {
+      project = resolveTaskProject(config, task.projectId)
+    } catch (error) {
+      return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     const liveWorktree = activeWorktrees.get(task.id)
     if (liveWorktree && file) {
-      const patch = await gitService.getWorktreeFileDiff(liveWorktree, file)
-      return { patch }
+      return { patch: await gitService.getWorktreeFileDiff(liveWorktree, file) }
     }
 
     if (!task.prNumber && !task.branchName) {
@@ -206,11 +146,10 @@ export async function createApiServer(
 
     const unifiedDiff = await gitService.getTaskUnifiedDiff(project, task)
     if (!file) {
-      return { patch: unifiedDiff || '' }
+      return { patch: unifiedDiff }
     }
 
-    const parsed = splitUnifiedDiffByFile(unifiedDiff)
-    const selected = parsed.get(file)
+    const selected = splitUnifiedDiffByFile(unifiedDiff).get(file)
     if (!selected) {
       return reply.status(404).send({ error: `Diff for file ${file} not found` })
     }
@@ -220,118 +159,110 @@ export async function createApiServer(
 
   fastify.post('/tasks/:taskId/approve', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    const body = request.body as { approver?: string; planMarkdown?: string }
-
+    const { approver, planMarkdown } = (request.body ?? {}) as {
+      approver?: string
+      planMarkdown?: string
+    }
     const task = dbService.getTaskByLookup(taskId)
     if (!task) {
       return reply.status(404).send({ error: 'Task not found' })
     }
 
     if (!isPlanAwaitingApproval(normalizePlanState(task))) {
-      return reply.status(409).send({ error: 'Task is not in a state where approval is required.' })
+      return reply.status(409).send({ error: 'Task is not awaiting plan approval.' })
     }
 
-    if (typeof body?.planMarkdown === 'string') {
-      const trimmedPlan = body.planMarkdown.trim()
-      if (!trimmedPlan) {
+    if (planMarkdown !== undefined) {
+      const trimmed = planMarkdown.trim()
+      if (!trimmed) {
         return reply.status(400).send({ error: 'planMarkdown cannot be empty when provided.' })
       }
 
-      dbService.updateTaskPlanOutput(task.id, { planMarkdown: trimmedPlan })
+      dbService.updateTaskPlanOutput(task.id, { planMarkdown: trimmed })
     }
 
-    dbService.approveTaskPlan(task.id, body?.approver)
+    dbService.approveTaskPlan(task.id, approver)
     taskLifecycle.queue(task.id, 'Plan approved. Queued for execution.')
-
     return { ok: true }
   })
 
   fastify.post('/tasks/:taskId/reject', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    const body = request.body as { reason?: string }
-
+    const { reason } = (request.body ?? {}) as { reason?: string }
     const task = dbService.getTaskByLookup(taskId)
     if (!task) {
       return reply.status(404).send({ error: 'Task not found' })
     }
 
     if (!isPlanAwaitingApproval(normalizePlanState(task))) {
-      return reply
-        .status(409)
-        .send({ error: 'Task is not in a state where rejection is required.' })
+      return reply.status(409).send({ error: 'Task is not awaiting plan approval.' })
+    }
+
+    if (!reason?.trim()) {
+      return reply.status(400).send({ error: 'Reject reason is required.' })
     }
 
     dbService.rejectTaskPlan(task.id)
     dbService.updateTaskPlanOutput(task.id, {
-      planResult: `Rejected by operator: ${body?.reason || 'No reason provided.'}`,
+      planState: TaskPlanState.PLAN_REJECTED,
+      planResult: `Rejected by operator: ${reason.trim()}`,
     })
-    taskLifecycle.fail(task.id, 'Plan rejected by operator.')
-
+    taskLifecycle.fail(task.id, 'Plan rejected by operator.', TaskPlanState.PLAN_REJECTED)
     return { ok: true }
   })
 
   fastify.post('/tasks/:taskId/retry', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    const body = request.body as { mode?: RetryMode } | undefined
+    const { mode: rawMode } = (request.body ?? {}) as { mode?: string }
     const task = dbService.getTaskByLookup(taskId)
-
     if (!task) {
       return reply.status(404).send({ error: 'Task not found' })
     }
 
     if (activeTasks.has(task.id)) {
-      return reply.status(409).send({ error: 'Task is already running' })
+      return reply.status(409).send({ error: 'Task is already running.' })
     }
 
     let mode: RetryMode
     try {
-      mode = parseRetryMode(body?.mode)
-    } catch (error: any) {
-      return reply.status(400).send({ error: error.message })
+      mode = parseRetryMode(rawMode)
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     if (mode === 'execution') {
-      let taskPlanState: TaskPlanState
-      try {
-        taskPlanState = normalizePlanState(task)
-      } catch (error: any) {
-        return reply.status(409).send({ error: error.message })
-      }
-      if (
-        taskPlanState !== TaskPlanState.PLAN_APPROVED &&
-        taskPlanState !== TaskPlanState.NOT_REQUIRED
-      ) {
+      const planState = normalizePlanState(task)
+      if (planState !== TaskPlanState.PLAN_APPROVED && planState !== TaskPlanState.NOT_REQUIRED) {
         return reply.status(409).send({
           error: 'Execution retry requires an approved plan. Use mode=full to regenerate plan.',
         })
       }
-      dbService.updateTaskStatus(task.id, 'PENDING')
+
       dbService.resetExecutionAttempts(task.id)
     } else {
-      dbService.updateTaskStatus(task.id, 'PENDING')
       dbService.resetTaskForFullRetry(task.id)
       dbService.clearTaskPullRequestInfo(task.id)
     }
+
+    dbService.updateTaskStatus(task.id, TASK_STATUS.PENDING)
     canceledTasks.delete(task.id)
     clearTaskState(task.id)
     taskLifecycle.queue(
       task.id,
       mode === 'execution' ? 'Queued for manual execution retry' : 'Queued for manual full retry'
     )
-
     return { ok: true, mode }
   })
 
   fastify.post('/tasks/:taskId/cancel', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
     const task = dbService.getTaskByLookup(taskId)
-
     if (!task) {
       return reply.status(404).send({ error: 'Task not found' })
     }
 
-    if (task.status === 'COMPLETED' || task.status === 'FAILED' || task.status === 'CANCELED') {
-      return reply.status(409).send({ error: 'Task is not cancellable' })
+    if (isTerminalTaskStatus(task.status)) {
+      return reply.status(409).send({ error: 'Task is not cancellable.' })
     }
 
     canceledTasks.add(task.id)
@@ -339,7 +270,6 @@ export async function createApiServer(
       task.id,
       activeTasks.has(task.id) ? 'Cancellation requested' : 'Task canceled'
     )
-
     return { ok: true }
   })
 

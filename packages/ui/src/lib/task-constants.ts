@@ -1,12 +1,14 @@
-export const TASK_STATUS = {
-  QUEUED: 'queued',
-  RUNNING: 'running',
-  CANCELED: 'canceled',
-  FAILED: 'failed',
-  DONE: 'done',
-} as const
+import {
+  TASK_REVIEW_STATE,
+  TASK_RUNTIME_STATUS,
+  TaskPlanState,
+  type TaskReviewState,
+  type TaskRuntimeStatus,
+} from '@parallax/common'
 
-export type TaskStatus = (typeof TASK_STATUS)[keyof typeof TASK_STATUS]
+export const TASK_STATUS = TASK_RUNTIME_STATUS
+
+export type TaskStatus = TaskRuntimeStatus
 
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   [TASK_STATUS.QUEUED]: 'Queue',
@@ -16,31 +18,15 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   [TASK_STATUS.DONE]: 'Done',
 }
 
-export const PLAN_STATE = {
-  NOT_REQUIRED: 'NOT_REQUIRED',
-  PLAN_GENERATING: 'PLAN_GENERATING',
-  PLAN_READY: 'PLAN_READY',
-  PLAN_REQUIRES_CLARIFICATION: 'PLAN_REQUIRES_CLARIFICATION',
-  PLAN_APPROVED: 'PLAN_APPROVED',
-  PLAN_REJECTED: 'PLAN_REJECTED',
-  PLAN_FAILED: 'PLAN_FAILED',
-} as const
+export const PLAN_STATE = TaskPlanState
 
-export type TaskPlanState = (typeof PLAN_STATE)[keyof typeof PLAN_STATE]
+export type UiTaskPlanState = TaskPlanState
 
-export const REVIEW_STATE = {
-  NONE: 'NONE',
-  WAITING_FOR_REVIEW: 'WAITING_FOR_REVIEW',
-  REVIEW_PENDING: 'REVIEW_PENDING',
-  SYNCING_MAIN: 'SYNCING_MAIN',
-  RESOLVING_CONFLICTS: 'RESOLVING_CONFLICTS',
-  APPLYING_REVIEW: 'APPLYING_REVIEW',
-  REVISION_PUSHED: 'REVISION_PUSHED',
-} as const
+export { TASK_REVIEW_STATE }
 
-export type TaskReviewState = (typeof REVIEW_STATE)[keyof typeof REVIEW_STATE]
+export type { TaskReviewState }
 
-export const PLAN_EDITABLE_STATES = new Set<string>([
+export const PLAN_EDITABLE_STATES = new Set<TaskPlanState>([
   PLAN_STATE.PLAN_READY,
   PLAN_STATE.PLAN_REQUIRES_CLARIFICATION,
 ])

@@ -1,22 +1,22 @@
-import { PlanResultStatus, Task, TaskPlanState } from '@parallax/common'
+import { PlanResultStatus, Task, TaskPlanState, TASK_REVIEW_STATE, TASK_STATUS } from '@parallax/common'
 
 export function deriveTaskMessage(task: Task): string {
   const planState = normalizePlanState(task)
-  const reviewState = `${task.reviewState || 'NONE'}`
+  const reviewState = task.reviewState ?? TASK_REVIEW_STATE.NONE
 
-  if (task.status === 'CANCELED') {
+  if (task.status === TASK_STATUS.CANCELED) {
     return 'Task canceled'
   }
-  if (reviewState === 'WAITING_FOR_REVIEW') {
+  if (reviewState === TASK_REVIEW_STATE.WAITING_FOR_REVIEW) {
     return task.prUrl ? `Waiting for review on ${task.prUrl}` : 'Waiting for review'
   }
-  if (reviewState === 'REVISION_PUSHED') {
+  if (reviewState === TASK_REVIEW_STATE.REVISION_PUSHED) {
     return 'Review changes pushed to PR'
   }
-  if (task.status === 'COMPLETED') {
+  if (task.status === TASK_STATUS.COMPLETED) {
     return task.prUrl ? `PR ready: ${task.prUrl}` : 'Task completed'
   }
-  if (task.status === 'FAILED') {
+  if (task.status === TASK_STATUS.FAILED) {
     return 'Task failed'
   }
   if (planState === TaskPlanState.PLAN_GENERATING) {
@@ -26,7 +26,7 @@ export function deriveTaskMessage(task: Task): string {
     return 'Plan generation failed'
   }
   if (planState === TaskPlanState.PLAN_READY) {
-    return reviewState === 'WAITING_FOR_REVIEW' ? 'Plan submitted' : 'Awaiting plan approval'
+    return 'Awaiting plan approval'
   }
   if (planState === TaskPlanState.PLAN_REQUIRES_CLARIFICATION) {
     return 'Plan requires clarification'
@@ -84,7 +84,15 @@ export function normalizePlanState(task: Task): TaskPlanState {
 }
 
 export function getTaskPlanPrompt(task: Task): string {
-  return task.planPrompt || `Auto-generated task prompt for ${task.externalId}`
+  return assertPlanPrompt(task.planPrompt, task.id)
+}
+
+export function assertPlanPrompt(prompt: string | undefined, taskId: string): string {
+  if (!prompt) {
+    throw new Error(`Task ${taskId} is missing planPrompt.`)
+  }
+
+  return prompt
 }
 
 export function isPlaceholderPlanError(error: string | undefined): boolean {
@@ -92,7 +100,7 @@ export function isPlaceholderPlanError(error: string | undefined): boolean {
 }
 
 export function isRetryableExecution(task: Task, maxExecutionAttempts: number): boolean {
-  return (task.executionAttempts || 0) < maxExecutionAttempts
+  return (task.executionAttempts ?? 0) < maxExecutionAttempts
 }
 
 export function requiresPlan(task: Task): boolean {

@@ -132,9 +132,9 @@ export function TaskSidebar({
                     />
                     <p className="truncate text-sm font-medium text-zinc-100">{task.id}</p>
                   </div>
-                  <p className="mb-2 truncate text-xs text-zinc-500">{task.title || task.msg}</p>
+                  <p className="mb-2 truncate text-xs text-zinc-500">{task.title}</p>
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-400">{task.projectId || 'unknown project'}</span>
+                    <span className="text-zinc-400">{task.projectId}</span>
                     <span className="text-zinc-500">{TASK_STATUS_LABEL[task.status]}</span>
                   </div>
                 </button>
