@@ -1,20 +1,19 @@
 import TerminalBlock from "./TerminalBlock";
 
 const configLines = [
-  { number: 1, isCommand: false, content: <span><span className="text-primary">id</span>: <span className="text-foreground">www</span></span> },
-  { number: 2, isCommand: false, content: <span><span className="text-primary">workspaceDir</span>: <span className="text-muted-foreground">/Users/maxi/projects/www</span></span> },
-  { number: 3, isCommand: false, content: <span><span className="text-primary">pullFrom</span>:</span> },
-  { number: 4, isCommand: false, content: <span>  <span className="text-primary">provider</span>: <span className="text-foreground">github</span></span> },
-  { number: 5, isCommand: false, content: <span>  <span className="text-primary">filters</span>:</span> },
-  { number: 6, isCommand: false, content: <span>    <span className="text-primary">owner</span>: <span className="text-foreground">maxigimenez</span></span> },
-  { number: 7, isCommand: false, content: <span>    <span className="text-primary">repo</span>: <span className="text-foreground">www</span></span> },
-  { number: 8, isCommand: false, content: <span>    <span className="text-primary">state</span>: <span className="text-foreground">open</span></span> },
-  { number: 9, isCommand: false, content: <span>    <span className="text-primary">labels</span>: <span className="text-muted-foreground">[ai-ready]</span></span> },
-  { number: 10, isCommand: false, content: <span><span className="text-primary">agent</span>:</span> },
-  { number: 11, isCommand: false, content: <span>  <span className="text-primary">provider</span>: <span className="text-foreground">codex</span></span> },
-  { number: 12, isCommand: false, content: <span>  <span className="text-primary">model</span>: <span className="text-foreground">gpt-5.3-codex</span></span> },
-  { number: 13, isCommand: false, content: <span>  <span className="text-primary">sandbox</span>: <span className="text-foreground">true</span></span> },
-  { number: 14, isCommand: false, content: <span>  <span className="text-primary">disableMcp</span>: <span className="text-foreground">true</span></span> },
+  { number: 1, isCommand: false, content: <span><span className="text-primary">- id</span>: <span className="text-foreground">www</span></span> },
+  { number: 2, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;workspaceDir</span>: <span className="text-muted-foreground">/Users/maxi/projects/www</span></span> },
+  { number: 3, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;pullFrom</span>:</span> },
+  { number: 4, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;provider</span>: <span className="text-foreground">github</span></span> },
+  { number: 5, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;filters</span>:</span> },
+  { number: 6, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;owner</span>: <span className="text-foreground">maxigimenez</span></span> },
+  { number: 7, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;repo</span>: <span className="text-foreground">www</span></span> },
+  { number: 8, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;state</span>: <span className="text-foreground">open</span></span> },
+  { number: 9, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;labels</span>: <span className="text-muted-foreground">[ai-ready]</span></span> },
+  { number: 10, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;agent</span>:</span> },
+  { number: 11, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;provider</span>: <span className="text-foreground">codex</span></span> },
+  { number: 12, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;model</span>: <span className="text-foreground">gpt-5.3-codex</span></span> },
+  { number: 13, isCommand: false, content: <span><span className="text-primary">&nbsp;&nbsp;&nbsp;&nbsp;sandbox</span>: <span className="text-foreground">true</span></span> },
 ];
 
 const ConfigSection = () => {

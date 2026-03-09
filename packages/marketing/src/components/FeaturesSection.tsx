@@ -30,7 +30,7 @@ const features = [
     icon: <Github className="w-5 h-5" />,
     title: "Suggest Features",
     description: "Have an idea? Help shape parallax_ by suggesting features on GitHub Issues.",
-    href: "https://github.com",
+    href: "https://github.com/maxigimenez",
     isExternal: true,
   },
 ];
