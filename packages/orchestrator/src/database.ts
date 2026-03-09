@@ -248,7 +248,7 @@ export const dbService = {
       details.branchName,
       details.prUrl,
       details.prNumber,
-      TASK_REVIEW_STATE.WAITING_FOR_REVIEW,
+      TASK_REVIEW_STATE.NONE,
       Date.now(),
       id
     )

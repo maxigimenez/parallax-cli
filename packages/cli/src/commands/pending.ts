@@ -85,7 +85,7 @@ function printPendingSummary(tasks: TaskPendingState[]) {
 export async function runPending(args: string[], context: CliContext) {
   const options = parsePendingOptions(args)
   const configPath = options.configPath ? context.resolvePath(options.configPath) : undefined
-  const apiBase = options.apiBase || (await context.resolveDefaultApiBase(configPath))
+  const apiBase = await context.resolveDefaultApiBase(configPath)
 
   const pendingTasks = await fetchJson<TaskPendingState[]>(`${apiBase}/tasks/pending-plans`)
   const allowedProjectIds = await context.resolveProjectIdsForPending(configPath)

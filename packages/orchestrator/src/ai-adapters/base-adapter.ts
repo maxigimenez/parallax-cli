@@ -25,18 +25,4 @@ export abstract class BaseAgentAdapter {
   ): Promise<AgentResult>
 
   abstract runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult>
-
-  abstract runReviewFixPass(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string; feedback: string }
-  ): Promise<AgentResult>
-
-  abstract runMergeConflictResolution(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string }
-  ): Promise<AgentResult>
 }

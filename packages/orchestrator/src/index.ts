@@ -5,7 +5,7 @@ import { GitService } from './git-service.js'
 import { BaseAgentAdapter } from './ai-adapters/index.js'
 import { loadConfig } from './config-loader.js'
 import { logger, setIo, setLogLevels } from './logger.js'
-import { ProjectConfig, TASK_REVIEW_STATE, TASK_STATUS, TaskPlanState, sleep } from '@parallax/common'
+import { ProjectConfig, TASK_STATUS, TaskPlanState, sleep } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
 import { createApiServer } from './runtime/api-server.js'
@@ -13,7 +13,6 @@ import { validateRuntimeRequirements } from './runtime/preflight.js'
 import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'
 import {
   createAgentAdapter,
-  processPullRequestReview,
   processTask,
   processTaskPlan,
 } from './workflow/task-runner.js'
@@ -158,55 +157,6 @@ async function pollProjects(
         })
       }
 
-      if (!services.githubPullRequestService) {
-        continue
-      }
-
-      const prs = await services.githubPullRequestService.listManagedPullRequests(project)
-      for (const pr of prs) {
-        const task = dbService.getTaskByPrNumber(project.id, pr.number)
-        if (
-          !task ||
-          activeTasks.has(task.id) ||
-          task.status === TASK_STATUS.CANCELED ||
-          canceledTasks.has(task.id)
-        ) {
-          continue
-        }
-
-        const reviewContext = await services.githubPullRequestService.getReviewContext(
-          project,
-          pr,
-          task.lastReviewEventAt
-        )
-
-        if (!reviewContext) {
-          continue
-        }
-
-        activeTasks.add(task.id)
-        dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVIEW_PENDING)
-        taskLifecycle.queue(task.id, 'Queued for PR review follow-up')
-        limit(async () => {
-          try {
-            if (canceledTasks.has(task.id)) {
-              return
-            }
-            await processPullRequestReview(
-              task,
-              project,
-              reviewContext,
-              adapter,
-              gitService,
-              canceledTasks,
-              activeWorktrees
-            )
-          } finally {
-            canceledTasks.delete(task.id)
-            activeTasks.delete(task.id)
-          }
-        })
-      }
     } catch (projectError: any) {
       logger.error(`Project poll error (${project.id}): ${projectError.message}`)
     }

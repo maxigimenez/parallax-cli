@@ -66,7 +66,6 @@ export function parsePendingOptions(args: string[]): PendingCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args, 'api') ?? '',
     configPath: parseOptionalArg(args, 'config'),
     approve,
     reject,
@@ -87,7 +86,6 @@ export function parseRetryOptions(args: string[]): RetryCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args.slice(1), 'api') ?? '',
     taskId,
     mode: rawMode,
   }
@@ -100,7 +98,6 @@ export function parseCancelOptions(args: string[]): CancelCommandOptions {
   }
 
   return {
-    apiBase: parseOptionalArg(args.slice(1), 'api') ?? '',
     taskId,
   }
 }

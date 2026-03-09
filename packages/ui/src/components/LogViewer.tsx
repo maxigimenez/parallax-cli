@@ -6,7 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { AppConfig, TaskPlanState, TaskReviewState } from '@parallax/common'
+import type { AppConfig, TaskPlanState } from '@parallax/common'
 import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
 
@@ -54,8 +54,6 @@ interface LogViewerProps {
   status: TaskStatus
   branchName?: string
   prUrl?: string
-  lastReviewEventAt?: string
-  reviewState: TaskReviewState
   planState?: TaskPlanState
   planMarkdown?: string
   planPrompt?: string
@@ -79,8 +77,6 @@ export function LogViewer({
   status,
   branchName,
   prUrl,
-  lastReviewEventAt,
-  reviewState,
   planState,
   planMarkdown,
   planPrompt,
@@ -259,7 +255,6 @@ export function LogViewer({
             />
             <SummaryRow label="Run Result" value={msg || 'No result yet'} />
             <SummaryRow label="Plan State" value={planState || 'unknown'} />
-            <SummaryRow label="Review State" value={reviewState || 'NONE'} />
             <SummaryRow
               label="PR Link"
               value={
@@ -276,10 +271,6 @@ export function LogViewer({
                   'Not created yet'
                 )
               }
-            />
-            <SummaryRow
-              label="Last Review Event"
-              value={lastReviewEventAt ? new Date(lastReviewEventAt).toLocaleString() : 'n/a'}
             />
             <SummaryRow label="Branch" value={branchName || 'n/a'} />
           </div>

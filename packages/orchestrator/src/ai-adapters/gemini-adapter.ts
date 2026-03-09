@@ -286,24 +286,6 @@ export class GeminiAdapter extends BaseAgentAdapter {
     }
   }
 
-  async runReviewFixPass(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string; feedback: string }
-  ): Promise<AgentResult> {
-    return this.executeAgent(task, workingDir, project, this.constructReviewPrompt(task, review))
-  }
-
-  async runMergeConflictResolution(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string }
-  ): Promise<AgentResult> {
-    return this.executeAgent(task, workingDir, project, this.constructConflictPrompt(task, review))
-  }
-
   private async executeAgent(
     task: Task,
     workingDir: string,
@@ -333,42 +315,6 @@ export class GeminiAdapter extends BaseAgentAdapter {
       ...(extractPrMetadata ? this.extractPrMetadata(result.output) : {}),
       error: result.exitCode !== 0 ? `Agent exited with code ${result.exitCode}` : undefined,
     }
-  }
-
-  private constructReviewPrompt(
-    task: Task,
-    review: { prUrl: string; branchName: string; baseBranch: string; feedback: string }
-  ): string {
-    const instructions = [
-      'Analyze the codebase in the current directory.',
-      'You are updating an existing pull request in response to review feedback.',
-      `The current branch is ${review.branchName} and it targets ${review.baseBranch}.`,
-      `The pull request URL is ${review.prUrl}.`,
-      'Address only the review feedback listed below.',
-      'Do not redo the full task. Do not broaden scope beyond the requested comments.',
-      'Run the relevant lightweight quality checks before finishing, and fix any issues you introduce.',
-      'Do not create a new branch or a new pull request.',
-      'Treat the feedback comments as the source of truth for what to change.',
-      ...this.buildSharedInstructions(),
-    ]
-
-    return `\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nReview feedback to address:\n${review.feedback}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
-  }
-
-  private constructConflictPrompt(
-    task: Task,
-    review: { prUrl: string; branchName: string; baseBranch: string }
-  ): string {
-    const instructions = [
-      'Analyze the repository state and resolve the current git merge conflicts.',
-      `You are on branch ${review.branchName} merging from ${review.baseBranch}.`,
-      `The pull request URL is ${review.prUrl}.`,
-      'Resolve conflicts carefully and preserve the intended task behavior.',
-      'Do not create a new branch or a new pull request.',
-      ...this.buildSharedInstructions(),
-    ]
-
-    return `\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nOriginal task description:\n${task.description}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
   }
 }
 

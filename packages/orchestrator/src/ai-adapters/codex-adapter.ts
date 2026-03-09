@@ -432,62 +432,6 @@ export class CodexAdapter extends BaseAgentAdapter {
     }
   }
 
-  async runReviewFixPass(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string; feedback: string }
-  ): Promise<AgentResult> {
-    const command = this.buildCommand(
-      task,
-      project,
-      `You are updating an existing pull request in response to review feedback.\n\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nReview feedback:\n${review.feedback}\nBranch: ${review.branchName}\nBase: ${review.baseBranch}\n\nAddress only requested feedback and keep scope constrained.`
-    )
-
-    const result = await this.executor.executeCommand(command, {
-      cwd: workingDir,
-      onData: (chunk) => this.handleLogChunk(task, chunk),
-    })
-
-    if (result.exitCode !== 0) {
-      return {
-        success: false,
-        output: result.output,
-        error: `Codex exited with code ${result.exitCode}`,
-      }
-    }
-
-    return { success: true, output: result.output }
-  }
-
-  async runMergeConflictResolution(
-    task: Task,
-    workingDir: string,
-    project: ProjectConfig,
-    review: { prUrl: string; branchName: string; baseBranch: string }
-  ): Promise<AgentResult> {
-    const command = this.buildCommand(
-      task,
-      project,
-      `Resolve merge conflicts on branch ${review.branchName} into ${review.baseBranch}.\nPR: ${review.prUrl}.\nOriginal task: ${task.description}.\nKeep changes constrained to this task.`
-    )
-
-    const result = await this.executor.executeCommand(command, {
-      cwd: workingDir,
-      onData: (chunk) => this.handleLogChunk(task, chunk),
-    })
-
-    if (result.exitCode !== 0) {
-      return {
-        success: false,
-        output: result.output,
-        error: `Codex exited with code ${result.exitCode}`,
-      }
-    }
-
-    return { success: true, output: result.output }
-  }
-
   private buildPlanPrompt(task: Task): string {
     return [
       'You are running plan mode for a coding task.',

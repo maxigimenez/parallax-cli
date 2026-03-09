@@ -84,9 +84,6 @@ const Index = () => {
             status={selectedTask.status}
             branchName={selectedTask.branchName}
             prUrl={selectedTask.prUrl}
-            prNumber={selectedTask.prNumber}
-            lastReviewEventAt={selectedTask.lastReviewEventAt}
-            reviewState={selectedTask.reviewState}
             planState={selectedTask.planState}
             planMarkdown={selectedTask.planMarkdown}
             planPrompt={selectedTask.planPrompt}

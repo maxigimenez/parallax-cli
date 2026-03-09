@@ -90,15 +90,12 @@ describe('CLI pending scope and approval helpers', () => {
 
   it('parses strict pending options when valid', () => {
     const options = parsePendingOptions([
-      '--api',
-      'http://localhost:4000',
       '--approve',
       'abc-123,abc-456',
       '--approver',
       'qa-bot',
     ])
 
-    expect(options.apiBase).toBe('http://localhost:4000')
     expect(options.approve).toBe('abc-123,abc-456')
     expect(options.approver).toBe('qa-bot')
   })
@@ -113,14 +110,12 @@ describe('CLI pending scope and approval helpers', () => {
     const options = parseRetryOptions(['eng-123'])
     expect(options.taskId).toBe('eng-123')
     expect(options.mode).toBe('full')
-    expect(options.apiBase).toBe('')
   })
 
   it('parses retry options with explicit execution mode', () => {
-    const options = parseRetryOptions(['eng-123', '--mode', 'execution', '--api', 'http://x'])
+    const options = parseRetryOptions(['eng-123', '--mode', 'execution'])
     expect(options.taskId).toBe('eng-123')
     expect(options.mode).toBe('execution')
-    expect(options.apiBase).toBe('http://x')
   })
 
   it('throws for invalid retry mode', () => {
@@ -130,9 +125,8 @@ describe('CLI pending scope and approval helpers', () => {
   })
 
   it('parses cancel options', () => {
-    const options = parseCancelOptions(['eng-123', '--api', 'http://x'])
+    const options = parseCancelOptions(['eng-123'])
     expect(options.taskId).toBe('eng-123')
-    expect(options.apiBase).toBe('http://x')
   })
 
   it('parses logs options with task and since', () => {

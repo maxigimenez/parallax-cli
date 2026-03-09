@@ -1,17 +1,10 @@
-import { PlanResultStatus, Task, TaskPlanState, TASK_REVIEW_STATE, TASK_STATUS } from '@parallax/common'
+import { PlanResultStatus, Task, TaskPlanState, TASK_STATUS } from '@parallax/common'
 
 export function deriveTaskMessage(task: Task): string {
   const planState = normalizePlanState(task)
-  const reviewState = task.reviewState ?? TASK_REVIEW_STATE.NONE
 
   if (task.status === TASK_STATUS.CANCELED) {
     return 'Task canceled'
-  }
-  if (reviewState === TASK_REVIEW_STATE.WAITING_FOR_REVIEW) {
-    return task.prUrl ? `Waiting for review on ${task.prUrl}` : 'Waiting for review'
-  }
-  if (reviewState === TASK_REVIEW_STATE.REVISION_PUSHED) {
-    return 'Review changes pushed to PR'
   }
   if (task.status === TASK_STATUS.COMPLETED) {
     return task.prUrl ? `PR ready: ${task.prUrl}` : 'Task completed'
@@ -111,9 +104,4 @@ export function requiresPlan(task: Task): boolean {
 export function isTaskExecutable(task: Task): boolean {
   const state = normalizePlanState(task)
   return state === TaskPlanState.PLAN_APPROVED || state === TaskPlanState.NOT_REQUIRED
-}
-
-export function buildReviewFeedbackPreview(feedback: string): string {
-  const normalized = feedback.replace(/\s+/g, ' ').trim()
-  return normalized.length <= 200 ? normalized : `${normalized.slice(0, 200)}...`
 }

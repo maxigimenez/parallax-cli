@@ -69,9 +69,9 @@ Commands:
 - `parallax start [--config <path>] [--env-file <path>]`
 - `parallax stop [--force]`
 - `parallax preflight`
-- `parallax pending [--api <base>] [--config <path>] [--approve <id|all>] [--reject <id>] [--json]`
-- `parallax retry <task-id> [--api <base>] [--mode <full|execution>]`
-- `parallax cancel <task-id> [--api <base>]`
+- `parallax pending [--config <path>] [--approve <id|all>] [--reject <id>] [--json]`
+- `parallax retry <task-id> [--mode <full|execution>]`
+- `parallax cancel <task-id>`
 - `parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]`
 
 ## Runtime behavior
@@ -81,8 +81,6 @@ Commands:
 3. Wait for explicit plan approval from UI or CLI.
 4. Execute only approved plan steps.
 5. Open/update PR and move task lifecycle state.
-
-PR review rework is intentionally strict: follow-up execution only triggers from explicit command comments (`parallax fix all comments`), not generic automation comments (for example deployment bots).
 
 ## Dashboard behavior
 

@@ -13,7 +13,6 @@ export type TaskPendingState = {
 }
 
 export type PendingCommandOptions = {
-  apiBase: string
   configPath?: string
   approve?: string
   reject?: string
@@ -26,13 +25,11 @@ export type StopCommandOptions = {
 }
 
 export type RetryCommandOptions = {
-  apiBase: string
   taskId: string
   mode: 'full' | 'execution'
 }
 
 export type CancelCommandOptions = {
-  apiBase: string
   taskId: string
 }
 

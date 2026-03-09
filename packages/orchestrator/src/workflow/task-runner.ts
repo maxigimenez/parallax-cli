@@ -4,7 +4,6 @@ import {
   PlanResult,
   PlanResultStatus,
   ProjectConfig,
-  TASK_REVIEW_STATE,
   Task,
   TaskPlanState,
 } from '@parallax/common'
@@ -17,7 +16,6 @@ import { taskLifecycle } from '../task-lifecycle.js'
 import { ExternalServices, markTaskInProgress } from '../runtime/provider-services.js'
 import {
   assertPlanPrompt,
-  buildReviewFeedbackPreview,
   getNextPlanState,
   getTaskPlanPrompt,
   isPlaceholderPlanError,
@@ -28,7 +26,6 @@ import {
   TaskCanceledError,
   throwIfCancellationRequested,
 } from './task-state.js'
-import { PullRequestReviewContext } from '../github/pull-request-service.js'
 
 export const MAX_EXECUTION_ATTEMPTS = 2
 
@@ -223,101 +220,6 @@ export async function processTask(
 
     logger.error(`Critical error: ${error.message}`, task.id)
     taskLifecycle.fail(task.id, `Critical error: ${error.message}`)
-  } finally {
-    activeWorktrees.delete(task.id)
-    if (worktreePath) {
-      await gitService.removeWorktree(worktreePath, project.workspaceDir)
-    }
-  }
-}
-
-export async function processPullRequestReview(
-  task: Task,
-  project: ProjectConfig,
-  review: PullRequestReviewContext,
-  adapter: BaseAgentAdapter,
-  gitService: GitService,
-  canceledTasks: Set<string>,
-  activeWorktrees: Map<string, string>
-) {
-  logger.info(`Starting PR review follow-up for ${review.prUrl}`, task.id)
-  taskLifecycle.run(task.id, `Starting PR review follow-up for ${review.prUrl}`)
-  dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVIEW_PENDING)
-  dbService.updateTaskReviewEventAt(task.id, review.latestFeedbackAt)
-
-  let worktreePath: string | undefined
-
-  try {
-    throwIfCancellationRequested(task.id, canceledTasks)
-    const tempBaseDir = path.resolve(process.cwd(), 'worktrees')
-    const reviewTask: Task = {
-      ...task,
-      branchName: review.branchName,
-      prNumber: review.prNumber,
-      prUrl: review.prUrl,
-      lastReviewEventAt: review.latestFeedbackAt,
-    }
-
-    logger.info(`Review feedback preview: ${buildReviewFeedbackPreview(review.feedback)}`, task.id)
-    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.SYNCING_MAIN)
-    worktreePath = await gitService.createWorktreeForExistingBranch(
-      reviewTask,
-      project,
-      tempBaseDir
-    )
-    activeWorktrees.set(task.id, worktreePath)
-    logger.info(`Review worktree created: ${worktreePath}`, task.id)
-
-    const mergeResult = await gitService.mergeMainIntoBranch(worktreePath)
-    if (mergeResult.conflicted) {
-      dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.RESOLVING_CONFLICTS)
-      logger.warn(
-        'Merge conflicts detected while syncing with main. Asking AI to resolve them.',
-        task.id
-      )
-      const conflictResolution = await adapter.runMergeConflictResolution(
-        reviewTask,
-        worktreePath,
-        project,
-        review
-      )
-
-      if (!conflictResolution.success) {
-        logger.error(`Conflict resolution failed: ${conflictResolution.error}`, task.id)
-        taskLifecycle.fail(task.id, `Conflict resolution failed: ${conflictResolution.error}`)
-        return
-      }
-    }
-
-    throwIfCancellationRequested(task.id, canceledTasks)
-    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.APPLYING_REVIEW)
-    const reviewFixResult = await adapter.runReviewFixPass(reviewTask, worktreePath, project, review)
-    throwIfCancellationRequested(task.id, canceledTasks)
-    if (!reviewFixResult.success) {
-      logger.error(`Review fix pass failed: ${reviewFixResult.error}`, task.id)
-      taskLifecycle.fail(task.id, `Review fix pass failed: ${reviewFixResult.error}`)
-      return
-    }
-
-    const branchName = await gitService.commitAndPush(worktreePath, reviewTask)
-    if (!branchName) {
-      logger.error('No changes made while addressing PR review feedback.', task.id)
-      taskLifecycle.fail(task.id, 'No changes made while addressing PR review feedback.')
-      return
-    }
-
-    logger.success(`PR Updated: ${review.prUrl}`, task.id)
-    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVISION_PUSHED)
-    taskLifecycle.complete(task.id, `PR Updated: ${review.prUrl}`)
-  } catch (error: any) {
-    if (error instanceof TaskCanceledError) {
-      taskLifecycle.cancel(task.id, 'Task canceled before review follow-up completed.')
-      logger.warn('Task canceled before review follow-up completed.', task.id)
-      return
-    }
-
-    logger.error(`Critical review error: ${error.message}`, task.id)
-    taskLifecycle.fail(task.id, `Critical review error: ${error.message}`)
   } finally {
     activeWorktrees.delete(task.id)
     if (worktreePath) {

@@ -15,7 +15,7 @@ async function postJson(url: string, body: unknown) {
 
 export async function runCancel(args: string[], context: CliContext) {
   const options = parseCancelOptions(args)
-  const apiBase = options.apiBase || (await context.resolveDefaultApiBase())
+  const apiBase = await context.resolveDefaultApiBase()
   await postJson(`${apiBase}/tasks/${encodeURIComponent(options.taskId)}/cancel`, {})
   console.log(`Canceled: ${options.taskId}`)
 }

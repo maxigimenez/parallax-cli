@@ -56,7 +56,7 @@ parallax stop [--force]
 List pending plans and optionally approve/reject from CLI.
 
 ```bash
-parallax pending [--api <base>] [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
+parallax pending [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
 ```
 
 Examples:
@@ -73,7 +73,7 @@ parallax pending --json
 Queue a retry for a task.
 
 ```bash
-parallax retry <task-id> [--api <base>] [--mode <full|execution>]
+parallax retry <task-id> [--mode <full|execution>]
 ```
 
 Modes:
@@ -86,7 +86,7 @@ Modes:
 Cancel a pending or running task.
 
 ```bash
-parallax cancel <task-id> [--api <base>]
+parallax cancel <task-id>
 ```
 
 ## `parallax logs`

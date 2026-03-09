@@ -1,13 +1,11 @@
 import { PULL_PROVIDER, ProjectConfig, Task } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
-import { GitHubPullRequestService } from '../github/pull-request-service.js'
 import { GitHubService } from '../github/service.js'
 import { LinearService } from '../linear/service.js'
 
 export type ExternalServices = {
   linearService?: LinearService
   githubService?: GitHubService
-  githubPullRequestService?: GitHubPullRequestService
 }
 
 export function buildExternalServices(
@@ -20,9 +18,6 @@ export function buildExternalServices(
   return {
     linearService: options.linearApiKey ? new LinearService(options.linearApiKey) : undefined,
     githubService: options.requiresGitHub ? new GitHubService(executor) : undefined,
-    githubPullRequestService: options.requiresGitHub
-      ? new GitHubPullRequestService(executor)
-      : undefined,
   }
 }
 
