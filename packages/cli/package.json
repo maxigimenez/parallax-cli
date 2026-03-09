@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
-    "@parallax/common": "0.0.2",
-    "@parallax/orchestrator": "0.0.2",
-    "@parallax/ui": "0.0.2",
+    "@parallax/common": "workspace:*",
+    "@parallax/orchestrator": "workspace:*",
+    "@parallax/ui": "workspace:*",
     "chalk": "4",
     "dotenv": "16.4.7",
     "fastify": "5.7.4",

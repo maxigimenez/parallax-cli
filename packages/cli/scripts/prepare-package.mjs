@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename)
 const cliDir = path.resolve(__dirname, '..')
 const workspaceRoot = path.resolve(cliDir, '..', '..')
 const backupPath = path.join(cliDir, '.pack-backup.json')
+const cliPackageJsonPath = path.join(cliDir, 'package.json')
 
 const bundledPackages = [
   {
@@ -101,12 +102,27 @@ async function main() {
   runPnpm(['--filter', '@parallax/ui', 'build'])
   runPnpm(['--filter', 'parallax-cli', 'build'])
 
-  const backup = {}
+  const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, 'utf8'))
+  const backup = {
+    cliPackageJson,
+    packages: {},
+  }
   for (const metadata of bundledPackages) {
     const targetDir = targetDirForPackage(metadata.name)
-    backup[metadata.name] = await backupExistingTarget(targetDir)
+    backup.packages[metadata.name] = await backupExistingTarget(targetDir)
     await writeBundledPackage(metadata)
   }
+
+  const rewrittenCliPackageJson = {
+    ...cliPackageJson,
+    dependencies: {
+      ...cliPackageJson.dependencies,
+      '@parallax/common': bundledPackages[0].packageJson.version,
+      '@parallax/orchestrator': bundledPackages[1].packageJson.version,
+      '@parallax/ui': bundledPackages[2].packageJson.version,
+    },
+  }
+  await fs.writeFile(cliPackageJsonPath, JSON.stringify(rewrittenCliPackageJson, null, 2) + '\n')
 
   await fs.writeFile(backupPath, JSON.stringify(backup, null, 2))
 }

@@ -1,0 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 0 0% 85%;
+
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 85%;
+
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 85%;
+
+    --primary: 24 95% 53%;
+    --primary-foreground: 0 0% 2%;
+
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 85%;
+
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 24 95% 53%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 6%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 24 95% 53%;
+    --sidebar-primary-foreground: 0 0% 2%;
+    --sidebar-accent: 0 0% 12%;
+    --sidebar-accent-foreground: 0 0% 85%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 24 95% 53%;
+
+    --terminal-green: 142 70% 49%;
+    --terminal-comment: 0 0% 40%;
+    --terminal-line: 0 0% 25%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-mono;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+.animate-timeline-draw {
+  animation: timeline-draw 0.6s ease-out;
+}
+
+@keyframes terminal-type {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes timeline-draw {
+  from { opacity: 0; transform: scaleY(0); transform-origin: top; }
+  to { opacity: 1; transform: scaleY(1); transform-origin: top; }
+}
+
+@keyframes arrow-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes arrow-flow {
+  0% { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
+
+@keyframes arrow-flow-v {
+  0% { transform: scaleY(0); transform-origin: top; }
+  100% { transform: scaleY(1); transform-origin: top; }
+}
+
+.animated-arrow-line {
+  animation: arrow-flow 0.8s ease-out forwards, arrow-pulse 2s ease-in-out 0.8s infinite;
+}
+
+.animated-arrow-line-v {
+  animation: arrow-flow-v 0.8s ease-out forwards, arrow-pulse 2s ease-in-out 0.8s infinite;
+}
+
+.animated-arrow-head {
+  animation: arrow-pulse 2s ease-in-out infinite;
+}
+
+.delay-300 {
+  animation-delay: 0.3s;
+}
+
+.line-number {
+  @apply text-muted-foreground select-none inline-block w-8 text-right mr-6 text-sm;
+}
+
+.terminal-window {
+  @apply bg-card border border-border rounded-lg overflow-hidden;
+}
+
+.terminal-header {
+  @apply flex items-center gap-2 px-4 py-3 border-b border-border;
+}
+
+.terminal-dot {
+  @apply w-3 h-3 rounded-full;
+}
+
+.glow-orange {
+  text-shadow: 0 0 20px hsl(24 95% 53% / 0.5), 0 0 40px hsl(24 95% 53% / 0.2);
+}
+
+.border-glow {
+  box-shadow: 0 0 20px hsl(24 95% 53% / 0.1), inset 0 0 20px hsl(24 95% 53% / 0.05);
+}

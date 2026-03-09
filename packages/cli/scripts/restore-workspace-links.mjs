@@ -6,6 +6,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const cliDir = path.resolve(__dirname, '..')
 const backupPath = path.join(cliDir, '.pack-backup.json')
+const cliPackageJsonPath = path.join(cliDir, 'package.json')
 
 function targetDirForPackage(packageName) {
   return path.join(cliDir, 'node_modules', ...packageName.split('/'))
@@ -26,7 +27,11 @@ async function main() {
     const raw = await fs.readFile(backupPath, 'utf8')
     const backup = JSON.parse(raw)
 
-    for (const [packageName, targetBackup] of Object.entries(backup)) {
+    if (backup.cliPackageJson) {
+      await fs.writeFile(cliPackageJsonPath, JSON.stringify(backup.cliPackageJson, null, 2) + '\n')
+    }
+
+    for (const [packageName, targetBackup] of Object.entries(backup.packages ?? {})) {
       await restoreTarget(packageName, targetBackup)
     }
   } finally {
