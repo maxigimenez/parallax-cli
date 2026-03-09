@@ -20,7 +20,7 @@ This documentation is for users running Parallax as a local automation runtime f
 
 ## Recommended first run
 
-1. Install: `npm i -g parallax-ai@alpha`
+1. Install: `npm i -g parallax-cli`
 2. Validate dependencies: `parallax preflight`
 3. Create `parallax.yml`
 4. Start Parallax: `parallax start`

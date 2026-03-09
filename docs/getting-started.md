@@ -4,12 +4,12 @@
 
 Requirements:
 
-- Node.js `>= 22`
+- Node.js `>= 23.7.0`
 
 Install Parallax globally:
 
 ```bash
-npm i -g parallax-ai@alpha
+npm i -g parallax-cli
 ```
 
 Confirm command is available:
@@ -28,7 +28,7 @@ parallax preflight
 
 `preflight` checks:
 
-- Node.js version (`>= 22`)
+- Node.js version (`>= 23.7.0`)
 - `git` CLI
 - `pnpm` CLI
 - `gh` CLI

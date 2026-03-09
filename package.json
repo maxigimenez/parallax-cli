@@ -1,6 +1,6 @@
 {
   "name": "parallax",
-  "version": "0.0.1-alpha.6",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,15 +8,13 @@
     "test": "pnpm -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "parallax": "NODE_ENV=dev pnpm --filter @parallax/cli start",
+    "parallax": "NODE_ENV=dev pnpm --filter parallax-cli start",
     "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
-    "prepare:release": "sh ./scripts/prepare_release",
-    "release": "cd .release && npm_config_cache=.npm-cache npm publish --tag alpha --access public",
-    "release:pack": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm pack",
-    "release:publish": "pnpm prepare:release && cd .release && npm_config_cache=.npm-cache npm publish --access public"
+    "release:pack": "pnpm --filter parallax-cli pack:tarball",
+    "release:publish": "pnpm --dir packages/cli publish:package"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
+    "@eslint/js": "10.0.2",
     "@typescript-eslint/eslint-plugin": "8.56.1",
     "@typescript-eslint/parser": "8.56.1",
     "eslint": "10.0.2",

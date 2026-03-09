@@ -12,7 +12,7 @@ function loadYamlModule() {
     return requireFromCli('js-yaml') as { load: (input: string) => unknown }
   } catch (error) {
     throw new Error(
-      'Missing runtime dependency "js-yaml". Reinstall parallax-ai (npm i -g parallax-ai@alpha).',
+      'Missing runtime dependency "js-yaml". Reinstall parallax-cli (npm i -g parallax-cli).',
       { cause: error }
     )
   }
@@ -32,8 +32,9 @@ function ensureArray(value: unknown, source: string): string[] {
   })
 }
 
-export function findWorkspaceRoot(startDir: string): string {
+export function resolveCliRoot(startDir: string): string {
   let current = startDir
+  let cliPackageRoot: string | undefined
   while (current !== path.parse(current).root) {
     const packageJsonPath = path.join(current, 'package.json')
     if (fsSync.existsSync(packageJsonPath)) {
@@ -41,11 +42,18 @@ export function findWorkspaceRoot(startDir: string): string {
       if (content.name === 'parallax') {
         return current
       }
+      if (content.name === 'parallax-cli') {
+        cliPackageRoot = current
+      }
     }
     current = path.dirname(current)
   }
 
-  throw new Error(`Unable to resolve workspace root from ${startDir}.`)
+  if (cliPackageRoot) {
+    return cliPackageRoot
+  }
+
+  throw new Error(`Unable to resolve CLI root from ${startDir}.`)
 }
 
 export async function ensureFileExists(filePath: string): Promise<boolean> {

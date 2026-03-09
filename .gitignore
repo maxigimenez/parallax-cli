@@ -14,6 +14,8 @@ packages/orchestrator/worktrees/
 .parallax
 .release
 parallax.*.*yml
+packages/cli/.npm-cache/
+packages/cli/*.tgz
 
 # Sensitive data
 .env

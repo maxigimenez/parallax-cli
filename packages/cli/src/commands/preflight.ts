@@ -3,8 +3,29 @@ import { checkGhAuth, commandExists, startSpinner } from '../process.js'
 import type { VerifyCheck } from '../types.js'
 
 function isSupportedNodeVersion(version: string): boolean {
-  const major = Number.parseInt(version.replace(/^v/, '').split('.')[0] ?? '0', 10)
-  return Number.isFinite(major) && major >= 22
+  const [majorRaw, minorRaw, patchRaw] = version.replace(/^v/, '').split('.')
+  const major = Number.parseInt(majorRaw ?? '0', 10)
+  const minor = Number.parseInt(minorRaw ?? '0', 10)
+  const patch = Number.parseInt(patchRaw ?? '0', 10)
+
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(patch)) {
+    return false
+  }
+
+  if (major > 23) {
+    return true
+  }
+  if (major < 23) {
+    return false
+  }
+  if (minor > 7) {
+    return true
+  }
+  if (minor < 7) {
+    return false
+  }
+
+  return patch >= 0
 }
 
 function printVerifyChecks(checks: VerifyCheck[]) {
@@ -28,7 +49,7 @@ export async function runPreflight(args: string[]) {
 
   try {
     checks.push({
-      name: 'Node.js >= 22',
+      name: 'Node.js >= 23.7.0',
       ok: isSupportedNodeVersion(process.version),
       required: true,
       detail: isSupportedNodeVersion(process.version) ? undefined : `Current: ${process.version}`,

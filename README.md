@@ -13,7 +13,7 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 
 ## Requirements
 
-- Node.js `>= 22`
+- Node.js `>= 23.7.0`
 - `pnpm` `10.x`
 - `git`
 - Provider credentials in your shell environment (optional per-project `.env` via `parallax register --env-file`)
@@ -103,29 +103,27 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 For full user guides, see [docs/README.md](docs/README.md).
 
-## Publish Single NPM Package (`parallax-ai`)
+## Publish Global CLI (`parallax-cli`)
 
-Parallax can be published as one global package so users can run:
+Parallax is published as a single global CLI package:
 
 ```bash
-npm i -g parallax-ai
+npm i -g parallax-cli
 ```
 
 Release steps:
 
 ```bash
 pnpm install
-pnpm prepare:release
-cd .release
-npm_config_cache=.npm-cache npm pack
-# inspect tarball contents, then:
-npm_config_cache=.npm-cache npm publish --access public
+pnpm release:pack
+# inspect packages/cli/parallax-cli-0.0.2.tgz, then:
+pnpm release:publish
 ```
 
 Then on Raspberry Pi / any machine:
 
 ```bash
-npm i -g parallax-ai
+npm i -g parallax-cli
 parallax preflight
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 parallax register ./parallax.yml

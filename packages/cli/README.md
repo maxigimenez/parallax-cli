@@ -1,4 +1,4 @@
-# parallax_
+# parallax-cli
 
 > WARNING: This package is in active development and may contain breaking changes or unstable behavior.
 
@@ -7,12 +7,12 @@ Parallax is a local AI orchestrator for software development tasks.
 ## Install
 
 ```bash
-npm i -g parallax-ai@alpha
+npm i -g parallax-cli
 ```
 
 Requirements:
 
-- Node.js `>= 22`
+- Node.js `>= 23.7.0`
 
 ## Basic Usage
 
@@ -22,7 +22,7 @@ parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 parallax register ./parallax.yml --env-file ./.env
 ```
 
-## Example `parallax.yml` (GitHub pull source)
+## Example `parallax.yml`
 
 ```yaml
 - id: my-repo
@@ -41,10 +41,4 @@ parallax register ./parallax.yml --env-file ./.env
     disableMcp: true
 ```
 
-Parallax stores runtime state under `~/.parallax` and keeps registered configs in `~/.parallax/registry.json`.
-
-## Support
-
-For questions, issues, or feedback, reach out via:
-
-- https://github.com/maxigimenez
+Parallax stores runtime state under `~/.parallax`.

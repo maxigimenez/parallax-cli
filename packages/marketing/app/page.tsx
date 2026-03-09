@@ -64,7 +64,7 @@ export default function HomePage() {
               <span className="ml-2 font-mono text-[11px] text-white/40">terminal</span>
             </div>
             <div className="rounded border border-white/10 bg-black/50 p-4 font-mono text-sm leading-7">
-              <p className="text-white/72">$ npm i -g parallax-ai</p>
+              <p className="text-white/72">$ npm i -g parallax-cli</p>
               <p className="text-white/72">$ parallax preflight</p>
               <p className="text-white/72">$ parallax start --data-dir ./.parallax</p>
               <p className="text-white/88">
@@ -112,7 +112,7 @@ export default function HomePage() {
         <section className="mx-auto mt-20 max-w-3xl border-t border-white/10 pt-10 text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-white/60">Install</p>
           <div className="mx-auto mt-4 max-w-md rounded border border-white/10 bg-black/45 px-4 py-3 font-mono text-sm text-white/90">
-            npm i -g parallax-ai
+            npm i -g parallax-cli
           </div>
         </section>
       </div>

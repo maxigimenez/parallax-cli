@@ -4,7 +4,7 @@
 
 ### Node.js version check failed
 
-Use Node.js `>= 22` (recommended: latest LTS), then rerun `parallax preflight`.
+Use Node.js `>= 23.7.0`, then rerun `parallax preflight`. Older Node versions can fail when Parallax initializes SQLite.
 
 ### `gh auth status` failed
 

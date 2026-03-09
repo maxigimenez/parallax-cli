@@ -7,12 +7,12 @@ import { DEFAULT_API_PORT } from '@parallax/common'
 import { hasFlag, parseCancelOptions, parseLogsOptions, parsePendingOptions, parsePreflightOptions, parseRegisterOptions, parseRetryOptions, parseStartOptions, parseStopOptions as parseStopOptionsInternal, resolvePath } from './args.js'
 import {
   ensureFileExists,
-  findWorkspaceRoot,
   loadRegistry as loadRegistryFromDisk,
   loadRunningState as loadRunningStateFromDisk,
   parseConfigProjectIds,
   parseRegistryState,
   parseRunningState,
+  resolveCliRoot,
   saveRegistry as saveRegistryToDisk,
   validateConfigFile,
 } from './config.js'
@@ -39,7 +39,7 @@ const DEFAULT_DATA_DIR = path.join(os.homedir(), '.parallax')
 const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
 const MANIFEST_FILE = 'running.json'
 const REGISTRY_FILE = 'registry.json'
-const ROOT_DIR = findWorkspaceRoot(__dirname)
+const ROOT_DIR = resolveCliRoot(__dirname)
 
 function resolvePackageVersion(rootDir: string): string {
   const candidates = [
@@ -57,7 +57,7 @@ function resolvePackageVersion(rootDir: string): string {
     const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as { version?: string; name?: string }
     if (
       typeof parsed.version === 'string' &&
-      (parsed.name === '@parallax/cli' || candidate.endsWith('/packages/cli/package.json'))
+      (parsed.name === 'parallax-cli' || candidate.endsWith('/packages/cli/package.json'))
     ) {
       return parsed.version
     }
@@ -180,8 +180,21 @@ export function parseStopOptions(args: string[]) {
   return parseStopOptionsInternal(args)
 }
 
-const isExecutedDirectly =
-  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href
+function isDirectExecution() {
+  if (process.argv[1] === undefined) {
+    return false
+  }
+
+  try {
+    const invokedPath = fs.realpathSync(process.argv[1])
+    const modulePath = fs.realpathSync(fileURLToPath(import.meta.url))
+    return invokedPath === modulePath
+  } catch {
+    return import.meta.url === pathToFileURL(process.argv[1]).href
+  }
+}
+
+const isExecutedDirectly = isDirectExecution()
 
 if (isExecutedDirectly) {
   void cli()
