@@ -9,7 +9,6 @@ const docsSourceDir = path.resolve(marketingRoot, '..', '..', 'docs')
 const docsTargetDir = path.join(marketingRoot, 'public', 'docs')
 
 const DOC_FILES = [
-  'README.md',
   'getting-started.md',
   'configuration.md',
   'cli-reference.md',

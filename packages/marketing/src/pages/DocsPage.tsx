@@ -7,7 +7,6 @@ import { Sheet, SheetContent, SheetTrigger } from "../components/ui/sheet";
 import { Button } from "../components/ui/button";
 
 const docPages = [
-  { slug: "overview", title: "Overview", file: "/docs/README.md" },
   { slug: "getting-started", title: "Getting Started", file: "/docs/getting-started.md" },
   { slug: "configuration", title: "Configuration", file: "/docs/configuration.md" },
   { slug: "cli-reference", title: "CLI Reference", file: "/docs/cli-reference.md" },
@@ -18,9 +17,9 @@ const docPages = [
 const DocsPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [open, setOpen] = useState(false);
-  const currentSlug = slug || "overview";
+  const currentSlug = slug || "getting-started";
   const currentPage = docPages.find((p) => p.slug === currentSlug);
-  const filePath = currentPage?.file || "/docs/README.md";
+  const filePath = currentPage?.file || "/docs/getting-started.md";
   const { content, loading } = useMarkdown(filePath);
 
   return (
