@@ -23,5 +23,5 @@ This documentation is for users running Parallax as a local automation runtime f
 1. Install: `npm i -g parallax-ai@alpha`
 2. Validate dependencies: `parallax preflight`
 3. Create `parallax.yml`
-4. Start Parallax: `parallax start --data-dir ./.parallax` (or pass `--config`)
+4. Start Parallax: `parallax start` (or pass `--config`)
 5. Open dashboard: `http://localhost:8080`

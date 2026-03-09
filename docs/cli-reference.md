@@ -26,7 +26,7 @@ Notes:
 Start orchestrator in background.
 
 ```bash
-parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]
+parallax start [--config <path>] [--env-file <path>]
 ```
 
 Config behavior:
@@ -37,8 +37,8 @@ Config behavior:
 Examples:
 
 ```bash
-parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
-parallax start --data-dir ./.parallax
+parallax start --config ./parallax.yml --env-file ./.env
+parallax start
 ```
 
 ## `parallax stop`
@@ -46,7 +46,7 @@ parallax start --data-dir ./.parallax
 Stop background processes recorded in the running manifest.
 
 ```bash
-parallax stop [--data-dir <path>] [--force]
+parallax stop [--force]
 ```
 
 `--force` sends `SIGKILL` if graceful stop fails.
@@ -56,16 +56,15 @@ parallax stop [--data-dir <path>] [--force]
 List pending plans and optionally approve/reject from CLI.
 
 ```bash
-parallax pending [--api <base>] [--config <path>] [--data-dir <path>] [--approve <id|all>] [--reject <id> --reason <text>] [--json]
+parallax pending [--api <base>] [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
 ```
 
 Examples:
 
 ```bash
-parallax pending --data-dir ./.parallax
 parallax pending --approve all
 parallax pending --approve 3ed59f6e7cea
-parallax pending --reject 3ed59f6e7cea --reason "Missing rollback plan"
+parallax pending --reject 3ed59f6e7cea
 parallax pending --json
 ```
 
@@ -108,7 +107,7 @@ parallax logs --since 1741200000000
 
 ## Data directory files
 
-By default, data is stored in `./.parallax` unless `--data-dir` is provided.
+Parallax stores runtime state in `~/.parallax`.
 
 Common files:
 

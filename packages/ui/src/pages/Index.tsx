@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { EmptyState } from '@/components/EmptyState'
 import { LogViewer } from '@/components/LogViewer'
 import { SettingsViewer } from '@/components/SettingsViewer'
 import { TaskSidebar } from '@/components/TaskSidebar'
 import { useParallax } from '@/hooks/useParallax'
 import { TASK_STATUS } from '@/lib/task-constants'
+import { useMemo } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 const TASK_VIEW = 'tasks'
 const SETTINGS_VIEW = 'settings'
@@ -14,67 +14,60 @@ const SUMMARY_TAB = 'summary'
 type ActiveView = typeof TASK_VIEW | typeof SETTINGS_VIEW
 type ActiveTab = typeof SUMMARY_TAB | 'logs' | 'plan'
 
-function resolveActiveView(view: string | null): ActiveView {
-  return view === SETTINGS_VIEW ? SETTINGS_VIEW : TASK_VIEW
+function resolveActiveView(pathname: string): ActiveView {
+  return pathname.startsWith('/settings') ? SETTINGS_VIEW : TASK_VIEW
 }
 
-function resolveActiveTab(tab: string | null): ActiveTab {
+function resolveActiveTab(tab: string | undefined): ActiveTab {
   return tab === 'logs' || tab === 'plan' ? tab : SUMMARY_TAB
 }
 
 const Index = () => {
   const { tasks, config, isConnected, error, retryTask, cancelTask, approvePlan, rejectPlan } =
     useParallax()
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  const activeView = resolveActiveView(searchParams.get('view'))
-  const selectedTaskId = searchParams.get('task')
-  const activeTab = resolveActiveTab(searchParams.get('tab'))
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { taskId, tab, projectIndex } = useParams<{
+    taskId?: string
+    tab?: string
+    projectIndex?: string
+  }>()
 
   if (error) {
     throw error
   }
 
-  const selectedEntityId = useMemo(() => {
-    if (!selectedTaskId) {
-      return null
-    }
+  const activeView = resolveActiveView(location.pathname)
+  const activeTab = resolveActiveTab(tab)
+  const selectedTask = taskId ? tasks[taskId] ?? null : null
+  const selectedTaskId = taskId ?? null
+  const selectedSettingsId = projectIndex ? `project-${projectIndex}` : null
+  const selectedSidebarId = activeView === TASK_VIEW ? selectedTaskId : selectedSettingsId
 
-    if (selectedTaskId.startsWith('project-')) {
-      return selectedTaskId
-    }
-
-    if (!tasks[selectedTaskId]) {
-      throw new Error(`Selected task "${selectedTaskId}" is not available in the UI store.`)
-    }
-
-    return selectedTaskId
-  }, [selectedTaskId, tasks])
-
-  const selectedTask =
-    selectedEntityId && !selectedEntityId.startsWith('project-') ? tasks[selectedEntityId] : null
+  const waitingTasks = useMemo(
+    () => Object.values(tasks).filter((task) => task.status === TASK_STATUS.QUEUED).length,
+    [tasks]
+  )
 
   const handleSelectTask = (id: string) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('task', id)
-    if (!next.get('tab')) {
-      next.set('tab', SUMMARY_TAB)
+    if (id.startsWith('project-')) {
+      navigate(`/settings/${id.replace('project-', '')}`)
+      return
     }
-    setSearchParams(next, { replace: true })
+
+    navigate(`/tasks/${id}/${SUMMARY_TAB}`)
   }
 
   const handleViewChange = (view: ActiveView) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('view', view)
-    next.delete('task')
-    next.delete('tab')
-    setSearchParams(next, { replace: true })
+    navigate(view === SETTINGS_VIEW ? '/settings' : '/')
   }
 
-  const handleTabChange = (tab: ActiveTab) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('tab', tab)
-    setSearchParams(next, { replace: true })
+  const handleTabChange = (nextTab: ActiveTab) => {
+    if (!taskId) {
+      return
+    }
+
+    navigate(`/tasks/${taskId}/${nextTab}`)
   }
 
   return (
@@ -106,24 +99,20 @@ const Index = () => {
             activeTab={activeTab}
             onTabChange={handleTabChange}
           />
-        ) : (activeView === SETTINGS_VIEW || selectedEntityId?.startsWith('project-')) &&
-          selectedEntityId ? (
-          <SettingsViewer
-            projectIndex={Number.parseInt(selectedEntityId.replace('project-', ''), 10)}
-            config={config}
-          />
+        ) : activeView === SETTINGS_VIEW && projectIndex !== undefined ? (
+          <SettingsViewer projectIndex={Number.parseInt(projectIndex, 10)} config={config} />
         ) : (
           <EmptyState
             view={activeView}
             isConnected={isConnected}
             hasTasks={Object.keys(tasks).length > 0}
-            waitingTasks={Object.values(tasks).filter((task) => task.status === TASK_STATUS.QUEUED).length}
+            waitingTasks={waitingTasks}
           />
         )}
       </div>
 
       <TaskSidebar
-        selectedTaskId={selectedEntityId}
+        selectedTaskId={selectedSidebarId}
         onSelectTask={handleSelectTask}
         activeView={activeView}
         onViewChange={handleViewChange}

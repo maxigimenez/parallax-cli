@@ -5,12 +5,12 @@ import { startSpinner, stopProcessBestEffort } from '../process.js'
 import type { CliContext } from '../types.js'
 
 export async function runStop(args: string[], context: CliContext) {
-  const options = parseStopOptions(args, context.resolvePath, context.defaultDataDir)
-  const manifestPath = path.join(options.dataDir, context.manifestFile)
+  const options = parseStopOptions(args)
+  const manifestPath = path.join(context.defaultDataDir, context.manifestFile)
   const spinner = startSpinner('Stopping Parallax...')
 
   try {
-    const state = await context.loadRunningState(options.dataDir)
+    const state = await context.loadRunningState()
 
     await stopProcessBestEffort(state.orchestratorPid, 'orchestrator', options.force)
     await stopProcessBestEffort(state.uiPid, 'UI', options.force)

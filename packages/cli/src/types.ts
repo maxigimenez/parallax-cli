@@ -14,17 +14,14 @@ export type TaskPendingState = {
 
 export type PendingCommandOptions = {
   apiBase: string
-  dataDir: string
   configPath?: string
   approve?: string
   reject?: string
-  reason?: string
   approver?: string
   json?: boolean
 }
 
 export type StopCommandOptions = {
-  dataDir: string
   force: boolean
 }
 
@@ -50,7 +47,6 @@ export type PreflightCommandOptions = Record<string, never>
 export type RunningState = {
   startedAt: number
   configPath: string
-  dataDir: string
   orchestratorPid: number
   uiPid?: number
 }
@@ -71,9 +67,9 @@ export type CliContext = {
   cliVersion: string
   resolvePath: (raw: string) => string
   ensureFileExists: (filePath: string) => Promise<boolean>
-  loadRunningState: (dataDir: string) => Promise<RunningState>
-  resolveProjectIdsForPending: (dataDir: string, configPath?: string) => Promise<Set<string>>
-  resolveDefaultApiBase: (dataDir?: string, configPath?: string) => Promise<string>
+  loadRunningState: () => Promise<RunningState>
+  resolveProjectIdsForPending: (configPath?: string) => Promise<Set<string>>
+  resolveDefaultApiBase: (configPath?: string) => Promise<string>
   resolveServerPorts: (configPath: string) => Promise<ServerConfig>
   buildEnvConfig: (configPath: string | undefined, dataDir: string) => Record<string, string>
 }

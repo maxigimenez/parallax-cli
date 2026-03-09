@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { DEFAULT_API_PORT } from '@parallax/common'
@@ -31,24 +32,20 @@ import { printUsage } from './usage.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const DEFAULT_DATA_DIR = path.join(process.cwd(), '.parallax')
+const DEFAULT_DATA_DIR = path.join(os.homedir(), '.parallax')
 const DEFAULT_CONFIG_PATH = path.resolve(process.cwd(), 'parallax.yml')
 const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
 const MANIFEST_FILE = 'running.json'
 const CLI_VERSION = '0.0.1'
 const ROOT_DIR = findWorkspaceRoot(__dirname)
 
-async function resolveDefaultApiBase(dataDir?: string, configPath?: string): Promise<string> {
+async function resolveDefaultApiBase(configPath?: string): Promise<string> {
   if (configPath && (await ensureFileExists(configPath))) {
     const server = await resolveServerPorts(configPath)
     return `http://localhost:${server.apiPort}`
   }
 
-  if (!dataDir) {
-    throw new Error('API base is required when no running data directory is available.')
-  }
-
-  const manifest = await loadRunningStateFromDisk(dataDir, MANIFEST_FILE)
+  const manifest = await loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE)
   if (!(await ensureFileExists(manifest.configPath))) {
     throw new Error(`Running config file not found: ${manifest.configPath}`)
   }
@@ -79,9 +76,9 @@ const cliContext: CliContext = {
   cliVersion: CLI_VERSION,
   resolvePath,
   ensureFileExists,
-  loadRunningState: (dataDir) => loadRunningStateFromDisk(dataDir, MANIFEST_FILE),
-  resolveProjectIdsForPending: (dataDir, configPath) =>
-    resolvePendingProjectIds(dataDir, MANIFEST_FILE, configPath),
+  loadRunningState: () => loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE),
+  resolveProjectIdsForPending: (configPath) =>
+    resolvePendingProjectIds(DEFAULT_DATA_DIR, MANIFEST_FILE, configPath),
   resolveDefaultApiBase,
   resolveServerPorts,
   buildEnvConfig,
@@ -151,12 +148,12 @@ export {
   scopePendingTasks,
 }
 
-export async function resolveProjectIdsForPending(dataDir: string, configPath?: string) {
+export async function resolveProjectIdsForPending(configPath?: string, dataDir = DEFAULT_DATA_DIR) {
   return resolvePendingProjectIds(dataDir, MANIFEST_FILE, configPath)
 }
 
 export function parseStopOptions(args: string[]) {
-  return parseStopOptionsInternal(args, resolvePath, DEFAULT_DATA_DIR)
+  return parseStopOptionsInternal(args)
 }
 
 const isExecutedDirectly =

@@ -86,13 +86,13 @@ For full field behavior, see [Configuration Reference](./configuration.md).
 Start with explicit config:
 
 ```bash
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax start --config ./parallax.yml
 ```
 
 If `--config` is omitted, Parallax reads `./parallax.yml` from the current working directory:
 
 ```bash
-parallax start --data-dir ./.parallax
+parallax start
 ```
 
 ## 6. Open dashboard
@@ -110,11 +110,11 @@ LAN access:
 ## 7. Stop Parallax
 
 ```bash
-parallax stop --data-dir ./.parallax
+parallax stop
 ```
 
 Force stop when needed:
 
 ```bash
-parallax stop --data-dir ./.parallax --force
+parallax stop --force
 ```

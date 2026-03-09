@@ -52,7 +52,7 @@ export async function runStart(args: string[], context: CliContext) {
   const RESET = '\x1b[0m'
 
   const configArg = hasFlag(args, 'config') ? parseArgValue(args, 'config') : undefined
-  const dataDir = context.resolvePath(parseOptionalArg(args, 'data-dir') ?? context.defaultDataDir)
+  const dataDir = context.defaultDataDir
   const configPath = configArg ? context.resolvePath(configArg) : context.defaultConfigPath
   const envFilePath = await resolveEnvFilePath(
     parseOptionalArg(args, 'env-file'),
@@ -86,6 +86,20 @@ export async function runStart(args: string[], context: CliContext) {
   let uiPid = 0
 
   try {
+    const existingManifestPath = path.join(dataDir, context.manifestFile)
+    if (await context.ensureFileExists(existingManifestPath)) {
+      const existingState = await context.loadRunningState().catch(() => undefined)
+      const existingUiAlive =
+        existingState?.uiPid !== undefined ? isProcessAlive(existingState.uiPid) : false
+      if (existingState && (isProcessAlive(existingState.orchestratorPid) || existingUiAlive)) {
+        throw new Error(
+          `Parallax is already running. Stop it first with "parallax stop". Manifest: ${existingManifestPath}`
+        )
+      }
+
+      await fs.unlink(existingManifestPath).catch(() => undefined)
+    }
+
     if (workspaceDevMode) {
       orchestratorPid = spawnDetached(
         process.execPath,
@@ -145,7 +159,6 @@ export async function runStart(args: string[], context: CliContext) {
         {
           startedAt: Date.now(),
           configPath,
-          dataDir,
           orchestratorPid,
           uiPid: uiPid || undefined,
         },

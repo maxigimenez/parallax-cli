@@ -273,14 +273,20 @@ export class GitHubPullRequestService {
       }
     `.trim()
 
-    const variables = JSON.stringify({
-      owner,
-      repo,
-      number: pullRequestNumber,
-    })
-
     const result = await this.executor.executeCommand(
-      ['gh', 'api', 'graphql', '-f', `query=${query}`, '-f', `variables=${variables}`],
+      [
+        'gh',
+        'api',
+        'graphql',
+        '-f',
+        `query=${query}`,
+        '-F',
+        `owner=${owner}`,
+        '-F',
+        `repo=${repo}`,
+        '-F',
+        `number=${pullRequestNumber}`,
+      ],
       { cwd }
     )
 

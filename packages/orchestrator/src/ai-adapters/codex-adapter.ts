@@ -276,6 +276,7 @@ export class CodexAdapter extends BaseAgentAdapter {
         status: textPlan.status,
         output: trimmed,
         planMarkdown: textPlan.planMarkdown,
+        planPrompt: this.buildPlanPromptTemplate(),
         summary: textPlan.summary,
         error: textPlan.error,
       }
@@ -298,6 +299,7 @@ export class CodexAdapter extends BaseAgentAdapter {
         status: normalized.status,
         output: trimmed,
         planMarkdown: normalized.planMarkdown,
+        planPrompt: this.buildPlanPromptTemplate(),
         summary: typeof normalized.scope === 'string' ? normalized.scope : undefined,
         error: normalized.error,
       }
@@ -511,6 +513,13 @@ export class CodexAdapter extends BaseAgentAdapter {
       '- No shell commands.',
       '- Keep plan concise and actionable.',
       '- Do not use placeholder bullets like "Step 1", "Step 2", "TBD", or "..."',
+    ].join('\n')
+  }
+
+  private buildPlanPromptTemplate() {
+    return [
+      'Plain-text planning schema with STATUS, SUMMARY, PLAN, optional QUESTIONS, and optional ERROR.',
+      'No JSON, no markdown code fences, no tool calls, no shell commands.',
     ].join('\n')
   }
 

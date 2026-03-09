@@ -1,12 +1,12 @@
 export function printUsage(): void {
   console.log(`Usage:
   parallax --version
-  parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]
-  parallax pending [--api <base>] [--config <path>] [--data-dir <path>] [--approve <id|all>] [--reject <id> --reason <text>] [--json]
+  parallax start [--config <path>] [--env-file <path>]
+  parallax pending [--api <base>] [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
   parallax preflight
   parallax retry <task-id> [--api <base>] [--mode <full|execution>]
   parallax cancel <task-id> [--api <base>]
-  parallax stop [--data-dir <path>] [--force]
+  parallax stop [--force]
   parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]
 
 Commands:

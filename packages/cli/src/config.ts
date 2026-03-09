@@ -73,7 +73,6 @@ export function parseRunningState(raw: string, source: string): RunningState {
     typeof parsed !== 'object' ||
     typeof (parsed as { startedAt?: unknown }).startedAt !== 'number' ||
     typeof (parsed as { configPath?: unknown }).configPath !== 'string' ||
-    typeof (parsed as { dataDir?: unknown }).dataDir !== 'string' ||
     typeof (parsed as { orchestratorPid?: unknown }).orchestratorPid !== 'number' ||
     (parsed as { orchestratorPid: number }).orchestratorPid <= 0 ||
     ('uiPid' in parsed && typeof (parsed as { uiPid?: unknown }).uiPid !== 'number') ||

@@ -50,42 +50,26 @@ export function parseOptionalArg(args: string[], key: string): string | undefine
   return parseArgValue(args, key)
 }
 
-export function parseStopOptions(
-  args: string[],
-  resolvePath: (value: string) => string,
-  defaultDataDir: string
-): StopCommandOptions {
+export function parseStopOptions(args: string[]): StopCommandOptions {
   return {
-    dataDir: resolvePath(parseOptionalArg(args, 'data-dir') ?? defaultDataDir),
     force: hasFlag(args, 'force'),
   }
 }
 
-export function parsePendingOptions(args: string[], defaultDataDir: string): PendingCommandOptions {
+export function parsePendingOptions(args: string[]): PendingCommandOptions {
   const approve = parseOptionalArg(args, 'approve')
   const reject = parseOptionalArg(args, 'reject')
-  const reason = parseOptionalArg(args, 'reason')
   const approver = parseOptionalArg(args, 'approver')
 
   if (approve && reject) {
     throw new Error('Use either --approve or --reject, not both.')
   }
 
-  if (!approve && reject && !reason) {
-    throw new Error('Reject action requires --reason.')
-  }
-
-  if (!reject && reason) {
-    throw new Error('--reason can only be used with --reject.')
-  }
-
   return {
     apiBase: parseOptionalArg(args, 'api') ?? '',
-    dataDir: parseOptionalArg(args, 'data-dir') ?? defaultDataDir,
     configPath: parseOptionalArg(args, 'config'),
     approve,
     reject,
-    reason,
     approver,
     json: hasFlag(args, 'json'),
   }

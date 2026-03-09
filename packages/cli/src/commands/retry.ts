@@ -15,7 +15,7 @@ async function postJson(url: string, body: unknown) {
 
 export async function runRetry(args: string[], context: CliContext) {
   const options = parseRetryOptions(args)
-  const apiBase = options.apiBase || (await context.resolveDefaultApiBase(context.defaultDataDir))
+  const apiBase = options.apiBase || (await context.resolveDefaultApiBase())
   await postJson(`${apiBase}/tasks/${encodeURIComponent(options.taskId)}/retry`, {
     mode: options.mode,
   })

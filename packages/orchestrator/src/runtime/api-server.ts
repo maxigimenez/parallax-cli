@@ -2,7 +2,7 @@ import cors from '@fastify/cors'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { AppConfig, TASK_STATUS, TaskPlanState } from '@parallax/common'
 import { dbService } from '../database.js'
-import { clearTaskState } from '../logger.js'
+import { resetTaskRuntimeState } from '../logger.js'
 import { GitService } from '../git-service.js'
 import { taskLifecycle } from '../task-lifecycle.js'
 import { isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
@@ -188,7 +188,6 @@ export async function createApiServer(
 
   fastify.post('/tasks/:taskId/reject', async (request, reply) => {
     const { taskId } = request.params as { taskId: string }
-    const { reason } = (request.body ?? {}) as { reason?: string }
     const task = dbService.getTaskByLookup(taskId)
     if (!task) {
       return reply.status(404).send({ error: 'Task not found' })
@@ -198,14 +197,10 @@ export async function createApiServer(
       return reply.status(409).send({ error: 'Task is not awaiting plan approval.' })
     }
 
-    if (!reason?.trim()) {
-      return reply.status(400).send({ error: 'Reject reason is required.' })
-    }
-
     dbService.rejectTaskPlan(task.id)
     dbService.updateTaskPlanOutput(task.id, {
       planState: TaskPlanState.PLAN_REJECTED,
-      planResult: `Rejected by operator: ${reason.trim()}`,
+      planResult: 'Plan rejected.',
     })
     taskLifecycle.fail(task.id, 'Plan rejected by operator.', TaskPlanState.PLAN_REJECTED)
     return { ok: true }
@@ -244,9 +239,10 @@ export async function createApiServer(
       dbService.clearTaskPullRequestInfo(task.id)
     }
 
+    dbService.clearTaskLogs(task.id)
     dbService.updateTaskStatus(task.id, TASK_STATUS.PENDING)
     canceledTasks.delete(task.id)
-    clearTaskState(task.id)
+    resetTaskRuntimeState(task.id)
     taskLifecycle.queue(
       task.id,
       mode === 'execution' ? 'Queued for manual execution retry' : 'Queued for manual full retry'

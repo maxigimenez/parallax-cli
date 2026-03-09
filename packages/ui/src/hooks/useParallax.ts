@@ -83,8 +83,8 @@ export function useParallax() {
     )
   }
 
-  const rejectPlan = async (taskId: string, reason?: string) => {
-    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/reject`, { reason })
+  const rejectPlan = async (taskId: string) => {
+    await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/reject`)
     setTasks((prev) =>
       upsertTaskState(prev, taskId, {
         msg: 'Plan rejected.',

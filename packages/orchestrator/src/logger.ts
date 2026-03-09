@@ -58,6 +58,10 @@ export function clearTaskState(taskId: string) {
   emitTaskRemoved(taskId)
 }
 
+export function resetTaskRuntimeState(taskId: string) {
+  clearTaskStateStore(taskId)
+}
+
 function setTaskRuntimeStatus(taskId: string, message: string, status: TaskRuntimeStatus) {
   updateTaskStatus(taskId, message, status)
   emitTaskStatus(taskId, status)

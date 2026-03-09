@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Tooltip,
@@ -9,6 +9,35 @@ import {
 import type { AppConfig, TaskPlanState, TaskReviewState } from '@parallax/common'
 import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
+
+const MIN_ACTION_DELAY_MS = 400
+
+const STATUS_ACCENT_CLASS: Record<TaskStatus, string> = {
+  [TASK_STATUS.QUEUED]: 'text-zinc-300',
+  [TASK_STATUS.RUNNING]: 'text-sky-300',
+  [TASK_STATUS.CANCELED]: 'text-amber-300',
+  [TASK_STATUS.FAILED]: 'text-red-300',
+  [TASK_STATUS.DONE]: 'text-emerald-300',
+}
+
+const STATUS_DOT_CLASS: Record<TaskStatus, string> = {
+  [TASK_STATUS.QUEUED]: 'bg-zinc-500',
+  [TASK_STATUS.RUNNING]: 'bg-sky-500',
+  [TASK_STATUS.CANCELED]: 'bg-amber-500',
+  [TASK_STATUS.FAILED]: 'bg-red-500',
+  [TASK_STATUS.DONE]: 'bg-emerald-500',
+}
+
+async function withMinimumDelay(action: () => Promise<void>) {
+  const startedAt = Date.now()
+  await action()
+  const remainingDelay = MIN_ACTION_DELAY_MS - (Date.now() - startedAt)
+  if (remainingDelay > 0) {
+    await new Promise((resolve) => {
+      setTimeout(resolve, remainingDelay)
+    })
+  }
+}
 
 interface LogViewerProps {
   taskId: string
@@ -25,7 +54,6 @@ interface LogViewerProps {
   status: TaskStatus
   branchName?: string
   prUrl?: string
-  prNumber?: number
   lastReviewEventAt?: string
   reviewState: TaskReviewState
   planState?: TaskPlanState
@@ -51,7 +79,6 @@ export function LogViewer({
   status,
   branchName,
   prUrl,
-  prNumber,
   lastReviewEventAt,
   reviewState,
   planState,
@@ -77,6 +104,9 @@ export function LogViewer({
 
   const provider = resolveProjectProvider(config, projectId)
   const actionGuard = planActionsState(planState)
+  const planActionsDisabledByStatus =
+    status === TASK_STATUS.CANCELED || status === TASK_STATUS.FAILED
+  const canEditPlan = actionGuard.canEdit && !planActionsDisabledByStatus
 
   useEffect(() => {
     setEditablePlan((planMarkdown || planResult || planPrompt || '').trim())
@@ -94,24 +124,24 @@ export function LogViewer({
   }, [activeLevel, logs])
 
   const onApprove = async () => {
-    if (!onApprovePlan || !actionGuard.canEdit) {
+    if (!onApprovePlan || !canEditPlan) {
       return
     }
     setApprovePending(true)
     try {
-      await onApprovePlan(taskId, 'operator', editablePlan)
+      await withMinimumDelay(() => onApprovePlan(taskId, 'operator', editablePlan))
     } finally {
       setApprovePending(false)
     }
   }
 
   const onReject = async () => {
-    if (!onRejectPlan || !actionGuard.canEdit) {
+    if (!onRejectPlan || !canEditPlan) {
       return
     }
     setRejectPending(true)
     try {
-      await onRejectPlan(taskId)
+      await withMinimumDelay(() => onRejectPlan(taskId))
     } finally {
       setRejectPending(false)
     }
@@ -123,7 +153,7 @@ export function LogViewer({
     }
     setRetryPending(true)
     try {
-      await onRetry(taskId)
+      await withMinimumDelay(() => onRetry(taskId))
     } finally {
       setRetryPending(false)
     }
@@ -135,7 +165,7 @@ export function LogViewer({
     }
     setCancelPending(true)
     try {
-      await onCancel(taskId)
+      await withMinimumDelay(() => onCancel(taskId))
     } finally {
       setCancelPending(false)
     }
@@ -218,12 +248,35 @@ export function LogViewer({
           <div className="space-y-3 text-sm">
             <SummaryRow label="Source Provider" value={provider} />
             <SummaryRow label="Project" value={projectId || 'unknown'} />
-            <SummaryRow label="Status" value={TASK_STATUS_LABEL[status]} />
+            <SummaryRow
+              label="Status"
+              value={
+                <span className={`inline-flex items-center gap-2 ${STATUS_ACCENT_CLASS[status]}`}>
+                  <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[status]}`} />
+                  <span>{TASK_STATUS_LABEL[status]}</span>
+                </span>
+              }
+            />
             <SummaryRow label="Run Result" value={msg || 'No result yet'} />
             <SummaryRow label="Plan State" value={planState || 'unknown'} />
             <SummaryRow label="Review State" value={reviewState || 'NONE'} />
-            <SummaryRow label="PR Link" value={prUrl || 'Not created yet'} />
-            <SummaryRow label="PR Number" value={prNumber ? String(prNumber) : 'n/a'} />
+            <SummaryRow
+              label="PR Link"
+              value={
+                prUrl ? (
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sky-300 underline decoration-sky-800 underline-offset-4 hover:text-sky-200"
+                  >
+                    {prUrl}
+                  </a>
+                ) : (
+                  'Not created yet'
+                )
+              }
+            />
             <SummaryRow
               label="Last Review Event"
               value={lastReviewEventAt ? new Date(lastReviewEventAt).toLocaleString() : 'n/a'}
@@ -275,7 +328,7 @@ export function LogViewer({
           <textarea
             value={editablePlan}
             onChange={(event) => setEditablePlan(event.target.value)}
-            disabled={!actionGuard.canEdit}
+            disabled={!canEditPlan}
             className="h-72 w-full rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-sm text-zinc-200 outline-none focus:border-emerald-600"
           />
           <TooltipProvider>
@@ -283,26 +336,38 @@ export function LogViewer({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    disabled={!actionGuard.canEdit || planActionPending}
+                    disabled={!canEditPlan || planActionPending}
                     onClick={onApprove}
                     className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-2 text-xs text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {approvePending ? 'Approving...' : 'Approve'}
                   </button>
                 </TooltipTrigger>
-                {!actionGuard.canEdit && <TooltipContent>{actionGuard.reason}</TooltipContent>}
+                {!canEditPlan && (
+                  <TooltipContent>
+                    {planActionsDisabledByStatus
+                      ? 'Plan actions are disabled once a task is failed or canceled.'
+                      : actionGuard.reason}
+                  </TooltipContent>
+                )}
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    disabled={!actionGuard.canEdit || planActionPending}
+                    disabled={!canEditPlan || planActionPending}
                     onClick={onReject}
                     className="rounded border border-red-800 bg-red-950/30 px-3 py-2 text-xs text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {rejectPending ? 'Rejecting...' : 'Reject'}
                   </button>
                 </TooltipTrigger>
-                {!actionGuard.canEdit && <TooltipContent>{actionGuard.reason}</TooltipContent>}
+                {!canEditPlan && (
+                  <TooltipContent>
+                    {planActionsDisabledByStatus
+                      ? 'Plan actions are disabled once a task is failed or canceled.'
+                      : actionGuard.reason}
+                  </TooltipContent>
+                )}
               </Tooltip>
             </div>
           </TooltipProvider>
@@ -312,7 +377,7 @@ export function LogViewer({
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="grid grid-cols-[180px_1fr] gap-3 border-b border-zinc-900 py-2">
       <span className="text-xs uppercase tracking-[0.14em] text-zinc-500">{label}</span>

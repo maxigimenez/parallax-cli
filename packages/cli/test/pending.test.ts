@@ -82,22 +82,10 @@ describe('CLI pending scope and approval helpers', () => {
     expect(() => parsePendingOptions(['--approve'])).toThrow('Missing value for --approve.')
   })
 
-  it('throws on reject without a reason', () => {
-    expect(() => parsePendingOptions(['--reject', 'abc-123'])).toThrow(
-      'Reject action requires --reason.'
-    )
-  })
-
-  it('throws when reason is used without reject', () => {
-    expect(() => parsePendingOptions(['--reason', 'only'])).toThrow(
-      '--reason can only be used with --reject.'
-    )
-  })
-
   it('throws when both approve and reject are used together', () => {
-    expect(() =>
-      parsePendingOptions(['--approve', 'abc-123', '--reject', 'xyz-456', '--reason', 'bad'])
-    ).toThrow('Use either --approve or --reject, not both.')
+    expect(() => parsePendingOptions(['--approve', 'abc-123', '--reject', 'xyz-456'])).toThrow(
+      'Use either --approve or --reject, not both.'
+    )
   })
 
   it('parses strict pending options when valid', () => {
@@ -118,15 +106,7 @@ describe('CLI pending scope and approval helpers', () => {
   it('parses stop options with defaults', () => {
     const options = parseStopOptions([])
 
-    expect(options.dataDir).toBe(process.cwd() + '/.parallax')
     expect(options.force).toBe(false)
-  })
-
-  it('parses stop options with custom data dir and force', () => {
-    const options = parseStopOptions(['--data-dir', './.parallax', '--force'])
-
-    expect(options.dataDir).toBe(process.cwd() + '/.parallax')
-    expect(options.force).toBe(true)
   })
 
   it('parses retry options with default mode', () => {
@@ -191,7 +171,6 @@ describe('CLI pending scope and approval helpers', () => {
           {
             startedAt: Date.now(),
             configPath,
-            dataDir: dir,
             orchestratorPid: 1,
             uiPid: 2,
           },
@@ -200,7 +179,7 @@ describe('CLI pending scope and approval helpers', () => {
         )
       )
 
-      const ids = await resolveProjectIdsForPending(dir)
+      const ids = await resolveProjectIdsForPending(undefined, dir)
 
       expect(ids.has('from-running')).toBe(true)
       expect(ids.size).toBe(1)

@@ -54,11 +54,11 @@ projects:
 
 ```bash
 pnpm parallax --version
-pnpm parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
-pnpm parallax start --data-dir ./.parallax
-pnpm parallax stop --data-dir ./.parallax
+pnpm parallax start --config ./parallax.yml --env-file ./.env
+pnpm parallax start
+pnpm parallax stop
 pnpm parallax preflight
-pnpm parallax pending --data-dir ./.parallax
+pnpm parallax pending
 pnpm parallax retry ENG-123 --mode execution
 pnpm parallax cancel ENG-123
 pnpm parallax logs --task ENG-123
@@ -66,10 +66,10 @@ pnpm parallax logs --task ENG-123
 
 Commands:
 
-- `parallax start [--config <path>] [--data-dir <path>] [--env-file <path>]`
-- `parallax stop [--data-dir <path>] [--force]`
+- `parallax start [--config <path>] [--env-file <path>]`
+- `parallax stop [--force]`
 - `parallax preflight`
-- `parallax pending [--api <base>] [--config <path>] [--data-dir <path>] [--approve <id|all>] [--reject <id> --reason <text>] [--json]`
+- `parallax pending [--api <base>] [--config <path>] [--approve <id|all>] [--reject <id>] [--json]`
 - `parallax retry <task-id> [--api <base>] [--mode <full|execution>]`
 - `parallax cancel <task-id> [--api <base>]`
 - `parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]`
@@ -122,7 +122,7 @@ Then on Raspberry Pi / any machine:
 ```bash
 npm i -g parallax-ai
 parallax preflight
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax start --config ./parallax.yml
 ```
 
 The dashboard is served by the orchestrator at `http://<host>:3000` (LAN accessible if host firewall allows it).

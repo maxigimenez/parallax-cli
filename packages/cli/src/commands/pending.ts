@@ -83,13 +83,12 @@ function printPendingSummary(tasks: TaskPendingState[]) {
 }
 
 export async function runPending(args: string[], context: CliContext) {
-  const options = parsePendingOptions(args, context.defaultDataDir)
-  const dataDir = context.resolvePath(options.dataDir)
+  const options = parsePendingOptions(args)
   const configPath = options.configPath ? context.resolvePath(options.configPath) : undefined
-  const apiBase = options.apiBase || (await context.resolveDefaultApiBase(dataDir, configPath))
+  const apiBase = options.apiBase || (await context.resolveDefaultApiBase(configPath))
 
   const pendingTasks = await fetchJson<TaskPendingState[]>(`${apiBase}/tasks/pending-plans`)
-  const allowedProjectIds = await context.resolveProjectIdsForPending(dataDir, configPath)
+  const allowedProjectIds = await context.resolveProjectIdsForPending(configPath)
   const scopedTasks = scopePendingTasks(pendingTasks, allowedProjectIds)
 
   if (options.approve) {
@@ -105,9 +104,7 @@ export async function runPending(args: string[], context: CliContext) {
 
   if (options.reject) {
     const rejectedId = resolveRejectTarget(scopedTasks, options.reject)
-    await postJson(`${apiBase}/tasks/${encodeURIComponent(rejectedId)}/reject`, {
-      reason: options.reason,
-    })
+    await postJson(`${apiBase}/tasks/${encodeURIComponent(rejectedId)}/reject`, {})
     console.log(`Rejected: ${rejectedId}`)
     return
   }
@@ -124,6 +121,6 @@ export async function runPending(args: string[], context: CliContext) {
 
   printPendingSummary(scopedTasks)
   console.log(
-    '\nApprove/reject with:\n  parallax pending --approve <id|all>\n  parallax pending --reject <id> --reason "<reason>"'
+    '\nApprove/reject with:\n  parallax pending --approve <id|all>\n  parallax pending --reject <id>'
   )
 }

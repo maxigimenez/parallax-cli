@@ -135,6 +135,23 @@ describe('GitHubPullRequestService', () => {
     expect(context?.feedback).toContain('Manual follow-up requested by maxi')
     expect(context?.feedback).toContain('src/form.ts:42')
     expect(context?.feedback).not.toContain('Resolved thread should be ignored.')
+    expect(executeCommandMock).toHaveBeenNthCalledWith(
+      2,
+      [
+        'gh',
+        'api',
+        'graphql',
+        '-f',
+        expect.stringMatching(/^query=/),
+        '-F',
+        'owner=org',
+        '-F',
+        'repo=repo',
+        '-F',
+        'number=7',
+      ],
+      { cwd: '/tmp/repo' }
+    )
   })
 
   it('returns null when unresolved review feedback was already handled', async () => {

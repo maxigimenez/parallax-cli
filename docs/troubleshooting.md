@@ -32,9 +32,9 @@ You started with `--config` pointing to a missing file, or ran start without `--
 Fix:
 
 ```bash
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax start --config ./parallax.yml
 # or run from the directory that contains parallax.yml:
-parallax start --data-dir ./.parallax
+parallax start
 ```
 
 ### API did not become healthy
@@ -48,8 +48,8 @@ Possible causes:
 Check:
 
 ```bash
-parallax stop --data-dir ./.parallax --force
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax stop --force
+parallax start --config ./parallax.yml
 ```
 
 ## Task actions fail (`approve`, `retry`, `cancel`)
@@ -59,7 +59,7 @@ parallax start --config ./parallax.yml --data-dir ./.parallax
 Use Parallax task id from dashboard or:
 
 ```bash
-parallax pending --data-dir ./.parallax
+parallax pending
 ```
 
 ### `Execution retry requires an approved plan`
@@ -86,9 +86,9 @@ Check:
 If local runtime state is corrupted:
 
 ```bash
-parallax stop --data-dir ./.parallax --force
-rm -rf ./.parallax
-parallax start --config ./parallax.yml --data-dir ./.parallax
+parallax stop --force
+rm -rf ~/.parallax
+parallax start --config ./parallax.yml
 ```
 
 Warning: deleting data dir removes local task/runtime history.

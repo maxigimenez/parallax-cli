@@ -33,10 +33,10 @@ pnpm lint
 Use the CLI entrypoint for all local runtime checks:
 
 ```bash
-pnpm parallax start --config ./parallax.yml --data-dir ./.parallax --env-file ./.env
-pnpm parallax pending --data-dir ./.parallax
-pnpm parallax logs --data-dir ./.parallax
-pnpm parallax stop --data-dir ./.parallax
+pnpm parallax start --config ./parallax.yml --env-file ./.env
+pnpm parallax pending
+pnpm parallax logs
+pnpm parallax stop
 ```
 
 Do not start the orchestrator or UI directly from package-level scripts for normal development flows.
