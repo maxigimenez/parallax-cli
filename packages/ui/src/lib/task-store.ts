@@ -23,6 +23,10 @@ type StatusEvent = {
   status: string
 }
 
+export function hasTaskState(tasks: Record<string, TaskInfo>, taskId: string): boolean {
+  return taskId in tasks
+}
+
 function canonicalizeLogMessage(message: string, icon: string): string {
   const withoutTaskPrefix = message.replace(/^\[[^\]]+\]\s*/, '').trim()
   const escapedIcon = icon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -117,7 +121,10 @@ export function applyTaskLogEvent(
   previous: Record<string, TaskInfo>,
   event: LogEvent
 ): Record<string, TaskInfo> {
-  const task = requireTask(previous, event.taskId)
+  const task = previous[event.taskId]
+  if (!task) {
+    return previous
+  }
   const incoming: TaskLogEntry = {
     message: event.msg,
     icon: event.icon,
@@ -143,7 +150,10 @@ export function applyTaskStatusEvent(
   previous: Record<string, TaskInfo>,
   event: StatusEvent
 ): Record<string, TaskInfo> {
-  const task = requireTask(previous, event.taskId)
+  const task = previous[event.taskId]
+  if (!task) {
+    return previous
+  }
 
   return {
     ...previous,

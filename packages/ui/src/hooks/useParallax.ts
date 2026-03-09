@@ -7,6 +7,7 @@ import { TASK_STATUS, type TaskStatus } from '@/lib/task-constants'
 import {
   applyTaskLogEvent,
   applyTaskStatusEvent,
+  hasTaskState,
   removeTaskState,
   replaceTasksFromApi,
   upsertTaskState,
@@ -49,25 +50,32 @@ export function useParallax() {
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  const refreshState = async () => {
+    const [tasksRes, configRes] = await Promise.all([
+      axios.get(`${apiBase}/tasks`),
+      axios.get(`${apiBase}/config`),
+    ])
+
+    const incoming = tasksRes.data as Array<
+      Omit<TaskInfo, 'status'> & {
+        status: string
+        logs?: TaskInfo['logs']
+      }
+    >
+
+    setConfig(configRes.data as AppConfig)
+    setTasks((prev) => replaceTasksFromApi(prev, incoming))
+    setError(null)
+  }
+
   const retryTask = async (taskId: string) => {
     await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/retry`)
-    setTasks((prev) =>
-      upsertTaskState(prev, taskId, {
-        msg: 'Queued for manual retry',
-        status: TASK_STATUS.QUEUED,
-        logs: [],
-      })
-    )
+    await refreshState()
   }
 
   const cancelTask = async (taskId: string) => {
     await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/cancel`)
-    setTasks((prev) =>
-      upsertTaskState(prev, taskId, {
-        msg: 'Cancellation requested',
-        status: TASK_STATUS.CANCELED,
-      })
-    )
+    await refreshState()
   }
 
   const approvePlan = async (taskId: string, approver?: string, planMarkdown?: string) => {
@@ -75,61 +83,48 @@ export function useParallax() {
       approver,
       planMarkdown,
     })
-    setTasks((prev) =>
-      upsertTaskState(prev, taskId, {
-        msg: 'Plan approved. Queued for execution.',
-        status: TASK_STATUS.QUEUED,
-      })
-    )
+    await refreshState()
   }
 
   const rejectPlan = async (taskId: string) => {
     await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/reject`)
-    setTasks((prev) =>
-      upsertTaskState(prev, taskId, {
-        msg: 'Plan rejected.',
-        status: TASK_STATUS.FAILED,
-      })
-    )
+    await refreshState()
   }
 
   useEffect(() => {
     let socket: ReturnType<typeof io> | undefined
 
-    const fetchData = async () => {
-      const [tasksRes, configRes] = await Promise.all([
-        axios.get(`${apiBase}/tasks`),
-        axios.get(`${apiBase}/config`),
-      ])
-
-      const incoming = tasksRes.data as Array<
-        Omit<TaskInfo, 'status'> & {
-          status: string
-          logs?: TaskInfo['logs']
+    const syncIfMissingTask = (taskId: string) => {
+      setTasks((prev) => {
+        if (hasTaskState(prev, taskId)) {
+          return prev
         }
-      >
 
-      setConfig(configRes.data as AppConfig)
-      setTasks((prev) => replaceTasksFromApi(prev, incoming))
-      setError(null)
+        void refreshState().catch((value) => {
+          setError(value instanceof Error ? value : new Error(String(value)))
+        })
+        return prev
+      })
     }
 
-    void fetchData()
+    void refreshState()
       .then(() => {
         socket = io(apiBase)
         socket.on('connect', () => setIsConnected(true))
         socket.on('disconnect', () => setIsConnected(false))
         socket.on('log', (data) => {
+          syncIfMissingTask(data.taskId)
           setTasks((prev) => applyTaskLogEvent(prev, data))
         })
         socket.on('task_status', (data) => {
+          syncIfMissingTask(data.taskId)
           setTasks((prev) => applyTaskStatusEvent(prev, data))
         })
         socket.on('task_removed', (data) => {
           setTasks((prev) => removeTaskState(prev, data.taskId))
         })
         socket.on('config_updated', () => {
-          void fetchData().catch((value) => {
+          void refreshState().catch((value) => {
             setError(value instanceof Error ? value : new Error(String(value)))
           })
         })
@@ -139,7 +134,7 @@ export function useParallax() {
       })
 
     const refreshInterval = window.setInterval(() => {
-      void fetchData().catch((value) => {
+      void refreshState().catch((value) => {
         setError(value instanceof Error ? value : new Error(String(value)))
       })
     }, 10000)

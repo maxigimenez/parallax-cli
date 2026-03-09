@@ -170,8 +170,6 @@ export async function runStart(args: string[], context: CliContext) {
     console.log(
       `${YELLOW}💡 Register a repository config with:${RESET} ${DIM}parallax register <config-file>${RESET}`
     )
-    console.log('')
-    console.log('')
   } catch (error) {
     const processAlive = orchestratorPid > 0 ? isProcessAlive(orchestratorPid) : false
     await stopProcessBestEffort(orchestratorPid, 'orchestrator', true)

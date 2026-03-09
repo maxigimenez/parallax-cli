@@ -10,7 +10,7 @@
     --card-foreground: 0 0% 95%;
     --popover: 0 0% 6%;
     --popover-foreground: 0 0% 95%;
-    --primary: 142 72% 42%;
+    --primary: 24 95% 53%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 94%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 16%;
     --input: 0 0% 16%;
-    --ring: 142 72% 42%;
+    --ring: 24 95% 53%;
     --radius: 0.45rem;
   }
 
@@ -44,7 +44,7 @@
       'Segoe UI',
       sans-serif;
     background-image:
-      radial-gradient(circle at 25% 20%, rgba(34, 197, 94, 0.08), transparent 42%),
+      radial-gradient(circle at 25% 20%, rgba(249, 112, 21, 0.14), transparent 42%),
       radial-gradient(circle at 85% 0%, rgba(255, 255, 255, 0.03), transparent 35%),
       linear-gradient(to bottom, #050505, #070707 30%, #050505);
   }

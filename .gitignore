@@ -13,6 +13,7 @@ packages/orchestrator/parallax.db-journal
 packages/orchestrator/worktrees/
 .parallax
 .release
+parallax.*.*yml
 
 # Sensitive data
 .env

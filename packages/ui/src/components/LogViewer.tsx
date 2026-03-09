@@ -11,6 +11,7 @@ import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
 
 const MIN_ACTION_DELAY_MS = 400
+const ACTION_ACCENT_CLASS = 'border-orange-700 bg-orange-950/30 text-orange-200'
 
 const STATUS_ACCENT_CLASS: Record<TaskStatus, string> = {
   [TASK_STATUS.QUEUED]: 'text-zinc-300',
@@ -100,9 +101,10 @@ export function LogViewer({
 
   const provider = resolveProjectProvider(config, projectId)
   const actionGuard = planActionsState(planState)
+  const isActionPending = approvePending || rejectPending || retryPending || cancelPending
   const planActionsDisabledByStatus =
     status === TASK_STATUS.CANCELED || status === TASK_STATUS.FAILED
-  const canEditPlan = actionGuard.canEdit && !planActionsDisabledByStatus
+  const canEditPlan = actionGuard.canEdit && !planActionsDisabledByStatus && !isActionPending
 
   useEffect(() => {
     setEditablePlan((planMarkdown || planResult || planPrompt || '').trim())
@@ -171,11 +173,11 @@ export function LogViewer({
   const canCancel =
     (status === TASK_STATUS.QUEUED || status === TASK_STATUS.RUNNING) &&
     Boolean(onCancel) &&
-    !cancelPending
+    !isActionPending
   const canRetry =
     (status === TASK_STATUS.FAILED || status === TASK_STATUS.CANCELED) &&
     Boolean(onRetry) &&
-    !retryPending
+    !isActionPending
   const cancelReason = canCancel ? '' : 'Cancel is only available for queued or running tasks.'
   const retryReason = canRetry ? '' : 'Retry is available only for failed or canceled tasks.'
 
@@ -284,7 +286,7 @@ export function LogViewer({
                 onClick={() => setActiveLevel(level)}
                 className={`rounded border px-2 py-1 text-xs ${
                   activeLevel === level
-                    ? 'border-emerald-600 bg-emerald-950/40 text-emerald-300'
+                    ? 'border-orange-600 bg-orange-950/40 text-orange-300'
                     : 'border-zinc-700 bg-zinc-900 text-zinc-400'
                 }`}
               >
@@ -320,7 +322,7 @@ export function LogViewer({
             value={editablePlan}
             onChange={(event) => setEditablePlan(event.target.value)}
             disabled={!canEditPlan}
-            className="h-72 w-full rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-sm text-zinc-200 outline-none focus:border-emerald-600"
+            className="h-72 w-full rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-sm text-zinc-200 outline-none focus:border-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
           />
           <TooltipProvider>
             <div className="mt-3 flex gap-2">
@@ -329,7 +331,7 @@ export function LogViewer({
                   <button
                     disabled={!canEditPlan || planActionPending}
                     onClick={onApprove}
-                    className="rounded border border-emerald-700 bg-emerald-900/30 px-3 py-2 text-xs text-emerald-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    className={`rounded border px-3 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-40 ${ACTION_ACCENT_CLASS}`}
                   >
                     {approvePending ? 'Approving...' : 'Approve'}
                   </button>

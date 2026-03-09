@@ -31,7 +31,7 @@ export function EmptyState({ view, isConnected, hasTasks, waitingTasks }: EmptyS
         <p className="mb-4 text-xs uppercase tracking-[0.18em] text-zinc-500">Parallax Status</p>
         <div className="font-mono text-3xl text-zinc-100">
           parallax
-          <span className="animate-terminal-cursor text-emerald-500">_</span>
+          <span className="animate-terminal-cursor text-orange-500">_</span>
         </div>
         <div className="mt-4 space-y-2 text-sm text-zinc-400">
           <p>Waiting tasks: {waitingTasks}</p>

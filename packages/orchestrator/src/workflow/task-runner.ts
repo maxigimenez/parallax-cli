@@ -1,4 +1,5 @@
 import path from 'path'
+import os from 'os'
 import {
   AGENT_PROVIDER,
   PlanResult,
@@ -28,6 +29,14 @@ import {
 } from './task-state.js'
 
 export const MAX_EXECUTION_ATTEMPTS = 2
+
+function resolveWorktreeBaseDir() {
+  const dataDir = process.env.PARALLAX_DATA_DIR
+    ? path.resolve(process.env.PARALLAX_DATA_DIR)
+    : path.join(os.homedir(), '.parallax')
+
+  return path.join(dataDir, 'worktrees')
+}
 
 export function createAgentAdapter(
   project: ProjectConfig,
@@ -66,7 +75,7 @@ export async function processTaskPlan(
     await markTaskInProgress(task, project, services)
     throwIfCancellationRequested(task.id, canceledTasks)
 
-    const tempBaseDir = path.resolve(process.cwd(), 'worktrees')
+    const tempBaseDir = resolveWorktreeBaseDir()
     const worktreePath = await gitService.createWorktree(task, project, tempBaseDir)
 
     logger.info(`Plan worktree created: ${worktreePath}`, task.id)
@@ -90,7 +99,7 @@ export async function processTaskPlan(
     if (task.externalId) {
       try {
         await gitService.removeWorktree(
-          path.resolve(process.cwd(), 'worktrees', task.externalId),
+          path.join(resolveWorktreeBaseDir(), task.externalId),
           project.workspaceDir
         )
       } catch {
@@ -152,7 +161,7 @@ export async function processTask(
     await markTaskInProgress(task, project, services)
     throwIfCancellationRequested(task.id, canceledTasks)
 
-    const tempBaseDir = path.resolve(process.cwd(), 'worktrees')
+    const tempBaseDir = resolveWorktreeBaseDir()
     worktreePath = await gitService.createWorktree(task, project, tempBaseDir)
     activeWorktrees.set(task.id, worktreePath)
 

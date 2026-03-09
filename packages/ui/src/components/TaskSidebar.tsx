@@ -61,7 +61,7 @@ export function TaskSidebar({
         <div className="mb-4 flex items-center justify-between gap-2">
           <div>
             <p className="font-mono text-lg font-semibold text-zinc-100">
-              parallax<span className="animate-terminal-cursor text-emerald-500">_</span>
+              parallax<span className="animate-terminal-cursor text-orange-500">_</span>
             </p>
             <p className="text-xs text-zinc-500">{isConnected ? 'Connected' : 'Disconnected'}</p>
           </div>
@@ -82,7 +82,7 @@ export function TaskSidebar({
             className={cn(
               'rounded border px-3 py-2 text-xs font-medium',
               activeView === 'tasks'
-                ? 'border-emerald-600 bg-emerald-950/60 text-emerald-300'
+                ? 'border-orange-600 bg-orange-950/60 text-orange-300'
                 : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
             )}
           >
@@ -93,7 +93,7 @@ export function TaskSidebar({
             className={cn(
               'rounded border px-3 py-2 text-xs font-medium',
               activeView === 'settings'
-                ? 'border-emerald-600 bg-emerald-950/60 text-emerald-300'
+                ? 'border-orange-600 bg-orange-950/60 text-orange-300'
                 : 'border-zinc-700 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
             )}
           >
@@ -156,7 +156,7 @@ export function TaskSidebar({
                 className={cn(
                   'w-full rounded border px-3 py-2 text-left text-xs',
                   selectedTaskId === `project-${index}`
-                    ? 'border-emerald-600 bg-zinc-900 text-zinc-100'
+                    ? 'border-orange-600 bg-zinc-900 text-zinc-100'
                     : 'border-zinc-700 bg-zinc-950 text-zinc-400 hover:text-zinc-100'
                 )}
               >
