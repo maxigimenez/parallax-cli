@@ -240,9 +240,11 @@ export class GeminiAdapter extends BaseAgentAdapter {
       await this.setupWorkspace(task, workingDir)
       const prompt = this.buildPlanPrompt(task)
       const command = this.buildCommand(task, project, prompt)
+      const env = await this.resolveProjectEnv(project)
       const result = await this.executor.executeCommand(command, {
         cwd: workingDir,
         onData: (chunk) => this.handleLogChunk(task, chunk),
+        env,
       })
 
       if (result.exitCode === 127) {
@@ -294,10 +296,12 @@ export class GeminiAdapter extends BaseAgentAdapter {
     extractPrMetadata = false
   ): Promise<AgentResult> {
     const command = this.buildCommand(task, project, prompt)
+    const env = await this.resolveProjectEnv(project)
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
       onData: (chunk) => this.handleLogChunk(task, chunk),
+      env,
     })
 
     if (result.exitCode === 127) {

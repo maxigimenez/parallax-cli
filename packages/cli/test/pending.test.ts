@@ -1,24 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import fs from 'node:fs/promises'
-import path from 'node:path'
-import { tmpdir } from 'node:os'
 import {
   parseConfigProjectIds,
   resolveApproveTargets,
   resolveRejectTarget,
+  parseStartOptions,
   parseStopOptions,
   parsePendingOptions,
   parseRetryOptions,
   parseCancelOptions,
   parseLogsOptions,
   parsePreflightOptions,
+  parseRegisterOptions,
   scopePendingTasks,
-  resolveProjectIdsForPending,
 } from '../src/index.js'
 
 describe('CLI pending scope and approval helpers', () => {
   it('parses project IDs from valid config YAML', () => {
-    const raw = `projects:\n  - id: revora-mvp\n  - id: www\n`
+    const raw = `- id: revora-mvp\n- id: www\n`
 
     const ids = parseConfigProjectIds(raw, 'parallax.yml')
 
@@ -30,7 +28,7 @@ describe('CLI pending scope and approval helpers', () => {
   it('throws for malformed config YAML', () => {
     const raw = `projects: [1,2,3]`
 
-    expect(() => parseConfigProjectIds(raw, 'parallax.yml')).toThrow('Invalid item')
+    expect(() => parseConfigProjectIds(raw, 'parallax.yml')).toThrow('Invalid parallax config')
   })
 
   it('filters pending tasks by configured project IDs', () => {
@@ -56,14 +54,19 @@ describe('CLI pending scope and approval helpers', () => {
   it('rejects approvals for unknown task ids', () => {
     const tasks = [{ id: 'a' }, { id: 'b' }] as any[]
 
-    expect(() => resolveApproveTargets(tasks, 'unknown')).toThrow('Unknown task id(s): unknown')
+    expect(() => resolveApproveTargets(tasks, 'unknown')).toThrow('Unknown task id: unknown')
   })
 
-  it('resolves explicit approval targets and all', () => {
+  it('resolves a single explicit approval target', () => {
     const tasks = [{ id: 'a' }, { id: 'b' }] as any[]
 
-    expect(resolveApproveTargets(tasks, 'a,b').sort()).toEqual(['a', 'b'])
-    expect(new Set(resolveApproveTargets(tasks, 'all'))).toEqual(new Set(['a', 'b']))
+    expect(resolveApproveTargets(tasks, 'a')).toEqual(['a'])
+  })
+
+  it('rejects multiple approval targets', () => {
+    const tasks = [{ id: 'a' }, { id: 'b' }] as any[]
+
+    expect(() => resolveApproveTargets(tasks, 'a,b')).toThrow('Approve accepts a single task id.')
   })
 
   it('rejects unknown task id on reject action', () => {
@@ -78,6 +81,13 @@ describe('CLI pending scope and approval helpers', () => {
     expect(() => parseConfigProjectIds(raw, 'parallax.yml')).toThrow('Invalid parallax config')
   })
 
+  it('parses start options with defaults', () => {
+    const options = parseStartOptions([])
+    expect(options.apiPort).toBe(3000)
+    expect(options.uiPort).toBe(8080)
+    expect(options.concurrency).toBe(2)
+  })
+
   it('throws on approve without a value', () => {
     expect(() => parsePendingOptions(['--approve'])).toThrow('Missing value for --approve.')
   })
@@ -89,38 +99,28 @@ describe('CLI pending scope and approval helpers', () => {
   })
 
   it('parses strict pending options when valid', () => {
-    const options = parsePendingOptions([
-      '--approve',
-      'abc-123,abc-456',
-      '--approver',
-      'qa-bot',
-    ])
+    const options = parsePendingOptions(['--approve', 'abc-123'])
 
-    expect(options.approve).toBe('abc-123,abc-456')
-    expect(options.approver).toBe('qa-bot')
+    expect(options.approve).toBe('abc-123')
   })
 
   it('parses stop options with defaults', () => {
     const options = parseStopOptions([])
+    expect(options).toEqual({})
+  })
 
-    expect(options.force).toBe(false)
+  it('rejects stop flags', () => {
+    expect(() => parseStopOptions(['--force'])).toThrow('parallax stop does not accept flags.')
   })
 
   it('parses retry options with default mode', () => {
     const options = parseRetryOptions(['eng-123'])
     expect(options.taskId).toBe('eng-123')
-    expect(options.mode).toBe('full')
   })
 
-  it('parses retry options with explicit execution mode', () => {
-    const options = parseRetryOptions(['eng-123', '--mode', 'execution'])
-    expect(options.taskId).toBe('eng-123')
-    expect(options.mode).toBe('execution')
-  })
-
-  it('throws for invalid retry mode', () => {
-    expect(() => parseRetryOptions(['eng-123', '--mode', 'bad'])).toThrow(
-      '--mode must be one of: full, execution.'
+  it('rejects retry flags', () => {
+    expect(() => parseRetryOptions(['eng-123', '--mode', 'execution'])).toThrow(
+      'parallax retry does not accept flags.'
     )
   })
 
@@ -129,15 +129,14 @@ describe('CLI pending scope and approval helpers', () => {
     expect(options.taskId).toBe('eng-123')
   })
 
-  it('parses logs options with task and since', () => {
-    const options = parseLogsOptions(['--task', 'eng-123', '--since', '42'])
+  it('parses logs options with task', () => {
+    const options = parseLogsOptions(['--task', 'eng-123'])
     expect(options.taskId).toBe('eng-123')
-    expect(options.since).toBe(42)
   })
 
-  it('throws for invalid logs since', () => {
+  it('rejects unsupported logs flags', () => {
     expect(() => parseLogsOptions(['--since', '-1'])).toThrow(
-      '--since must be a non-negative integer epoch timestamp.'
+      'parallax logs only accepts optional --task <task-id>.'
     )
   })
 
@@ -152,34 +151,13 @@ describe('CLI pending scope and approval helpers', () => {
     )
   })
 
-  it('resolves pending scope from running manifest when no --config is passed', async () => {
-    const dir = await fs.mkdtemp(path.join(tmpdir(), 'parallax-cli-'))
-    const configPath = path.join(dir, 'parallax.yml')
-    const manifestPath = path.join(dir, 'running.json')
-
-    try {
-      await fs.writeFile(configPath, 'projects:\n  - id: from-running\n')
-      await fs.writeFile(
-        manifestPath,
-        JSON.stringify(
-          {
-            startedAt: Date.now(),
-            configPath,
-            orchestratorPid: 1,
-            uiPid: 2,
-          },
-          null,
-          2
-        )
-      )
-
-      const ids = await resolveProjectIdsForPending(undefined, dir)
-
-      expect(ids.has('from-running')).toBe(true)
-      expect(ids.size).toBe(1)
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true })
-    }
+  it('parses register options', () => {
+    const options = parseRegisterOptions(['./config.yml'], 'register')
+    expect(options.configPath).toBe('./config.yml')
   })
 
+  it('parses register env file option', () => {
+    const options = parseRegisterOptions(['./config.yml', '--env-file', './.env'], 'register')
+    expect(options.envFilePath).toBe('./.env')
+  })
 })

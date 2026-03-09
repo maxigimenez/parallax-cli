@@ -1,4 +1,4 @@
-import { TaskPlanState, type ServerConfig } from '@parallax/common'
+import { TaskPlanState } from '@parallax/common'
 
 export type TaskPendingState = {
   id: string
@@ -13,39 +13,51 @@ export type TaskPendingState = {
 }
 
 export type PendingCommandOptions = {
-  configPath?: string
   approve?: string
   reject?: string
-  approver?: string
-  json?: boolean
 }
 
-export type StopCommandOptions = {
-  force: boolean
-}
+export type StopCommandOptions = Record<string, never>
 
-export type RetryCommandOptions = {
-  taskId: string
-  mode: 'full' | 'execution'
-}
+export type RetryCommandOptions = { taskId: string }
 
 export type CancelCommandOptions = {
   taskId: string
 }
 
 export type LogsCommandOptions = {
-  apiBase: string
   taskId?: string
-  since?: number
 }
 
 export type PreflightCommandOptions = Record<string, never>
 
+export type RegisterCommandOptions = {
+  configPath: string
+  envFilePath?: string
+}
+
+export type StartCommandOptions = {
+  apiPort: number
+  uiPort: number
+  concurrency: number
+}
+
 export type RunningState = {
   startedAt: number
-  configPath: string
   orchestratorPid: number
   uiPid?: number
+  apiPort: number
+  uiPort: number
+}
+
+export type RegisteredConfig = {
+  configPath: string
+  addedAt: number
+  envFilePath?: string
+}
+
+export type RegistryState = {
+  configs: RegisteredConfig[]
 }
 
 export type VerifyCheck = {
@@ -57,16 +69,21 @@ export type VerifyCheck = {
 
 export type CliContext = {
   defaultApiBase: string
-  defaultConfigPath: string
   defaultDataDir: string
   manifestFile: string
+  registryFile: string
   rootDir: string
   cliVersion: string
   resolvePath: (raw: string) => string
   ensureFileExists: (filePath: string) => Promise<boolean>
   loadRunningState: () => Promise<RunningState>
-  resolveProjectIdsForPending: (configPath?: string) => Promise<Set<string>>
-  resolveDefaultApiBase: (configPath?: string) => Promise<string>
-  resolveServerPorts: (configPath: string) => Promise<ServerConfig>
-  buildEnvConfig: (configPath: string | undefined, dataDir: string) => Record<string, string>
+  loadRegistry: () => Promise<RegistryState>
+  saveRegistry: (registry: RegistryState) => Promise<void>
+  resolveDefaultApiBase: () => Promise<string>
+  packageVersion: string
+  validateConfigFile: (configPath: string) => Promise<void>
+  buildEnvConfig: (
+    dataDir: string,
+    runtime: { apiPort: number; uiPort: number; concurrency: number }
+  ) => Record<string, string>
 }

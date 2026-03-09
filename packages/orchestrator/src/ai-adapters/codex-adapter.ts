@@ -363,6 +363,7 @@ export class CodexAdapter extends BaseAgentAdapter {
 
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     const command = this.buildCommand(task, project, this.buildPlanPrompt(task))
+    const env = await this.resolveProjectEnv(project)
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
@@ -372,6 +373,7 @@ export class CodexAdapter extends BaseAgentAdapter {
           return
         }
       },
+      env,
     })
 
     if (result.exitCode === 127) {
@@ -411,10 +413,12 @@ export class CodexAdapter extends BaseAgentAdapter {
     }
 
     const command = this.buildCommand(task, project, this.buildExecutionPrompt(task, approvedPlan))
+    const env = await this.resolveProjectEnv(project)
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
       onData: (chunk) => this.handleLogChunk(task, chunk),
+      env,
     })
 
     if (result.exitCode === 127) {

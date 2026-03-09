@@ -28,19 +28,22 @@ import { taskLifecycle } from './task-lifecycle.js'
 const activeWorktrees = new Map<string, string>()
 
 async function startRuntimeServers(
-  config: Awaited<ReturnType<typeof loadConfig>>,
+  getConfig: () => Awaited<ReturnType<typeof loadConfig>>,
+  reloadRuntime: () => Promise<Awaited<ReturnType<typeof loadConfig>>>,
   gitService: GitService,
   activeTasks: Set<string>,
   canceledTasks: Set<string>
 ) {
   const fastify = await createApiServer({
-    config,
+    getConfig,
+    reloadRuntime,
     gitService,
     activeTasks,
     canceledTasks,
     activeWorktrees,
   })
 
+  const config = getConfig()
   await fastify.listen({ port: config.server.apiPort, host: '0.0.0.0' })
   const io = new SocketServer(fastify.server, { cors: { origin: '*' } })
   setIo(io)
@@ -164,18 +167,31 @@ async function pollProjects(
 }
 
 async function main() {
-  const config = await loadConfig()
-  setLogLevels(config.logs)
-
   const executor = new HostExecutor()
-  await validateRuntimeRequirements(config, executor)
+  let runtimeConfig = await loadConfig()
+  setLogLevels(runtimeConfig.logs)
+  await validateRuntimeRequirements(runtimeConfig, executor)
 
-  const services = buildExternalServices(executor, {
-    requiresGitHub: config.projects.length > 0,
+  let services = buildExternalServices(executor, {
+    requiresGitHub: runtimeConfig.projects.length > 0,
     linearApiKey: process.env.LINEAR_API_KEY,
   })
+  const getConfig = () => runtimeConfig
+  const getServices = () => services
+  const reloadRuntime = async () => {
+    const nextConfig = await loadConfig()
+    setLogLevels(nextConfig.logs)
+    await validateRuntimeRequirements(nextConfig, executor)
+    runtimeConfig = nextConfig
+    services = buildExternalServices(executor, {
+      requiresGitHub: nextConfig.projects.length > 0,
+      linearApiKey: process.env.LINEAR_API_KEY,
+    })
+    return runtimeConfig
+  }
+
   const gitService = new GitService(executor)
-  const limit = pLimit(config.concurrency)
+  const limit = pLimit(runtimeConfig.concurrency)
   const activeTasks = new Set<string>()
   const canceledTasks = new Set<string>()
   const adapterCache = new Map<string, BaseAgentAdapter>()
@@ -192,17 +208,18 @@ async function main() {
     return adapter
   }
 
-  await startRuntimeServers(config, gitService, activeTasks, canceledTasks)
+  await startRuntimeServers(getConfig, reloadRuntime, gitService, activeTasks, canceledTasks)
 
   while (true) {
     try {
+      const config = getConfig()
       await pollProjects(
         config,
         gitService,
         activeTasks,
         canceledTasks,
         getAdapterForProject,
-        services,
+        getServices(),
         limit
       )
     } catch (error: any) {

@@ -5,6 +5,7 @@ import { dbService } from '../database.js'
 import { resetTaskRuntimeState } from '../logger.js'
 import { GitService } from '../git-service.js'
 import { taskLifecycle } from '../task-lifecycle.js'
+import { emitConfigUpdated } from '../logging/socket-publisher.js'
 import { isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
 import { splitUnifiedDiffByFile } from './api/diff-utils.js'
 import {
@@ -22,7 +23,8 @@ type TaskDiffFile = {
 }
 
 type ApiServerDependencies = {
-  config: AppConfig
+  getConfig: () => AppConfig
+  reloadRuntime: () => Promise<AppConfig>
   gitService: GitService
   activeTasks: Set<string>
   canceledTasks: Set<string>
@@ -50,7 +52,7 @@ export async function createApiServer(
   dependencies: ApiServerDependencies
 ): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: false })
-  const { config, gitService, activeTasks, canceledTasks, activeWorktrees } = dependencies
+  const { getConfig, reloadRuntime, gitService, activeTasks, canceledTasks, activeWorktrees } = dependencies
 
   await fastify.register(cors, { origin: '*' })
 
@@ -66,7 +68,17 @@ export async function createApiServer(
       .map((task) => serializeTaskForApi(task))
   )
 
-  fastify.get('/config', async () => config)
+  fastify.get('/config', async () => getConfig())
+
+  fastify.post('/runtime/reload', async (_request, reply) => {
+    try {
+      const config = await reloadRuntime()
+      emitConfigUpdated()
+      return { ok: true, projectCount: config.projects.length }
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
 
   fastify.get('/logs', async (request, reply) => {
     const { since, taskId, limit } = request.query as {
@@ -97,7 +109,7 @@ export async function createApiServer(
 
     let project
     try {
-      project = resolveTaskProject(config, task.projectId)
+      project = resolveTaskProject(getConfig(), task.projectId)
     } catch (error) {
       return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
     }
@@ -130,7 +142,7 @@ export async function createApiServer(
 
     let project
     try {
-      project = resolveTaskProject(config, task.projectId)
+      project = resolveTaskProject(getConfig(), task.projectId)
     } catch (error) {
       return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
     }

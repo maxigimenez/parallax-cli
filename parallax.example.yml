@@ -1,0 +1,14 @@
+- id: www
+  workspaceDir: /Users/maxi/projects/www
+  pullFrom:
+    provider: github
+    filters:
+      owner: maxigimenez
+      repo: wwww
+      state: open
+      labels: [ai-ready]
+  agent:
+    provider: codex
+    model: gpt-5.4
+    sandbox: true
+    disableMcp: true

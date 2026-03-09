@@ -112,6 +112,7 @@ export interface Task {
 export interface ProjectConfig {
   id: string
   workspaceDir: string // Absolute path to existing local repo
+  envFilePath?: string
   pullFrom: {
     provider: PullProvider
     filters: {
@@ -141,6 +142,7 @@ export interface ServerConfig {
 
 export const DEFAULT_API_PORT = 3000
 export const DEFAULT_UI_PORT = 8080
+export const DEFAULT_CONCURRENCY = 2
 
 export interface AppConfig {
   projects: ProjectConfig[]

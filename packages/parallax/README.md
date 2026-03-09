@@ -18,32 +18,30 @@ Requirements:
 
 ```bash
 parallax preflight
-parallax start --config ./parallax.yml
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax register ./parallax.yml --env-file ./.env
 ```
 
 ## Example `parallax.yml` (GitHub pull source)
 
 ```yaml
-server:
-  apiPort: 3000
-  uiPort: 8080
-concurrency: 1
-logs: [info, success, warn, error]
-projects:
-  - id: my-repo
-    workspaceDir: /absolute/path/to/local/repo
-    pullFrom:
-      provider: github
-      filters:
-        owner: your-github-org-or-user
-        repo: your-repo
-    agent:
-      provider: codex
-      model: gpt-5.3-codex
-      approvalMode: auto_edit
-      sandbox: true
-      disableMcp: true
+- id: my-repo
+  workspaceDir: /absolute/path/to/local/repo
+  pullFrom:
+    provider: github
+    filters:
+      owner: your-github-org-or-user
+      repo: your-repo
+      state: open
+      labels: [ai-ready]
+  agent:
+    provider: codex
+    model: gpt-5.4
+    sandbox: true
+    disableMcp: true
 ```
+
+Parallax stores runtime state under `~/.parallax` and keeps registered configs in `~/.parallax/registry.json`.
 
 ## Support
 

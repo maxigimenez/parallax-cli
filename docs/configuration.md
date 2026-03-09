@@ -1,60 +1,46 @@
 # Configuration Reference
 
-Parallax configuration is loaded from `parallax.yml`.
+Parallax project configuration is stored per repository in `parallax.yml`, then registered globally with:
+
+```bash
+parallax register ./parallax.yml
+parallax register ./parallax.yml --env-file ./.env
+```
+
+Runtime options such as API/UI ports and concurrency are not configured in `parallax.yml`.
+Those are set when you start Parallax:
+
+```bash
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+```
+
+## File format
+
+`parallax.yml` is a YAML array of project entries.
 
 ## Minimal valid config
 
 ```yaml
-projects:
-  - id: example
-    workspaceDir: /absolute/path/to/repo
-    pullFrom:
-      provider: linear
-      filters:
-        team: ENG
-    agent:
-      provider: codex
+- id: example
+  workspaceDir: /absolute/path/to/repo
+  pullFrom:
+    provider: linear
+    filters:
+      team: ENG
+  agent:
+    provider: codex
 ```
-
-## Root fields
-
-### `projects` (required)
-
-- type: array
-- must contain at least one project
-- each project `id` must be unique
-
-### `concurrency` (optional)
-
-- type: integer
-- allowed range: `1..16`
-- default: `1`
-- controls how many tasks can be processed concurrently
-
-### `logs` (optional)
-
-- type: array of `info | success | warn | error`
-- default: `["info", "success", "warn", "error"]`
-- duplicate values are removed
-
-### `server` (optional)
-
-- type: object
-- defaults:
-  - `apiPort: 3000`
-  - `uiPort: 8080`
-- `apiPort` and `uiPort` must be different integers in the range `1..65535`
 
 ## Project fields
 
 ### `id` (required)
 
 - non-empty string
-- unique across all projects
+- must be unique across all registered configs
 
 ### `workspaceDir` (required)
 
-- absolute path to an existing local repo directory
+- absolute path to a local repo directory
 - relative paths are rejected
 
 ### `pullFrom` (required)
@@ -91,14 +77,17 @@ Provider-specific requirement:
 #### `agent.approvalMode` (optional)
 
 - allowed values: `default`, `auto_edit`
+- defaults to `default`
 
 #### `agent.sandbox` (optional)
 
 - boolean
+- defaults to `true`
 
 #### `agent.disableMcp` (optional)
 
 - boolean
+- defaults to `false`
 
 #### `agent.allowedTools` (optional)
 
@@ -108,57 +97,45 @@ Provider-specific requirement:
 
 - array of non-empty strings
 
-## Full example: Linear
+## Example: GitHub
 
 ```yaml
-server:
-  apiPort: 3000
-  uiPort: 8080
-concurrency: 2
-logs: [info, success, warn, error]
-projects:
-  - id: platform-api
-    workspaceDir: /Users/you/src/platform-api
-    pullFrom:
-      provider: linear
-      filters:
-        team: API
-        state: Todo
-    agent:
-      provider: codex
-      model: gpt-5.3-codex
-      approvalMode: auto_edit
-      sandbox: true
-      disableMcp: true
+- id: taplands
+  workspaceDir: /Users/maxi/projects/taplands
+  pullFrom:
+    provider: github
+    filters:
+      owner: maxigimenez
+      repo: taplands
+      state: open
+      labels: [ai-ready]
+  agent:
+    provider: codex
+    model: gpt-5.4
+    sandbox: true
+    disableMcp: true
 ```
 
-## Full example: GitHub
+## Example: Linear
 
 ```yaml
-server:
-  apiPort: 3000
-  uiPort: 8080
-concurrency: 1
-projects:
-  - id: ui-repo
-    workspaceDir: /Users/you/src/ui-repo
-    pullFrom:
-      provider: github
-      filters:
-        owner: acme
-        repo: ui-repo
-        labels: [parallax]
-    agent:
-      provider: gemini
-      model: gemini-2.5-pro
+- id: platform-api
+  workspaceDir: /Users/you/src/platform-api
+  pullFrom:
+    provider: linear
+    filters:
+      team: API
+      state: Todo
+  agent:
+    provider: gemini
+    model: gemini-2.5-pro
+    sandbox: true
 ```
 
 ## Validation failures you may see
 
+- `Invalid parallax config`
 - `project.workspaceDir ... must be an absolute path`
-- `project.workspaceDir ... does not exist or is not a directory`
 - `Unsupported pull provider`
 - `Unsupported agent provider`
 - `Duplicate project id`
-- `concurrency ... must be an integer between 1 and 16`
-- `server.apiPort and server.uiPort ... must be different`

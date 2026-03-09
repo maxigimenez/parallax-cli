@@ -128,6 +128,11 @@ export function useParallax() {
         socket.on('task_removed', (data) => {
           setTasks((prev) => removeTaskState(prev, data.taskId))
         })
+        socket.on('config_updated', () => {
+          void fetchData().catch((value) => {
+            setError(value instanceof Error ? value : new Error(String(value)))
+          })
+        })
       })
       .catch((value) => {
         setError(value instanceof Error ? value : new Error(String(value)))

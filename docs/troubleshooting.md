@@ -25,17 +25,16 @@ Install missing tool and reopen terminal session.
 
 ## `parallax start` fails
 
-### `Config path not found`
-
-You started with `--config` pointing to a missing file, or ran start without `--config` from a directory that does not contain `parallax.yml`.
+### No registered configs
 
 Fix:
 
 ```bash
-parallax start --config ./parallax.yml
-# or run from the directory that contains parallax.yml:
 parallax start
+parallax register ./parallax.yml
 ```
+
+Parallax can run with zero registered configs, but it will not poll any projects until at least one config is registered.
 
 ### API did not become healthy
 
@@ -48,8 +47,8 @@ Possible causes:
 Check:
 
 ```bash
-parallax stop --force
-parallax start --config ./parallax.yml
+parallax stop
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 ```
 
 ## Task actions fail (`approve`, `retry`, `cancel`)
@@ -62,33 +61,23 @@ Use Parallax task id from dashboard or:
 parallax pending
 ```
 
-### `Execution retry requires an approved plan`
+### Task keeps failing after retry
 
-Use:
+Approve the task plan first if it is still pending, then run:
 
 ```bash
-parallax retry <task-id> --mode full
+parallax retry <task-id>
 ```
-
-or approve the plan first, then retry with `--mode execution`.
-
-## Dashboard not reachable from another machine on LAN
-
-Check:
-
-- Parallax is running
-- host machine firewall allows inbound TCP `3000`
-- both devices are on same network
-- you are using `http://<host-ip>:3000`
 
 ## Clean reset
 
 If local runtime state is corrupted:
 
 ```bash
-parallax stop --force
+parallax stop
 rm -rf ~/.parallax
-parallax start --config ./parallax.yml
+parallax start
+parallax register ./parallax.yml
 ```
 
 Warning: deleting data dir removes local task/runtime history.

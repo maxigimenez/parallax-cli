@@ -7,16 +7,16 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 
 - Plan-first task lifecycle with explicit approval/rejection.
 - Issue intake from Linear and GitHub.
-- Local SQLite state under a project data directory.
+- Global runtime state under `~/.parallax`.
 - CLI control plane plus dashboard UI.
 - Codex and Gemini adapters (configurable per project).
 
 ## Requirements
 
-- Node.js `>=23.7.0`
+- Node.js `>= 22`
 - `pnpm` `10.x`
 - `git`
-- Provider credentials in your shell environment (no repo `.env` requirement)
+- Provider credentials in your shell environment (optional per-project `.env` via `parallax register --env-file`)
 
 ## Install
 
@@ -28,51 +28,58 @@ pnpm build
 
 ## Configuration (`parallax.yml`)
 
+Repository config is stored per repo, then registered into the global Parallax runtime:
+
+```bash
+pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+pnpm parallax register ./parallax.yml --env-file ./.env
+```
+
+`parallax.yml` is a YAML array of project entries:
+
 ```yaml
-server:
-  apiPort: 3000
-  uiPort: 8080
-concurrency: 2
-logs: [info, success, warn, error]
-projects:
-  - id: my-app
-    workspaceDir: /absolute/path/to/repo
-    pullFrom:
-      provider: linear
-      filters:
-        team: ENG
-        state: Todo
-    agent:
-      provider: codex
-      model: gpt-5.3-codex
-      approvalMode: auto_edit
-      sandbox: true
-      disableMcp: true
+- id: taplands
+  workspaceDir: /Users/maxi/projects/taplands
+  pullFrom:
+    provider: github
+    filters:
+      owner: maxigimenez
+      repo: taplands
+      state: open
+      labels: [ai-ready]
+  agent:
+    provider: codex
+    model: gpt-5.4
+    sandbox: true
+    disableMcp: true
 ```
 
 ## CLI
 
 ```bash
 pnpm parallax --version
-pnpm parallax start --config ./parallax.yml --env-file ./.env
-pnpm parallax start
+pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+pnpm parallax register ./parallax.yml --env-file ./.env
+pnpm parallax unregister ./parallax.yml
 pnpm parallax stop
 pnpm parallax preflight
 pnpm parallax pending
-pnpm parallax retry ENG-123 --mode execution
+pnpm parallax retry ENG-123
 pnpm parallax cancel ENG-123
 pnpm parallax logs --task ENG-123
 ```
 
 Commands:
 
-- `parallax start [--config <path>] [--env-file <path>]`
-- `parallax stop [--force]`
+- `parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]`
+- `parallax register <config-file> [--env-file <path>]`
+- `parallax unregister <config-file>`
+- `parallax stop`
 - `parallax preflight`
-- `parallax pending [--config <path>] [--approve <id|all>] [--reject <id>] [--json]`
-- `parallax retry <task-id> [--mode <full|execution>]`
+- `parallax pending [--approve <id>] [--reject <id>]`
+- `parallax retry <task-id>`
 - `parallax cancel <task-id>`
-- `parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]`
+- `parallax logs [--task <id>]`
 
 ## Runtime behavior
 
@@ -120,10 +127,15 @@ Then on Raspberry Pi / any machine:
 ```bash
 npm i -g parallax-ai
 parallax preflight
-parallax start --config ./parallax.yml
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax register ./parallax.yml
 ```
 
-The dashboard is served by the orchestrator at `http://<host>:3000` (LAN accessible if host firewall allows it).
+Default runtime locations and ports:
+
+- runtime state: `~/.parallax`
+- API: `http://localhost:3000`
+- dashboard: `http://localhost:8080`
 
 ## License
 

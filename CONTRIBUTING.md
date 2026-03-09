@@ -7,7 +7,7 @@ Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 - `packages/orchestrator`: polling, task state machine, API.
 - `packages/ui`: dashboard and task observability.
 - `packages/common`: shared models and execution interfaces.
-- `packages/cli`: control CLI (`parallax start|stop|provision|pending|logs`).
+- `packages/cli`: control CLI (`parallax start|stop|register|pending|logs`).
 
 ## Contribution expectations
 
@@ -33,7 +33,8 @@ pnpm lint
 Use the CLI entrypoint for all local runtime checks:
 
 ```bash
-pnpm parallax start --config ./parallax.yml --env-file ./.env
+pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+pnpm parallax register ./parallax.yml --env-file ./.env
 pnpm parallax pending
 pnpm parallax logs
 pnpm parallax stop

@@ -25,3 +25,7 @@ export function emitTaskLog(taskId: string, entry: TaskLogEntry) {
     timestamp: entry.timestamp,
   })
 }
+
+export function emitConfigUpdated() {
+  io?.emit('config_updated')
+}

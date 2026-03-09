@@ -23,49 +23,70 @@ Notes:
 
 ## `parallax start`
 
-Start orchestrator in background.
+Start orchestrator and dashboard in background.
 
 ```bash
-parallax start [--config <path>] [--env-file <path>]
+parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
 ```
 
-Config behavior:
-
-- if `--config` is passed, that file is used
-- if `--config` is omitted, Parallax uses `./parallax.yml` from your current working directory
+`parallax start` initializes the global Parallax runtime from `~/.parallax` using the provided runtime flags.
+Repository configs are added separately with `parallax register <config-file>`.
 
 Examples:
 
 ```bash
-parallax start --config ./parallax.yml --env-file ./.env
-parallax start
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax register ./parallax.yml --env-file ./.env
 ```
+
+## `parallax register`
+
+Register a repository config in the global Parallax registry.
+
+```bash
+parallax register <config-file> [--env-file <path>]
+```
+
+Notes:
+
+- stores the config in `~/.parallax/registry.json`
+- optional `--env-file` is attached to that registered project config
+- if Parallax is already running, the runtime reloads immediately
+
+## `parallax unregister`
+
+Remove a repository config from the global Parallax registry.
+
+```bash
+parallax unregister <config-file>
+```
+
+Notes:
+
+- fails if the config is not registered
+- if Parallax is already running, the runtime reloads immediately
 
 ## `parallax stop`
 
 Stop background processes recorded in the running manifest.
 
 ```bash
-parallax stop [--force]
+parallax stop
 ```
-
-`--force` sends `SIGKILL` if graceful stop fails.
 
 ## `parallax pending`
 
 List pending plans and optionally approve/reject from CLI.
 
 ```bash
-parallax pending [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
+parallax pending [--approve <id>] [--reject <id>]
 ```
 
 Examples:
 
 ```bash
-parallax pending --approve all
 parallax pending --approve 3ed59f6e7cea
 parallax pending --reject 3ed59f6e7cea
-parallax pending --json
 ```
 
 ## `parallax retry`
@@ -73,13 +94,8 @@ parallax pending --json
 Queue a retry for a task.
 
 ```bash
-parallax retry <task-id> [--mode <full|execution>]
+parallax retry <task-id>
 ```
-
-Modes:
-
-- `full`: regenerate plan and run again
-- `execution`: rerun execution using existing approved plan
 
 ## `parallax cancel`
 
@@ -94,7 +110,7 @@ parallax cancel <task-id>
 Tail logs from orchestrator API.
 
 ```bash
-parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]
+parallax logs [--task <id>]
 ```
 
 Examples:
@@ -102,7 +118,6 @@ Examples:
 ```bash
 parallax logs
 parallax logs --task 3ed59f6e7cea
-parallax logs --since 1741200000000
 ```
 
 ## Data directory files
@@ -111,5 +126,6 @@ Parallax stores runtime state in `~/.parallax`.
 
 Common files:
 
-- `running.json`: process manifest (`orchestratorPid`, config path, start timestamp)
+- `running.json`: process manifest (`orchestratorPid`, `uiPid`, ports, start timestamp)
 - `parallax.db`: SQLite state database
+- `registry.json`: registered repository configs

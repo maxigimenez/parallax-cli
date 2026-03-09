@@ -2,8 +2,8 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { DEFAULT_API_PORT, DEFAULT_UI_PORT, type ServerConfig } from '@parallax/common'
-import type { RunningState } from './types.js'
+import type { ServerConfig } from '@parallax/common'
+import type { RegistryState, RunningState } from './types.js'
 
 const requireFromCli = createRequire(import.meta.url)
 
@@ -72,9 +72,12 @@ export function parseRunningState(raw: string, source: string): RunningState {
     !parsed ||
     typeof parsed !== 'object' ||
     typeof (parsed as { startedAt?: unknown }).startedAt !== 'number' ||
-    typeof (parsed as { configPath?: unknown }).configPath !== 'string' ||
     typeof (parsed as { orchestratorPid?: unknown }).orchestratorPid !== 'number' ||
+    typeof (parsed as { apiPort?: unknown }).apiPort !== 'number' ||
+    typeof (parsed as { uiPort?: unknown }).uiPort !== 'number' ||
     (parsed as { orchestratorPid: number }).orchestratorPid <= 0 ||
+    (parsed as { apiPort: number }).apiPort <= 0 ||
+    (parsed as { uiPort: number }).uiPort <= 0 ||
     ('uiPid' in parsed && typeof (parsed as { uiPid?: unknown }).uiPid !== 'number') ||
     (typeof (parsed as { uiPid?: unknown }).uiPid === 'number' &&
       (parsed as { uiPid: number }).uiPid <= 0)
@@ -85,18 +88,53 @@ export function parseRunningState(raw: string, source: string): RunningState {
   return parsed as RunningState
 }
 
+export function parseRegistryState(raw: string, source: string): RegistryState {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(
+      `Invalid config registry at ${source}: ${error instanceof Error ? error.message : 'unknown error'}`,
+      { cause: error }
+    )
+  }
+
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { configs?: unknown }).configs)) {
+    throw new Error(`Invalid config registry at ${source}.`)
+  }
+
+  return {
+    configs: (parsed as { configs: unknown[] }).configs.map((entry, index) => {
+      if (
+        !entry ||
+        typeof entry !== 'object' ||
+        typeof (entry as { configPath?: unknown }).configPath !== 'string' ||
+        typeof (entry as { addedAt?: unknown }).addedAt !== 'number' ||
+        ('envFilePath' in entry &&
+          (entry as { envFilePath?: unknown }).envFilePath !== undefined &&
+          typeof (entry as { envFilePath?: unknown }).envFilePath !== 'string')
+      ) {
+        throw new Error(`Invalid config registry entry ${index + 1} in ${source}.`)
+      }
+
+      return {
+        configPath: (entry as { configPath: string }).configPath,
+        addedAt: (entry as { addedAt: number }).addedAt,
+        envFilePath:
+          (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
+      }
+    }),
+  }
+}
+
 export function parseConfigProjectIds(raw: string, source: string): Set<string> {
-  const parsed = (loadYamlModule().load(raw) as { projects?: unknown }) || {}
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    !Array.isArray((parsed as { projects?: unknown }).projects)
-  ) {
+  const parsed = loadYamlModule().load(raw)
+  if (!Array.isArray(parsed)) {
     throw new Error(`Invalid parallax config at ${source}.`)
   }
 
   const projects = ensureArray(
-    (parsed as { projects: unknown[] }).projects.map((project) =>
+    parsed.map((project) =>
       typeof project === 'object' && project && 'id' in project
         ? (project as { id?: unknown }).id
         : undefined
@@ -112,42 +150,7 @@ export function parseConfigProjectIds(raw: string, source: string): Set<string> 
 }
 
 export function parseServerPortsFromConfig(raw: string, source: string): ServerConfig {
-  const parsed = (loadYamlModule().load(raw) as { server?: unknown }) || {}
-  const server = parsed.server
-
-  if (server === undefined) {
-    return {
-      apiPort: DEFAULT_API_PORT,
-      uiPort: DEFAULT_UI_PORT,
-    }
-  }
-
-  if (!server || typeof server !== 'object' || Array.isArray(server)) {
-    throw new Error(`Invalid server config at ${source}.`)
-  }
-
-  const parsePort = (value: unknown, label: string, fallback: number) => {
-    if (value === undefined) {
-      return fallback
-    }
-
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 65535) {
-      throw new Error(`${label} in ${source} must be an integer between 1 and 65535.`)
-    }
-
-    return value
-  }
-
-  const resolved = {
-    apiPort: parsePort((server as { apiPort?: unknown }).apiPort, 'server.apiPort', DEFAULT_API_PORT),
-    uiPort: parsePort((server as { uiPort?: unknown }).uiPort, 'server.uiPort', DEFAULT_UI_PORT),
-  }
-
-  if (resolved.apiPort === resolved.uiPort) {
-    throw new Error(`server.apiPort and server.uiPort in ${source} must be different.`)
-  }
-
-  return resolved
+  throw new Error(`Server ports are no longer configured in ${source}; use "parallax start" flags.`)
 }
 
 export async function resolveServerPorts(configPath: string): Promise<ServerConfig> {
@@ -163,38 +166,55 @@ export async function loadRunningState(dataDir: string, manifestFile: string): P
   return parseRunningState(await fs.readFile(manifestPath, 'utf8'), manifestPath)
 }
 
-export async function resolveProjectIdsFromRunningConfig(
-  dataDir: string,
-  manifestFile: string
-): Promise<Set<string>> {
-  const manifest = await loadRunningState(dataDir, manifestFile)
-  if (!(await ensureFileExists(manifest.configPath))) {
-    throw new Error(`Running config file not found: ${manifest.configPath}`)
+export async function loadRegistry(dataDir: string, registryFile: string): Promise<RegistryState> {
+  const registryPath = path.join(dataDir, registryFile)
+  if (!(await ensureFileExists(registryPath))) {
+    return { configs: [] }
   }
 
-  return parseConfigProjectIds(await fs.readFile(manifest.configPath, 'utf8'), manifest.configPath)
+  return parseRegistryState(await fs.readFile(registryPath, 'utf8'), registryPath)
 }
 
-export async function resolveProjectIdsForPending(
+export async function saveRegistry(
   dataDir: string,
-  manifestFile: string,
-  configPath?: string
+  registryFile: string,
+  registry: RegistryState
+): Promise<void> {
+  await fs.writeFile(path.join(dataDir, registryFile), JSON.stringify(registry, null, 2))
+}
+
+export async function resolveProjectIdsFromRegistry(
+  dataDir: string,
+  registryFile: string
 ): Promise<Set<string>> {
-  if (configPath) {
-    if (!(await ensureFileExists(configPath))) {
-      throw new Error(`Config file not found: ${configPath}`)
+  const registry = await loadRegistry(dataDir, registryFile)
+  const ids = new Set<string>()
+
+  for (const config of registry.configs) {
+    if (!(await ensureFileExists(config.configPath))) {
+      throw new Error(`Registered config file not found: ${config.configPath}`)
     }
 
-    return parseConfigProjectIds(await fs.readFile(configPath, 'utf8'), configPath)
+    const configIds = parseConfigProjectIds(
+      await fs.readFile(config.configPath, 'utf8'),
+      config.configPath
+    )
+
+    for (const id of configIds) {
+      if (ids.has(id)) {
+        throw new Error(`Duplicate project id "${id}" across registered configs.`)
+      }
+      ids.add(id)
+    }
   }
 
-  return resolveProjectIdsFromRunningConfig(dataDir, manifestFile)
+  return ids
 }
 
 export async function validateConfigFile(configPath: string): Promise<void> {
   const raw = await fs.readFile(configPath, 'utf8')
-  const parsed = (loadYamlModule().load(raw) || {}) as { projects?: unknown }
-  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.projects)) {
+  const parsed = loadYamlModule().load(raw)
+  if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error(`Invalid parallax config at ${configPath}`)
   }
 }

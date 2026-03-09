@@ -1,20 +1,25 @@
 export function printUsage(): void {
   console.log(`Usage:
   parallax --version
-  parallax start [--config <path>] [--env-file <path>]
-  parallax pending [--config <path>] [--approve <id|all>] [--reject <id>] [--json]
+  parallax --help
+  parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
+  parallax register <config-file> [--env-file <path>]
+  parallax unregister <config-file>
+  parallax pending [--approve <id>] [--reject <id>]
   parallax preflight
-  parallax retry <task-id> [--mode <full|execution>]
+  parallax retry <task-id>
   parallax cancel <task-id>
-  parallax stop [--force]
-  parallax logs [--api <base>] [--task <id>] [--since <epoch-ms>]
+  parallax stop
+  parallax logs [--task <id>]
 
 Commands:
-  start      Start orchestrator + UI in background.
+  start      Start orchestrator + UI in background using the provided runtime flags.
+  register   Register a repository config in ~/.parallax, with optional project env file.
+  unregister Remove a repository config from ~/.parallax.
   pending    List pending plans and optionally approve/reject them.
   preflight  Validate local prerequisites and auth.
   retry      Queue a task for manual retry.
   cancel     Cancel a pending or running task.
-  stop       Stop running parallax processes.
-  logs       Tail task logs from orchestrator API.`)
+  stop       Force-stop the running Parallax processes.
+  logs       Tail task logs from the running Parallax API.`)
 }

@@ -58,41 +58,29 @@ Provider credentials:
 Example:
 
 ```yaml
-server:
-  apiPort: 3000
-  uiPort: 8080
-concurrency: 2
-logs: [info, success, warn, error]
-projects:
-  - id: web-app
-    workspaceDir: /absolute/path/to/your/repo
-    pullFrom:
-      provider: linear
-      filters:
-        team: ENG
-        state: Todo
-    agent:
-      provider: codex
-      model: gpt-5.3-codex
-      approvalMode: auto_edit
-      sandbox: true
-      disableMcp: true
+- id: web-app
+  workspaceDir: /absolute/path/to/your/repo
+  pullFrom:
+    provider: linear
+    filters:
+      team: ENG
+      state: Todo
+  agent:
+    provider: codex
+    model: gpt-5.4
+    sandbox: true
+    disableMcp: true
 ```
 
 For full field behavior, see [Configuration Reference](./configuration.md).
 
 ## 5. Start Parallax
 
-Start with explicit config:
+Start the runtime, then register the repository config:
 
 ```bash
-parallax start --config ./parallax.yml
-```
-
-If `--config` is omitted, Parallax reads `./parallax.yml` from the current working directory:
-
-```bash
-parallax start
+parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax register ./parallax.yml --env-file ./.env
 ```
 
 ## 6. Open dashboard
@@ -102,19 +90,10 @@ Default URL:
 - API: `http://localhost:3000`
 - UI: `http://localhost:8080`
 
-LAN access:
-
-- orchestrator listens on `0.0.0.0:3000`
-- other devices on your local network can access it if your OS firewall allows inbound traffic on port `3000`
+Parallax stores runtime state in `~/.parallax`.
 
 ## 7. Stop Parallax
 
 ```bash
 parallax stop
-```
-
-Force stop when needed:
-
-```bash
-parallax stop --force
 ```

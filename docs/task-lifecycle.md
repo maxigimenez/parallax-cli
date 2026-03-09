@@ -29,12 +29,12 @@ Execution does not proceed until the plan is approved (unless plan is marked `NO
 Plan approval can be done from:
 
 - dashboard plan tab
-- CLI via `parallax pending --approve <id|all>`
+- CLI via `parallax pending --approve <id>`
 
 Rejection:
 
 - dashboard
-- CLI via `parallax pending --reject <id> --reason "<text>"`
+- CLI via `parallax pending --reject <id>`
 
 ## 4. Execution phase
 
@@ -56,8 +56,7 @@ Task statuses:
 
 Manual retry:
 
-- `parallax retry <task-id> --mode full`
-- `parallax retry <task-id> --mode execution`
+- `parallax retry <task-id>`
 
 Cancellation:
 
@@ -67,4 +66,4 @@ Cancellation only succeeds for cancellable states; otherwise the API returns con
 
 ## 6. Observability and history
 
-Parallax stores task state and logs in SQLite under your data directory. The dashboard subscribes to live updates through sockets and can show historical task information from the same database.
+Parallax stores task state and logs in SQLite under `~/.parallax`. The dashboard subscribes to live updates through sockets and can show historical task information from the same database.

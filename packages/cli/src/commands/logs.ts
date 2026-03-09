@@ -25,8 +25,8 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export async function runLogs(args: string[], context: CliContext) {
   const options = parseLogsOptions(args)
-  const apiBase = options.apiBase || (await context.resolveDefaultApiBase())
-  let cursor = options.since ?? 0
+  const apiBase = await context.resolveDefaultApiBase()
+  let cursor = 0
   let seenAtCursor = new Set<string>()
 
   while (true) {

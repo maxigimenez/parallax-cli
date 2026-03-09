@@ -2,8 +2,7 @@ import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { hasFlag, parseArgValue, parseOptionalArg } from '../args.js'
-import { resolveEnvFilePath, validateConfigFile } from '../config.js'
+import { parseStartOptions } from '../args.js'
 import {
   isProcessAlive,
   readFileTail,
@@ -48,33 +47,26 @@ export async function runStart(args: string[], context: CliContext) {
   const CYAN = '\x1b[36m'
   const BLUE = '\x1b[34m'
   const GREEN = '\x1b[32m'
+  const YELLOW = '\x1b[33m'
   const DIM = '\x1b[2m'
   const RESET = '\x1b[0m'
 
-  const configArg = hasFlag(args, 'config') ? parseArgValue(args, 'config') : undefined
+  const options = parseStartOptions(args)
   const dataDir = context.defaultDataDir
-  const configPath = configArg ? context.resolvePath(configArg) : context.defaultConfigPath
-  const envFilePath = await resolveEnvFilePath(
-    parseOptionalArg(args, 'env-file'),
-    context.resolvePath,
-    context.ensureFileExists
-  )
 
   await fs.mkdir(dataDir, { recursive: true })
 
   console.log('')
   console.log(`${CYAN}⏳ Initializing Parallax...${RESET}`)
-  console.log(`${BLUE}📄 Config:${RESET} ${DIM}${configPath}${RESET}`)
   console.log(`${BLUE}📁 Data Dir:${RESET} ${DIM}${dataDir}${RESET}`)
   console.log('')
 
-  if (!(await context.ensureFileExists(configPath))) {
-    throw new Error(`Config path not found: ${configPath}`)
-  }
-
-  await validateConfigFile(configPath)
-  const server = await context.resolveServerPorts(configPath)
-  const env = context.buildEnvConfig(configPath, dataDir)
+  const registry = await context.loadRegistry()
+  const env = context.buildEnvConfig(dataDir, {
+    apiPort: options.apiPort,
+    uiPort: options.uiPort,
+    concurrency: options.concurrency,
+  })
   const workspaceDevMode = process.env.NODE_ENV === 'dev'
   const orchestratorStdoutPath = path.join(dataDir, 'orchestrator.stdout.log')
   const orchestratorStderrPath = path.join(dataDir, 'orchestrator.stderr.log')
@@ -104,7 +96,6 @@ export async function runStart(args: string[], context: CliContext) {
       orchestratorPid = spawnDetached(
         process.execPath,
         [
-          ...(envFilePath ? [`--env-file=${envFilePath}`] : []),
           '--import',
           'tsx',
           path.resolve(context.rootDir, 'packages/orchestrator/src/index.ts'),
@@ -119,10 +110,10 @@ export async function runStart(args: string[], context: CliContext) {
 
       uiPid = spawnDetached(
         'pnpm',
-        ['--filter', '@parallax/ui', 'start', '--', '--host', '0.0.0.0', '--port', String(server.uiPort)],
+        ['--filter', '@parallax/ui', 'start', '--', '--host', '0.0.0.0', '--port', String(options.uiPort)],
         context.rootDir,
         {
-          VITE_PARALLAX_API_BASE: `http://localhost:${server.apiPort}`,
+          VITE_PARALLAX_API_BASE: `http://localhost:${options.apiPort}`,
         },
         {
           stdoutPath: uiStdoutPath,
@@ -132,7 +123,7 @@ export async function runStart(args: string[], context: CliContext) {
     } else {
       orchestratorPid = spawnDetached(
         process.execPath,
-        [...(envFilePath ? [`--env-file=${envFilePath}`] : []), resolveOrchestratorEntryPoint(context.rootDir)],
+        [resolveOrchestratorEntryPoint(context.rootDir)],
         process.cwd(),
         env,
         {
@@ -150,27 +141,37 @@ export async function runStart(args: string[], context: CliContext) {
       throw new Error('Failed to spawn UI process.')
     }
 
-    await waitForUrlHealth(`http://localhost:${server.apiPort}/tasks`, 'Orchestrator API')
-    await waitForUrlHealth(`http://localhost:${server.uiPort}`, 'Parallax UI')
+    await waitForUrlHealth(`http://localhost:${options.apiPort}/tasks`, 'Orchestrator API')
+    await waitForUrlHealth(`http://localhost:${options.uiPort}`, 'Parallax UI')
 
     await fs.writeFile(
       path.join(dataDir, context.manifestFile),
       JSON.stringify(
         {
           startedAt: Date.now(),
-          configPath,
           orchestratorPid,
           uiPid: uiPid || undefined,
+          apiPort: options.apiPort,
+          uiPort: options.uiPort,
         },
         null,
         2
       )
     )
 
+    console.log('')
+    console.log('')
     console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
     console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
-    console.log(`${DIM}Dashboard:${RESET} http://localhost:${server.uiPort}`)
-    console.log(`${DIM}API:${RESET} http://localhost:${server.apiPort}`)
+    console.log(`${DIM}Dashboard:${RESET} http://localhost:${options.uiPort}`)
+    console.log(`${DIM}Registered Configs:${RESET} ${registry.configs.length}`)
+    console.log('')
+    console.log('')
+    console.log(
+      `${YELLOW}💡 Register a repository config with:${RESET} ${DIM}parallax register <config-file>${RESET}`
+    )
+    console.log('')
+    console.log('')
   } catch (error) {
     const processAlive = orchestratorPid > 0 ? isProcessAlive(orchestratorPid) : false
     await stopProcessBestEffort(orchestratorPid, 'orchestrator', true)

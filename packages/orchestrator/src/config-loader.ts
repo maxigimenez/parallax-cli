@@ -1,6 +1,8 @@
 import fs from 'fs/promises'
 import yaml from 'js-yaml'
 import path from 'path'
+import os from 'os'
+import dotenv from 'dotenv'
 import {
   AGENT_PROVIDER,
   APPROVAL_MODE,
@@ -13,8 +15,15 @@ import {
   ProjectConfig,
   ServerConfig,
 } from '@parallax/common'
+type RegisteredConfig = {
+  configPath: string
+  addedAt: number
+  envFilePath?: string
+}
 
-const DEFAULT_CONFIG_NAMES = ['parallax.yml', '.parallax/config.yml', '.parallax/config.yaml']
+type RegistryState = {
+  configs: RegisteredConfig[]
+}
 
 async function fileExists(filePath: string): Promise<boolean> {
   try {
@@ -25,35 +34,49 @@ async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-async function resolveConfigPath(): Promise<string> {
-  if (process.env.PARALLAX_CONFIG_PATH) {
-    return path.resolve(process.cwd(), process.env.PARALLAX_CONFIG_PATH)
-  }
-
-  const workspaceRootCandidates = [process.cwd(), path.resolve(process.cwd(), '..', '..')]
-
-  for (const base of workspaceRootCandidates) {
-    const configuredPath = path.resolve(base, 'parallax.yml')
-    if (await fileExists(configuredPath)) {
-      return configuredPath
-    }
-  }
-
-  for (const name of DEFAULT_CONFIG_NAMES) {
-    const candidate = path.resolve(process.cwd(), name)
-    if (await fileExists(candidate)) {
-      return candidate
-    }
-  }
-
-  return path.resolve(process.cwd(), '../../parallax.yml')
+function resolveDataDir(): string {
+  return process.env.PARALLAX_DATA_DIR
+    ? path.resolve(process.env.PARALLAX_DATA_DIR)
+    : path.join(os.homedir(), '.parallax')
 }
 
 export async function loadConfig(): Promise<AppConfig> {
-  const configPath = await resolveConfigPath()
-  const fileContent = await fs.readFile(configPath, 'utf8')
-  const parsed = (yaml.load(fileContent) || {}) as Partial<AppConfig>
-  return validateConfig(parsed, configPath)
+  const dataDir = resolveDataDir()
+  const registryPath = path.join(dataDir, 'registry.json')
+  if (!(await fileExists(registryPath))) {
+    return buildEmptyConfig()
+  }
+
+  const registry = parseRegistry(await fs.readFile(registryPath, 'utf8'), registryPath)
+  if (registry.configs.length === 0) {
+    return buildEmptyConfig()
+  }
+
+  const configs = await Promise.all(
+    registry.configs.map(async (entry) => {
+      if (!(await fileExists(entry.configPath))) {
+        throw new Error(`Registered config file not found: ${entry.configPath}`)
+      }
+      if (entry.envFilePath) {
+        if (!(await fileExists(entry.envFilePath))) {
+          throw new Error(`Registered env file not found: ${entry.envFilePath}`)
+        }
+        const envContent = await fs.readFile(entry.envFilePath, 'utf8')
+        const envValues = dotenv.parse(envContent)
+        for (const [key, value] of Object.entries(envValues)) {
+          if (process.env[key] === undefined) {
+            process.env[key] = value
+          }
+        }
+      }
+
+      const fileContent = await fs.readFile(entry.configPath, 'utf8')
+      const parsed = yaml.load(fileContent)
+      return validateConfig(parsed, entry.configPath, entry.envFilePath)
+    })
+  )
+
+  return mergeConfigs(configs)
 }
 
 const ALLOWED_LOG_LEVELS: LogLevel[] = Object.values(LOG_LEVEL)
@@ -101,49 +124,98 @@ function parseLogs(raw: unknown, source: string): LogLevel[] {
   return [...new Set(parsed)] as LogLevel[]
 }
 
-function parseConcurrency(raw: unknown, source: string): number {
+function parseRuntimeConcurrency(): number {
+  const raw = process.env.PARALLAX_CONCURRENCY
   if (raw === undefined) {
-    return 1
+    return 2
   }
 
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 16) {
-    throw new Error(`concurrency in ${source} must be an integer between 1 and 16.`)
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 16) {
+    throw new Error('PARALLAX_CONCURRENCY must be an integer between 1 and 16.')
   }
 
-  return raw
+  return parsed
 }
 
-function parsePort(raw: unknown, label: string, fallback: number): number {
+function parseRuntimePort(raw: string | undefined, label: string, fallback: number): number {
   if (raw === undefined) {
     return fallback
   }
 
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1 || raw > 65535) {
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) {
     throw new Error(`${label} must be an integer between 1 and 65535.`)
   }
 
-  return raw
+  return parsed
 }
 
-function parseServerConfig(raw: unknown, source: string): ServerConfig {
-  if (raw === undefined) {
-    return {
-      apiPort: DEFAULT_API_PORT,
-      uiPort: DEFAULT_UI_PORT,
-    }
-  }
-
-  assertObject(raw, `server in ${source}`)
-
-  const server = raw as Record<string, unknown>
-  const apiPort = parsePort(server.apiPort, `server.apiPort in ${source}`, DEFAULT_API_PORT)
-  const uiPort = parsePort(server.uiPort, `server.uiPort in ${source}`, DEFAULT_UI_PORT)
+function parseRuntimeServerConfig(): ServerConfig {
+  const apiPort = parseRuntimePort(
+    process.env.PARALLAX_SERVER_API_PORT,
+    'PARALLAX_SERVER_API_PORT',
+    DEFAULT_API_PORT
+  )
+  const uiPort = parseRuntimePort(
+    process.env.PARALLAX_SERVER_UI_PORT,
+    'PARALLAX_SERVER_UI_PORT',
+    DEFAULT_UI_PORT
+  )
 
   if (apiPort === uiPort) {
-    throw new Error(`server.apiPort and server.uiPort in ${source} must be different.`)
+    throw new Error('PARALLAX_SERVER_API_PORT and PARALLAX_SERVER_UI_PORT must be different.')
   }
 
   return { apiPort, uiPort }
+}
+
+function buildEmptyConfig(): AppConfig {
+  return {
+    concurrency: parseRuntimeConcurrency(),
+    logs: ['info', 'success', 'warn', 'error'],
+    server: parseRuntimeServerConfig(),
+    projects: [],
+  }
+}
+
+function parseRegistry(raw: string, source: string): RegistryState {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(
+      `Invalid config registry at ${source}: ${error instanceof Error ? error.message : 'unknown error'}`,
+      { cause: error }
+    )
+  }
+
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { configs?: unknown }).configs)) {
+    throw new Error(`Invalid config registry at ${source}.`)
+  }
+
+  return {
+    configs: (parsed as { configs: unknown[] }).configs.map((entry, index) => {
+      if (
+        !entry ||
+        typeof entry !== 'object' ||
+        typeof (entry as { configPath?: unknown }).configPath !== 'string' ||
+        typeof (entry as { addedAt?: unknown }).addedAt !== 'number' ||
+        ('envFilePath' in entry &&
+          (entry as { envFilePath?: unknown }).envFilePath !== undefined &&
+          typeof (entry as { envFilePath?: unknown }).envFilePath !== 'string')
+      ) {
+        throw new Error(`Invalid config registry entry ${index + 1} in ${source}.`)
+      }
+
+      return {
+        configPath: (entry as { configPath: string }).configPath,
+        addedAt: (entry as { addedAt: number }).addedAt,
+        envFilePath:
+          (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
+      }
+    }),
+  }
 }
 
 function parseProject(raw: unknown, source: string): ProjectConfig {
@@ -262,13 +334,22 @@ async function assertWorkspaceExists(project: ProjectConfig, source: string): Pr
   }
 }
 
-async function validateConfig(raw: Partial<AppConfig>, source: string): Promise<AppConfig> {
-  assertObject(raw, `config ${source}`)
-  if (!Array.isArray(raw.projects) || raw.projects.length === 0) {
-    throw new Error(`config ${source} must define at least one project.`)
+async function validateConfig(
+  raw: unknown,
+  source: string,
+  envFilePath?: string
+): Promise<AppConfig> {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw new Error(`config ${source} must define a non-empty project array.`)
   }
 
-  const projects = raw.projects.map((project) => parseProject(project, source))
+  const projects = raw.map((project) => {
+    const parsed = parseProject(project, source)
+    return {
+      ...parsed,
+      envFilePath,
+    }
+  })
   const uniqueIds = new Set<string>()
   for (const project of projects) {
     if (uniqueIds.has(project.id)) {
@@ -279,9 +360,26 @@ async function validateConfig(raw: Partial<AppConfig>, source: string): Promise<
   }
 
   return {
-    concurrency: parseConcurrency(raw.concurrency, source),
-    logs: parseLogs(raw.logs, source),
-    server: parseServerConfig(raw.server, source),
+    concurrency: parseRuntimeConcurrency(),
+    logs: ['info', 'success', 'warn', 'error'],
+    server: parseRuntimeServerConfig(),
     projects,
   }
+}
+
+function mergeConfigs(configs: AppConfig[]): AppConfig {
+  const merged = buildEmptyConfig()
+  const projectIds = new Set<string>()
+
+  for (const config of configs) {
+    for (const project of config.projects) {
+      if (projectIds.has(project.id)) {
+        throw new Error(`Duplicate project id "${project.id}" across registered configs.`)
+      }
+      projectIds.add(project.id)
+      merged.projects.push(project)
+    }
+  }
+
+  return merged
 }

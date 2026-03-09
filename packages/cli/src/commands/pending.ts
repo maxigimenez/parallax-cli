@@ -20,24 +20,20 @@ export function scopePendingTasks(
 
 export function resolveApproveTargets(tasks: TaskPendingState[], approveValue: string): string[] {
   const available = new Set(tasks.map((task) => task.id))
-  if (approveValue === 'all') {
-    if (tasks.length === 0) {
-      throw new Error('No pending plans available to approve.')
-    }
-    return [...available]
+  const normalized = approveValue.trim()
+  if (!normalized) {
+    throw new Error('approve value must include a task id.')
   }
 
-  const explicit = approveValue.split(',').map((entry) => entry.trim()).filter(Boolean)
-  if (explicit.length === 0) {
-    throw new Error('approve value must include at least one task id.')
+  if (normalized.includes(',')) {
+    throw new Error('Approve accepts a single task id.')
   }
 
-  const unknown = explicit.filter((id) => !available.has(id))
-  if (unknown.length > 0) {
-    throw new Error(`Unknown task id(s): ${unknown.join(', ')}`)
+  if (!available.has(normalized)) {
+    throw new Error(`Unknown task id: ${normalized}`)
   }
 
-  return explicit
+  return [normalized]
 }
 
 export function resolveRejectTarget(tasks: TaskPendingState[], rejectId: string): string {
@@ -84,19 +80,15 @@ function printPendingSummary(tasks: TaskPendingState[]) {
 
 export async function runPending(args: string[], context: CliContext) {
   const options = parsePendingOptions(args)
-  const configPath = options.configPath ? context.resolvePath(options.configPath) : undefined
-  const apiBase = await context.resolveDefaultApiBase(configPath)
+  const apiBase = await context.resolveDefaultApiBase()
 
   const pendingTasks = await fetchJson<TaskPendingState[]>(`${apiBase}/tasks/pending-plans`)
-  const allowedProjectIds = await context.resolveProjectIdsForPending(configPath)
-  const scopedTasks = scopePendingTasks(pendingTasks, allowedProjectIds)
+  const scopedTasks = pendingTasks
 
   if (options.approve) {
     const approvedIds = resolveApproveTargets(scopedTasks, options.approve)
     for (const taskId of approvedIds) {
-      await postJson(`${apiBase}/tasks/${encodeURIComponent(taskId)}/approve`, {
-        approver: options.approver,
-      })
+      await postJson(`${apiBase}/tasks/${encodeURIComponent(taskId)}/approve`, {})
       console.log(`Approved: ${taskId}`)
     }
     return
@@ -109,11 +101,6 @@ export async function runPending(args: string[], context: CliContext) {
     return
   }
 
-  if (options.json) {
-    console.log(JSON.stringify(scopedTasks, null, 2))
-    return
-  }
-
   if (scopedTasks.length === 0) {
     console.log('No pending plans right now.')
     return
@@ -121,6 +108,6 @@ export async function runPending(args: string[], context: CliContext) {
 
   printPendingSummary(scopedTasks)
   console.log(
-    '\nApprove/reject with:\n  parallax pending --approve <id|all>\n  parallax pending --reject <id>'
+    '\nApprove/reject with:\n  parallax pending --approve <id>\n  parallax pending --reject <id>'
   )
 }
