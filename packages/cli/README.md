@@ -19,7 +19,7 @@ Requirements:
 ```bash
 parallax preflight
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
-parallax register ./parallax.yml --env-file ./.env
+parallax register ./parallax.yml
 ```
 
 ## Example `parallax.yml`

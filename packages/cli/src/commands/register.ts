@@ -26,6 +26,21 @@ async function reloadRunningRuntime(context: CliContext) {
   return true
 }
 
+async function saveRegistryAndReload(
+  context: CliContext,
+  previousRegistry: Awaited<ReturnType<CliContext['loadRegistry']>>,
+  nextRegistry: Awaited<ReturnType<CliContext['loadRegistry']>>
+) {
+  await context.saveRegistry(nextRegistry)
+
+  try {
+    return await reloadRunningRuntime(context)
+  } catch (error) {
+    await context.saveRegistry(previousRegistry)
+    throw error
+  }
+}
+
 export async function runRegister(
   args: string[],
   context: CliContext,
@@ -55,8 +70,7 @@ export async function runRegister(
     const nextRegistry = {
       configs: [...registry.configs, { configPath, envFilePath, addedAt: Date.now() }],
     }
-    await context.saveRegistry(nextRegistry)
-    const reloaded = await reloadRunningRuntime(context)
+    const reloaded = await saveRegistryAndReload(context, registry, nextRegistry)
     console.log(`Registered: ${configPath}`)
     if (reloaded) {
       console.log('Reloaded running Parallax instance.')
@@ -70,8 +84,8 @@ export async function runRegister(
     throw new Error(`Config is not registered: ${configPath}`)
   }
 
-  await context.saveRegistry({ configs: nextConfigs })
-  const reloaded = await reloadRunningRuntime(context)
+  const nextRegistry = { configs: nextConfigs }
+  const reloaded = await saveRegistryAndReload(context, registry, nextRegistry)
   console.log(`Unregistered: ${configPath}`)
   if (reloaded) {
     console.log('Reloaded running Parallax instance.')

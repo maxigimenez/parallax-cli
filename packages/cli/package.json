@@ -15,6 +15,9 @@
     "start": "tsx src/index.ts",
     "test": "vitest run"
   },
+  "engines": {
+    "node": ">=23.7.0"
+  },
   "dependencies": {
     "@fastify/cors": "11.2.0",
     "@parallax/common": "workspace:*",
