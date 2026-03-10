@@ -1,5 +1,6 @@
 import { EmptyState } from '@/components/EmptyState'
 import { LogViewer } from '@/components/LogViewer'
+import { OrchestratorErrorOverlay } from '@/components/OrchestratorErrorOverlay'
 import { SettingsViewer } from '@/components/SettingsViewer'
 import { TaskSidebar } from '@/components/TaskSidebar'
 import { useParallax } from '@/hooks/useParallax'
@@ -23,7 +24,17 @@ function resolveActiveTab(tab: string | undefined): ActiveTab {
 }
 
 const Index = () => {
-  const { tasks, config, isConnected, error, retryTask, cancelTask, approvePlan, rejectPlan } =
+  const {
+    tasks,
+    config,
+    isConnected,
+    error,
+    orchestratorErrors,
+    retryTask,
+    cancelTask,
+    approvePlan,
+    rejectPlan,
+  } =
     useParallax()
   const navigate = useNavigate()
   const location = useLocation()
@@ -117,6 +128,7 @@ const Index = () => {
         config={config}
         isConnected={isConnected}
       />
+      <OrchestratorErrorOverlay errors={orchestratorErrors} />
     </div>
   )
 }

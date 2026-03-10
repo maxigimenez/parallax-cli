@@ -7,6 +7,7 @@ import { GitService } from '../git-service.js'
 import { taskLifecycle } from '../task-lifecycle.js'
 import { emitConfigUpdated } from '../logging/socket-publisher.js'
 import { isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
+import { readOrchestratorErrors } from './diagnostics.js'
 import { splitUnifiedDiffByFile } from './api/diff-utils.js'
 import {
   parseNonNegativeInteger,
@@ -69,6 +70,14 @@ export async function createApiServer(
   )
 
   fastify.get('/config', async () => getConfig())
+
+  fastify.get('/runtime/errors', async (_request, reply) => {
+    try {
+      return await readOrchestratorErrors()
+    } catch (error) {
+      return reply.status(500).send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
 
   fastify.post('/runtime/reload', async (_request, reply) => {
     try {

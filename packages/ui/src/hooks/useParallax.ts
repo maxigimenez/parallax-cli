@@ -49,6 +49,7 @@ export function useParallax() {
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<Error | null>(null)
+  const [orchestratorErrors, setOrchestratorErrors] = useState<string[]>([])
 
   const refreshState = async () => {
     const [tasksRes, configRes] = await Promise.all([
@@ -66,6 +67,22 @@ export function useParallax() {
     setConfig(configRes.data as AppConfig)
     setTasks((prev) => replaceTasksFromApi(prev, incoming))
     setError(null)
+  }
+
+  const refreshOrchestratorErrors = async () => {
+    const response = await axios.get(`${apiBase}/runtime/errors`)
+    const payload = response.data as { errors?: unknown }
+    const errors = Array.isArray(payload.errors)
+      ? payload.errors.filter((value): value is string => typeof value === 'string')
+      : []
+
+    setOrchestratorErrors(errors)
+  }
+
+  const syncOrchestratorErrors = () => {
+    void refreshOrchestratorErrors().catch(() => {
+      setOrchestratorErrors([])
+    })
   }
 
   const retryTask = async (taskId: string) => {
@@ -109,6 +126,7 @@ export function useParallax() {
 
     void refreshState()
       .then(() => {
+        syncOrchestratorErrors()
         socket = io(apiBase)
         socket.on('connect', () => setIsConnected(true))
         socket.on('disconnect', () => setIsConnected(false))
@@ -127,6 +145,7 @@ export function useParallax() {
           void refreshState().catch((value) => {
             setError(value instanceof Error ? value : new Error(String(value)))
           })
+          syncOrchestratorErrors()
         })
       })
       .catch((value) => {
@@ -137,6 +156,7 @@ export function useParallax() {
       void refreshState().catch((value) => {
         setError(value instanceof Error ? value : new Error(String(value)))
       })
+      syncOrchestratorErrors()
     }, 10000)
 
     return () => {
@@ -150,6 +170,7 @@ export function useParallax() {
     config,
     isConnected,
     error,
+    orchestratorErrors,
     retryTask,
     cancelTask,
     approvePlan,

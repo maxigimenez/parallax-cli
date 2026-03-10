@@ -77,7 +77,14 @@ function buildEnvConfig(
   dataDir: string,
   runtime: { apiPort: number; uiPort: number; concurrency: number }
 ) {
+  const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
+  const sqliteWarningSuppression = '--disable-warning=ExperimentalWarning'
+  const nodeOptions = existingNodeOptions
+    ? `${existingNodeOptions} ${sqliteWarningSuppression}`
+    : sqliteWarningSuppression
+
   return {
+    NODE_OPTIONS: nodeOptions,
     PARALLAX_DATA_DIR: dataDir,
     PARALLAX_DB_PATH: path.join(dataDir, 'parallax.db'),
     PARALLAX_SERVER_API_PORT: String(runtime.apiPort),

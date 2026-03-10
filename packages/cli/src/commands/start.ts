@@ -92,6 +92,13 @@ export async function runStart(args: string[], context: CliContext) {
       await fs.unlink(existingManifestPath).catch(() => undefined)
     }
 
+    await Promise.all([
+      fs.writeFile(orchestratorStdoutPath, ''),
+      fs.writeFile(orchestratorStderrPath, ''),
+      fs.writeFile(uiStdoutPath, ''),
+      fs.writeFile(uiStderrPath, ''),
+    ])
+
     if (workspaceDevMode) {
       orchestratorPid = spawnDetached(
         process.execPath,
