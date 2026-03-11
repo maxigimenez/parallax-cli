@@ -92,7 +92,17 @@ Default URL:
 
 Parallax stores runtime state in `~/.parallax`.
 
-## 7. Stop Parallax
+## 7. Check runtime status
+
+Use:
+
+```bash
+parallax status
+```
+
+This reports whether the local Parallax runtime is healthy and surfaces orchestrator issues when present.
+
+## 8. Stop Parallax
 
 ```bash
 parallax stop

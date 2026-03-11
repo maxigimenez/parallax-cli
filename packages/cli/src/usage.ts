@@ -7,6 +7,7 @@ export function printUsage(): void {
   parallax unregister <config-file>
   parallax pending [--approve <id>] [--reject <id>]
   parallax preflight
+  parallax status
   parallax pr-review <task-id>
   parallax retry <task-id>
   parallax cancel <task-id>
@@ -19,6 +20,7 @@ Commands:
   unregister Remove a repository config from ~/.parallax.
   pending    List pending plans and optionally approve/reject them.
   preflight  Validate local prerequisites and auth.
+  status     Show overall orchestrator status and runtime diagnostics.
   pr-review  [experimental] Apply open human PR review comments to the task's existing open PR.
   retry      Queue a task for manual retry.
   cancel     Cancel a pending or running task.

@@ -8,6 +8,7 @@ import {
   parsePendingOptions,
   parseRetryOptions,
   parseCancelOptions,
+  parseStatusOptions,
   parseLogsOptions,
   parsePreflightOptions,
   parseRegisterOptions,
@@ -148,6 +149,17 @@ describe('CLI pending scope and approval helpers', () => {
   it('rejects preflight flags', () => {
     expect(() => parsePreflightOptions(['--config', './parallax.yml'])).toThrow(
       'parallax preflight does not accept flags.'
+    )
+  })
+
+  it('parses status options with defaults', () => {
+    const options = parseStatusOptions([])
+    expect(options).toEqual({})
+  })
+
+  it('rejects status flags', () => {
+    expect(() => parseStatusOptions(['--verbose'])).toThrow(
+      'parallax status does not accept flags.'
     )
   })
 

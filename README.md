@@ -63,6 +63,7 @@ pnpm parallax register ./parallax.yml --env-file ./.env
 pnpm parallax unregister ./parallax.yml
 pnpm parallax stop
 pnpm parallax preflight
+pnpm parallax status
 pnpm parallax pending
 pnpm parallax pr-review <task-id>
 pnpm parallax retry <task-id>
@@ -77,6 +78,7 @@ Commands:
 - `parallax unregister <config-file>`
 - `parallax stop`
 - `parallax preflight`
+- `parallax status`
 - `parallax pending [--approve <id>] [--reject <id>]`
 - `parallax pr-review <task-id>` (experimental)
 - `parallax retry <task-id>`
@@ -135,6 +137,7 @@ Then on Raspberry Pi / any machine:
 npm i -g parallax-cli
 parallax preflight
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax status
 parallax register ./parallax.yml
 ```
 

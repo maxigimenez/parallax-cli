@@ -19,6 +19,7 @@ Requirements:
 ```bash
 parallax preflight
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax status
 parallax register ./parallax.yml
 parallax pr-review <task-id>
 ```

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { DEFAULT_API_PORT } from '@parallax/common'
-import { hasFlag, parseCancelOptions, parseLogsOptions, parsePendingOptions, parsePreflightOptions, parsePrReviewOptions, parseRegisterOptions, parseRetryOptions, parseStartOptions, parseStopOptions as parseStopOptionsInternal, resolvePath } from './args.js'
+import { hasFlag, parseCancelOptions, parseLogsOptions, parsePendingOptions, parsePreflightOptions, parsePrReviewOptions, parseRegisterOptions, parseRetryOptions, parseStartOptions, parseStatusOptions, parseStopOptions as parseStopOptionsInternal, resolvePath } from './args.js'
 import {
   ensureFileExists,
   loadRegistry as loadRegistryFromDisk,
@@ -29,6 +29,7 @@ import { runPrReview } from './commands/pr-review.js'
 import { runRegister } from './commands/register.js'
 import { runRetry } from './commands/retry.js'
 import { runStart } from './commands/start.js'
+import { runStatus } from './commands/status.js'
 import { runStop } from './commands/stop.js'
 import type { CliContext } from './types.js'
 import { printUsage } from './usage.js'
@@ -145,6 +146,9 @@ async function cli() {
       case 'preflight':
         await runPreflight(commandArgs)
         return
+      case 'status':
+        await runStatus(commandArgs, cliContext)
+        return
       case 'pr-review':
         await runPrReview(commandArgs, cliContext)
         return
@@ -180,6 +184,7 @@ export {
   parseRegistryState,
   parseRetryOptions,
   parseStartOptions,
+  parseStatusOptions,
   parseRunningState,
   resolveApproveTargets,
   resolveRejectTarget,

@@ -21,6 +21,21 @@ Notes:
 - returns non-zero exit code when required checks fail
 - prints a final verdict (`PASS` or `FAIL`)
 
+## `parallax status`
+
+Check whether the current Parallax runtime is healthy.
+
+```bash
+parallax status
+```
+
+Notes:
+
+- no flags accepted
+- prints a clear message when Parallax is not running
+- shows orchestrator PID and dashboard URL when healthy
+- prints orchestrator stderr diagnostics when the runtime has issues
+
 ## `parallax start`
 
 Start orchestrator and dashboard in background.

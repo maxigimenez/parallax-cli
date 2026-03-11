@@ -35,6 +35,8 @@ export type LogsCommandOptions = {
 
 export type PreflightCommandOptions = Record<string, never>
 
+export type StatusCommandOptions = Record<string, never>
+
 export type RegisterCommandOptions = {
   configPath: string
   envFilePath?: string

@@ -24,5 +24,6 @@ This documentation is for users running Parallax as a local automation runtime f
 2. Validate dependencies: `parallax preflight`
 3. Create `parallax.yml`
 4. Start Parallax: `parallax start`
-5. Register config: `parallax register ./parallax.yml`
-6. Open dashboard: `http://localhost:8080`
+5. Check runtime status: `parallax status`
+6. Register config: `parallax register ./parallax.yml`
+7. Open dashboard: `http://localhost:8080`
