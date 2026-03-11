@@ -113,13 +113,20 @@ Parallax is published as a single global CLI package:
 npm i -g parallax-cli
 ```
 
-Release steps:
+Releases are published through the manual GitHub Actions workflow:
+
+- open the `Release parallax-cli` workflow in GitHub Actions
+- trigger it with `Run workflow`
+- the workflow publishes the exact version already set in [`packages/cli/package.json`](packages/cli/package.json)
+
+Repository requirement:
+
+- configure npm trusted publishing for this repository/package in npm
+
+Before triggering the release, update the version in:
 
 ```bash
-pnpm install
-pnpm release:pack
-# inspect packages/cli/parallax-cli-0.0.3.tgz, then:
-pnpm release:publish
+packages/cli/package.json
 ```
 
 Then on Raspberry Pi / any machine:
