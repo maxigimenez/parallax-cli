@@ -3,16 +3,19 @@ import { Server as SocketServer } from 'socket.io'
 import { dbService } from './database.js'
 import { GitService } from './git-service.js'
 import { BaseAgentAdapter } from './ai-adapters/index.js'
+import { ProjectConfig, TASK_REVIEW_STATE, TASK_STATUS, TaskPlanState, type Task, sleep } from '@parallax/common'
 import { loadConfig } from './config-loader.js'
 import { logger, setIo, setLogLevels } from './logger.js'
-import { ProjectConfig, TASK_STATUS, TaskPlanState, sleep } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
+import { GitHubReviewService } from './github/review-service.js'
+import { createTaskId } from './task-id.js'
 import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
 import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'
 import {
   createAgentAdapter,
+  processPullRequestReview,
   processTask,
   processTaskPlan,
 } from './workflow/task-runner.js'
@@ -30,6 +33,7 @@ const activeWorktrees = new Map<string, string>()
 async function startRuntimeServers(
   getConfig: () => Awaited<ReturnType<typeof loadConfig>>,
   reloadRuntime: () => Promise<Awaited<ReturnType<typeof loadConfig>>>,
+  triggerPullRequestReview: (taskId: string) => Promise<{ reviewTaskId: string; prNumber: number }>,
   gitService: GitService,
   activeTasks: Set<string>,
   canceledTasks: Set<string>
@@ -37,6 +41,7 @@ async function startRuntimeServers(
   const fastify = await createApiServer({
     getConfig,
     reloadRuntime,
+    triggerPullRequestReview,
     gitService,
     activeTasks,
     canceledTasks,
@@ -166,6 +171,32 @@ async function pollProjects(
   }
 }
 
+function createPullRequestReviewTask(originalTask: Task, project: ProjectConfig): Task {
+  if (!originalTask.prNumber || !originalTask.branchName || !originalTask.prUrl) {
+    throw new Error(`Task ${originalTask.id} does not have a related open PR.`)
+  }
+
+  const externalId = `${originalTask.externalId}/pr-review/${Date.now()}`
+  const now = Date.now()
+
+  return {
+    id: createTaskId(project.id, externalId),
+    externalId,
+    title: `PR Review: ${originalTask.title}`,
+    description: `On-demand PR review remediation for ${originalTask.externalId} on PR #${originalTask.prNumber}.`,
+    status: TASK_STATUS.PENDING,
+    projectId: project.id,
+    branchName: originalTask.branchName,
+    prUrl: originalTask.prUrl,
+    prNumber: originalTask.prNumber,
+    reviewState: TASK_REVIEW_STATE.REVIEW_PENDING,
+    createdAt: now,
+    updatedAt: now,
+    executionAttempts: 0,
+    planState: TaskPlanState.NOT_REQUIRED,
+  }
+}
+
 async function main() {
   const executor = new HostExecutor()
   let runtimeConfig = await loadConfig()
@@ -191,6 +222,7 @@ async function main() {
   }
 
   const gitService = new GitService(executor)
+  const reviewService = new GitHubReviewService(executor)
   const limit = pLimit(runtimeConfig.concurrency)
   const activeTasks = new Set<string>()
   const canceledTasks = new Set<string>()
@@ -208,7 +240,85 @@ async function main() {
     return adapter
   }
 
-  await startRuntimeServers(getConfig, reloadRuntime, gitService, activeTasks, canceledTasks)
+  const triggerPullRequestReview = async (sourceTaskId: string) => {
+    const sourceTask = dbService.getTaskByLookup(sourceTaskId)
+    if (!sourceTask) {
+      throw new Error(`Task ${sourceTaskId} not found.`)
+    }
+
+    const project = getConfig().projects.find((candidate) => candidate.id === sourceTask.projectId)
+    if (!project) {
+      throw new Error(`Project ${sourceTask.projectId} not found in config.`)
+    }
+
+    if (!sourceTask.prNumber || sourceTask.prNumber < 1) {
+      throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
+    }
+
+    const pullRequestDetails = await reviewService.getPullRequestDetails(project, sourceTask.prNumber)
+    if (pullRequestDetails.state !== 'OPEN') {
+      throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
+    }
+
+    const comments = await reviewService.listOpenReviewComments(project, sourceTask.prNumber)
+    if (comments.length === 0) {
+      throw new Error(`PR #${sourceTask.prNumber} does not have open human review comments.`)
+    }
+
+    const reviewTask = createPullRequestReviewTask(
+      {
+        ...sourceTask,
+        branchName: sourceTask.branchName ?? pullRequestDetails.headRefName,
+        prUrl: sourceTask.prUrl ?? pullRequestDetails.url,
+      },
+      project
+    )
+
+    dbService.saveTask(reviewTask)
+    dbService.updateTaskPlanOutput(reviewTask.id, {
+      planState: TaskPlanState.NOT_REQUIRED,
+      planPrompt: 'On-demand pull request review remediation.',
+    })
+    dbService.updateTaskReviewState(reviewTask.id, TASK_REVIEW_STATE.REVIEW_PENDING)
+
+    const adapter = getAdapterForProject(project)
+    activeTasks.add(reviewTask.id)
+    taskLifecycle.queue(reviewTask.id, `Queued PR review run for #${reviewTask.prNumber}`)
+    void limit(async () => {
+      try {
+        await processPullRequestReview(
+          reviewTask,
+          project,
+          adapter,
+          gitService,
+          reviewService,
+          comments,
+          canceledTasks,
+          activeWorktrees
+        )
+      } finally {
+        canceledTasks.delete(reviewTask.id)
+        activeTasks.delete(reviewTask.id)
+      }
+    }).catch((error: any) => {
+      logger.error(`Failed to schedule PR review run: ${error.message}`, reviewTask.id)
+      taskLifecycle.fail(reviewTask.id, `Failed to schedule PR review run: ${error.message}`)
+    })
+
+    return {
+      reviewTaskId: reviewTask.id,
+      prNumber: reviewTask.prNumber!,
+    }
+  }
+
+  await startRuntimeServers(
+    getConfig,
+    reloadRuntime,
+    triggerPullRequestReview,
+    gitService,
+    activeTasks,
+    canceledTasks
+  )
 
   while (true) {
     try {

@@ -17,7 +17,7 @@ const bundledPackages = [
     sourceDir: path.join(workspaceRoot, 'packages/common'),
     packageJson: {
       name: '@parallax/common',
-      version: '0.0.2',
+      version: '0.0.3',
       type: 'module',
       main: './dist/index.js',
       types: './dist/index.d.ts',
@@ -38,7 +38,7 @@ const bundledPackages = [
     sourceDir: path.join(workspaceRoot, 'packages/orchestrator'),
     packageJson: {
       name: '@parallax/orchestrator',
-      version: '0.0.2',
+      version: '0.0.3',
       type: 'module',
     },
   },
@@ -47,7 +47,7 @@ const bundledPackages = [
     sourceDir: path.join(workspaceRoot, 'packages/ui'),
     packageJson: {
       name: '@parallax/ui',
-      version: '0.0.2',
+      version: '0.0.3',
       type: 'module',
     },
   },

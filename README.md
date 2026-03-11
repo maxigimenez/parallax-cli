@@ -64,9 +64,10 @@ pnpm parallax unregister ./parallax.yml
 pnpm parallax stop
 pnpm parallax preflight
 pnpm parallax pending
-pnpm parallax retry ENG-123
-pnpm parallax cancel ENG-123
-pnpm parallax logs --task ENG-123
+pnpm parallax pr-review <task-id>
+pnpm parallax retry <task-id>
+pnpm parallax cancel <task-id>
+pnpm parallax logs --task <task-id>
 ```
 
 Commands:
@@ -77,6 +78,7 @@ Commands:
 - `parallax stop`
 - `parallax preflight`
 - `parallax pending [--approve <id>] [--reject <id>]`
+- `parallax pr-review <task-id>` (experimental)
 - `parallax retry <task-id>`
 - `parallax cancel <task-id>`
 - `parallax logs [--task <id>]`
@@ -116,7 +118,7 @@ Release steps:
 ```bash
 pnpm install
 pnpm release:pack
-# inspect packages/cli/parallax-cli-0.0.2.tgz, then:
+# inspect packages/cli/parallax-cli-0.0.3.tgz, then:
 pnpm release:publish
 ```
 

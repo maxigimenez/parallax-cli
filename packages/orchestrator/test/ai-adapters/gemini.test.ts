@@ -62,6 +62,24 @@ describe('GeminiAdapter', () => {
     expect(result.prSummary).toContain('Reduced N+1 queries')
   })
 
+  it('should extract commit metadata for review execution output', async () => {
+    const mockExecutor = {
+      executeCommand: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        output: 'Done\nPARALLAX_COMMIT_MESSAGE: Tighten dashboard loading flow',
+      }),
+    }
+    const adapter = new GeminiAdapter(mockExecutor as any, mockLogger as any)
+    const task = { externalId: 'REV-30', title: 'Review', description: 'Desc' } as any
+    const project = { agent: { model: 'flash' } } as any
+
+    vi.spyOn(adapter, 'setupWorkspace').mockResolvedValue()
+
+    const result = await adapter.runTask(task, '/tmp/dir', project, 'approved plan', 'commit')
+
+    expect(result.commitMessage).toBe('Tighten dashboard loading flow')
+  })
+
   it('returns failed result when plan status is invalid', async () => {
     const mockExecutor = {
       executeCommand: vi

@@ -41,7 +41,8 @@ export abstract class BaseAgentAdapter {
     task: Task,
     workingDir: string,
     project: ProjectConfig,
-    approvedPlan?: string
+    approvedPlan?: string,
+    outputMode?: 'pr' | 'commit'
   ): Promise<AgentResult>
 
   abstract runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult>

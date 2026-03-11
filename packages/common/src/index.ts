@@ -157,6 +157,7 @@ export interface AgentResult {
   error?: string
   prTitle?: string
   prSummary?: string
+  commitMessage?: string
   planMarkdown?: string
 }
 

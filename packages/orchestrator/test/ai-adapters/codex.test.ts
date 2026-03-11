@@ -85,7 +85,13 @@ describe('CodexAdapter plan mode', () => {
 
   it('builds codex execution command with model and extra args', async () => {
     const mockExecutor = {
-      executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: 'done' }),
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({
+          exitCode: 0,
+          output:
+            'done\nPARALLAX_PR_TITLE: Improve auth loading\nPARALLAX_PR_SUMMARY:\n- Updated auth flow',
+        }),
     }
 
     const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
@@ -100,6 +106,7 @@ describe('CodexAdapter plan mode', () => {
     } as any
 
     await adapter.runTask(task, '/tmp/repo', project, 'approved plan')
+    const result = await adapter.runTask(task, '/tmp/repo', project, 'approved plan')
 
     const command = mockExecutor.executeCommand.mock.calls[0][0]
     expect(command).toEqual(
@@ -115,6 +122,24 @@ describe('CodexAdapter plan mode', () => {
       ])
     )
     expect(command[command.length - 1]).toContain('You are executing an implementation plan.')
+    expect(result.prTitle).toBe('Improve auth loading')
+    expect(result.prSummary).toContain('Updated auth flow')
+  })
+
+  it('extracts commit message for review execution output', async () => {
+    const mockExecutor = {
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ exitCode: 0, output: 'done\nPARALLAX_COMMIT_MESSAGE: Address review comments' }),
+    }
+
+    const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
+    const task = { externalId: 'REV-104A', title: 'Execution', description: 'Do work' } as any
+    const project = { agent: {} } as any
+
+    const result = await adapter.runTask(task, '/tmp/repo', project, 'approved plan', 'commit')
+
+    expect(result.commitMessage).toBe('Address review comments')
   })
 
   it('maps default approval and disabled sandbox to codex runtime flags', async () => {
