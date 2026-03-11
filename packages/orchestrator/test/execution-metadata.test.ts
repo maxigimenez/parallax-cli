@@ -47,16 +47,20 @@ describe('execution metadata', () => {
     ].join('\n'))
   })
 
-  it('caps PR summaries to a short operator-readable size', () => {
+  it('preserves prose summaries while dropping trailing noise', () => {
     const summary = normalizePrSummary([
       'Removes the default-model field from persona/onboarding saves and adds a lightweight reusable model dropdown to AI module entry points.',
       '- Threads an optional model through request schemas and API handlers so each action uses the selected model.',
       '- Keeps legacy profiles falling back to stored default_model during migration.',
       '- Extra detail that should never appear in the final PR summary.',
+      'diff --git a/components/ai/ModelSelect.vue b/components/ai/ModelSelect.vue',
     ].join('\n'))
 
-    expect(summary).toBeDefined()
-    expect(summary!.split('\n').length).toBeLessThanOrEqual(10)
-    expect(summary!.length).toBeLessThanOrEqual(280)
+    expect(summary).toBe([
+      'Removes the default-model field from persona/onboarding saves and adds a lightweight reusable model dropdown to AI module entry points.',
+      '- Threads an optional model through request schemas and API handlers so each action uses the selected model.',
+      '- Keeps legacy profiles falling back to stored default_model during migration.',
+      '- Extra detail that should never appear in the final PR summary.',
+    ].join('\n'))
   })
 })

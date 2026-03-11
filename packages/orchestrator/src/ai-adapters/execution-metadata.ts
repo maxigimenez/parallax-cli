@@ -19,15 +19,13 @@ const SUMMARY_STOP_PATTERNS = [
   /^function\s+/,
 ]
 
-const MAX_PR_SUMMARY_LINES = 10
-const MAX_PR_SUMMARY_CHARS = 280
-
 function isSummaryNoiseLine(line: string) {
   return SUMMARY_STOP_PATTERNS.some((pattern) => pattern.test(line))
 }
 
-function sanitizePrSummary(value: string | undefined) {
-  const lines = value
+function extractPrSummary(output: string) {
+  const summaryMatch = output.match(/PARALLAX_PR_SUMMARY:\s*([\s\S]*?)(?:\nPARALLAX_|$)/i)
+  const lines = summaryMatch?.[1]
     ?.split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
@@ -42,54 +40,19 @@ function sanitizePrSummary(value: string | undefined) {
       break
     }
     kept.push(line)
-    if (kept.length >= MAX_PR_SUMMARY_LINES) {
-      break
-    }
   }
 
   const normalized = kept.join('\n').trim()
-  if (!normalized) {
-    return undefined
-  }
-
-  if (normalized.length <= MAX_PR_SUMMARY_CHARS) {
-    return normalized
-  }
-
-  const shortenedLines: string[] = []
-  let remaining = MAX_PR_SUMMARY_CHARS
-  for (const line of kept) {
-    if (remaining <= 1) {
-      break
-    }
-
-    const separatorLength = shortenedLines.length > 0 ? 1 : 0
-    const available = remaining - separatorLength
-    if (line.length <= available) {
-      shortenedLines.push(line)
-      remaining -= line.length + separatorLength
-      continue
-    }
-
-    const truncated = `${line.slice(0, Math.max(available - 1, 0)).trimEnd()}…`.trim()
-    if (truncated) {
-      shortenedLines.push(truncated)
-    }
-    break
-  }
-
-  const shortened = shortenedLines.join('\n').trim()
-  return shortened || normalized.slice(0, MAX_PR_SUMMARY_CHARS - 1).trimEnd() + '…'
+  return normalized || undefined
 }
 
 export function extractExecutionMetadata(output: string): Pick<AgentResult, 'prTitle' | 'prSummary' | 'commitMessage'> {
   const titleMatch = output.match(/PARALLAX_PR_TITLE:\s*(.+)/i)
-  const summaryMatch = output.match(/PARALLAX_PR_SUMMARY:\s*([\s\S]*?)(?:\nPARALLAX_|$)/i)
   const commitMessageMatch = output.match(/PARALLAX_COMMIT_MESSAGE:\s*(.+)/i)
 
   return {
     prTitle: sanitizeSingleLine(titleMatch?.[1]),
-    prSummary: sanitizePrSummary(summaryMatch?.[1]),
+    prSummary: extractPrSummary(output),
     commitMessage: sanitizeSingleLine(commitMessageMatch?.[1]),
   }
 }
@@ -99,7 +62,7 @@ export function sanitizeCommitMessage(commitMessage: string | undefined) {
 }
 
 export function normalizePrSummary(summary: string | undefined) {
-  return sanitizePrSummary(summary)
+  return extractPrSummary(`PARALLAX_PR_SUMMARY:\n${summary ?? ''}`)
 }
 
 export function buildDefaultCommitMessage(taskExternalId: string, taskTitle: string) {
