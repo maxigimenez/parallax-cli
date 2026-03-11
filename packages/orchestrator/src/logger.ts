@@ -1,6 +1,19 @@
 import chalk from 'chalk'
 import stripAnsi from 'strip-ansi'
-import { LOG_LEVEL, Logger, LogLevel, TASK_RUNTIME_STATUS, type TaskRuntimeStatus } from '@parallax/common'
+import {
+  LOG_LEVEL,
+  Logger,
+  LogLevel,
+  TASK_LOG_KIND,
+  TASK_LOG_LEVEL,
+  TASK_LOG_SOURCE,
+  TASK_RUNTIME_STATUS,
+  type TaskLogEntry,
+  type TaskLogKind,
+  type TaskLogLevel,
+  type TaskLogSource,
+  type TaskRuntimeStatus,
+} from '@parallax/common'
 import { dbService } from './database.js'
 import {
   appendTaskLog,
@@ -8,7 +21,6 @@ import {
   getTaskLogs,
   getTaskStatuses,
   touchTaskStatus,
-  type TaskLogLevel,
   updateTaskStatus,
 } from './logging/task-log-store.js'
 import {
@@ -80,40 +92,58 @@ function buildLogMessage(taskId: string, message: string) {
   return `[${taskId}] ${message}`
 }
 
-function writeTaskLog(taskId: string, level: TaskLogLevel, icon: string, message: string) {
+function writeTaskLog(entry: Omit<TaskLogEntry, 'timestamp'> & { taskId: string }) {
   const timestamp = Date.now()
-  const logMessage = buildLogMessage(taskId, message)
-  const entry = {
-    message: logMessage,
-    icon: stripAnsi(icon),
-    level,
+  const persistedEntry: TaskLogEntry = {
+    title: entry.title,
+    message: buildLogMessage(entry.taskId, entry.message),
+    icon: stripAnsi(entry.icon),
+    level: entry.level,
     timestamp,
+    kind: entry.kind,
+    source: entry.source,
+    groupId: entry.groupId,
   }
 
-  appendTaskLog(taskId, entry)
+  appendTaskLog(entry.taskId, persistedEntry)
   dbService.appendTaskLog({
-    taskExternalId: taskId,
-    ...entry,
+    taskExternalId: entry.taskId,
+    ...persistedEntry,
   })
-  emitTaskLog(taskId, entry)
+  emitTaskLog(entry.taskId, persistedEntry)
 }
 
-function logMessage(taskId: string | undefined, level: TaskLogLevel, icon: string, message: string) {
-  const raw = normalizeMessage(message)
-  if (!raw) {
+function writeConsoleAndTaskLog(
+  taskId: string | undefined,
+  title: string | undefined,
+  level: TaskLogLevel,
+  icon: string,
+  message: string,
+  kind: TaskLogKind,
+  source: TaskLogSource,
+  groupId?: string
+) {
+  const rawMessage = normalizeMessage(message)
+  if (!rawMessage) {
     return
   }
 
-  const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean)
-  for (const line of lines) {
-    console.log(formatConsoleLine(taskId, icon, line))
+  console.log(formatConsoleLine(taskId, icon, rawMessage.split('\n')[0] || rawMessage))
 
-    if (!taskId) {
-      continue
-    }
-
-    writeTaskLog(taskId, level, icon, line)
+  if (!taskId) {
+    return
   }
+
+  writeTaskLog({
+    taskId,
+    title,
+    level,
+    icon,
+    message: rawMessage,
+    kind,
+    source,
+    groupId,
+  })
 }
 
 function shouldEmitLog(configuredLevel: LogLevel) {
@@ -125,7 +155,9 @@ function emitLoggerMessage(
   configuredLevel: LogLevel,
   persistedLevel: TaskLogLevel,
   icon: string,
-  message: string
+  message: string,
+  kind: TaskLogKind,
+  source: TaskLogSource
 ) {
   if (taskId) {
     touchTaskStatus(taskId, message)
@@ -135,20 +167,70 @@ function emitLoggerMessage(
     return
   }
 
-  logMessage(taskId, persistedLevel, icon, message)
+  const lines = normalizeMessage(message).split('\n').map((line) => line.trim()).filter(Boolean)
+  for (const line of lines) {
+    writeConsoleAndTaskLog(taskId, undefined, persistedLevel, icon, line, kind, source)
+  }
 }
 
 export const logger: Logger = {
   info(message, taskId) {
-    emitLoggerMessage(taskId, LOG_LEVEL.INFO, 'info', LOG_ICON.info, message)
+    emitLoggerMessage(
+      taskId,
+      LOG_LEVEL.INFO,
+      TASK_LOG_LEVEL.INFO,
+      LOG_ICON.info,
+      message,
+      TASK_LOG_KIND.LIFECYCLE,
+      TASK_LOG_SOURCE.SYSTEM
+    )
   },
   success(message, taskId) {
-    emitLoggerMessage(taskId, LOG_LEVEL.SUCCESS, 'info', LOG_ICON.success, message)
+    emitLoggerMessage(
+      taskId,
+      LOG_LEVEL.SUCCESS,
+      TASK_LOG_LEVEL.INFO,
+      LOG_ICON.success,
+      message,
+      TASK_LOG_KIND.RESULT,
+      TASK_LOG_SOURCE.SYSTEM
+    )
   },
   warn(message, taskId) {
-    emitLoggerMessage(taskId, LOG_LEVEL.WARN, 'warning', LOG_ICON.warning, message)
+    emitLoggerMessage(
+      taskId,
+      LOG_LEVEL.WARN,
+      TASK_LOG_LEVEL.WARNING,
+      LOG_ICON.warning,
+      message,
+      TASK_LOG_KIND.WARNING,
+      TASK_LOG_SOURCE.SYSTEM
+    )
   },
   error(message, taskId) {
-    emitLoggerMessage(taskId, LOG_LEVEL.ERROR, 'error', LOG_ICON.error, message)
+    emitLoggerMessage(
+      taskId,
+      LOG_LEVEL.ERROR,
+      TASK_LOG_LEVEL.ERROR,
+      LOG_ICON.error,
+      message,
+      TASK_LOG_KIND.ERROR,
+      TASK_LOG_SOURCE.SYSTEM
+    )
+  },
+  event({ taskId, title, message, level = TASK_LOG_LEVEL.INFO, kind, source, icon, groupId }) {
+    const resolvedIcon =
+      icon ??
+      (level === TASK_LOG_LEVEL.ERROR
+        ? LOG_ICON.error
+        : level === TASK_LOG_LEVEL.WARNING
+          ? LOG_ICON.warning
+          : LOG_ICON.info)
+
+    if (taskId) {
+      touchTaskStatus(taskId, message)
+    }
+
+    writeConsoleAndTaskLog(taskId, title, level, resolvedIcon, message, kind, source, groupId)
   },
 }

@@ -8,6 +8,7 @@ describe('GeminiAdapter', () => {
     success: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    event: vi.fn(),
   }
 
   it('should construct the correct command', async () => {

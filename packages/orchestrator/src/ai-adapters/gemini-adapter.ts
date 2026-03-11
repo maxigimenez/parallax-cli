@@ -1,6 +1,7 @@
 import { Task, ProjectConfig, AgentResult, Logger, PlanResult, PlanResultStatus } from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
 import { extractExecutionMetadata } from './execution-metadata.js'
+import { classifyAgentLogChunk } from './stream-log.js'
 
 interface ParsedPlanOutput {
   status: string
@@ -40,20 +41,15 @@ export class GeminiAdapter extends BaseAgentAdapter {
       return
     }
 
-    if (chunk.stream === 'stderr') {
-      const lowerLine = line.toLowerCase()
-      if (
-        lowerLine.includes('warning') ||
-        lowerLine.includes('quota') ||
-        lowerLine.includes('retrying')
-      ) {
-        this.logger.warn(line, task.id)
-      } else {
-        this.logger.error(line, task.id)
-      }
-    } else {
-      this.logger.info(line, task.id)
-    }
+    const event = classifyAgentLogChunk(line, chunk.stream)
+    this.logger.event({
+      taskId: task.id,
+      message: event.message,
+      level: event.level,
+      kind: event.kind,
+      source: event.source,
+      groupId: event.groupId,
+    })
   }
 
   private buildCommand(task: Task, project: ProjectConfig, prompt: string): string[] {
@@ -226,6 +222,8 @@ export class GeminiAdapter extends BaseAgentAdapter {
             '- <key change 1>',
             '- <key change 2>',
             '- <tests/validation performed>',
+            'PARALLAX_PR_SUMMARY must be a concise human summary with maximum 10 lines.',
+            'Do not include code, diffs, commands, file patches, stack traces, or raw output in PARALLAX_PR_SUMMARY.',
           ]),
     ]
 

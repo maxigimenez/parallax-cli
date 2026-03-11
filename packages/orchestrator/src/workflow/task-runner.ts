@@ -1,6 +1,9 @@
 import path from 'path'
 import os from 'os'
 import {
+  TASK_LOG_KIND,
+  TASK_LOG_LEVEL,
+  TASK_LOG_SOURCE,
   AGENT_PROVIDER,
   PlanResult,
   PlanResultStatus,
@@ -181,6 +184,7 @@ export async function processTask(
     throwIfCancellationRequested(task.id, canceledTasks)
 
     if (result.success) {
+      await emitWorktreeDiffLogs(task, gitService, worktreePath)
       const branchName = await gitService.commitAndPush(worktreePath, task)
       if (!branchName) {
         logger.error('No changes made by agent.', task.id)
@@ -335,6 +339,7 @@ export async function processPullRequestReview(
       return
     }
 
+    await emitWorktreeDiffLogs(task, gitService, worktreePath)
     const branchName = await gitService.commitAndPush(worktreePath, task, {
       commitMessage: result.commitMessage,
     })
@@ -381,6 +386,21 @@ export async function processPullRequestReview(
     if (worktreePath) {
       await gitService.removeWorktree(worktreePath, project.workspaceDir)
     }
+  }
+}
+
+async function emitWorktreeDiffLogs(task: Task, gitService: GitService, worktreePath: string) {
+  const changedFiles = await gitService.getWorktreeChangedFiles(worktreePath)
+  for (const changedFile of changedFiles) {
+    const diff = await gitService.getWorktreeFileDiff(worktreePath, changedFile.path)
+    logger.event({
+      taskId: task.id,
+      title: changedFile.path,
+      message: diff || `${changedFile.status} ${changedFile.path}`,
+      kind: TASK_LOG_KIND.FILE_CHANGE,
+      level: TASK_LOG_LEVEL.INFO,
+      source: TASK_LOG_SOURCE.GIT,
+    })
   }
 }
 

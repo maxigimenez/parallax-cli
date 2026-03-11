@@ -1,7 +1,18 @@
-import { TASK_RUNTIME_STATUS, TASK_STATUS, Task, type TaskRuntimeStatus } from '@parallax/common'
+import {
+  TASK_LOG_KIND,
+  TASK_LOG_SOURCE,
+  TASK_RUNTIME_STATUS,
+  TASK_STATUS,
+  Task,
+  type TaskLogEntry,
+  type TaskRuntimeStatus,
+} from '@parallax/common'
 import { dbService } from '../../database.js'
-import { getTaskLogs, getTaskStatuses } from '../../logger.js'
+import { getTaskStatuses } from '../../logger.js'
 import { deriveTaskMessage, normalizePlanState } from '../../workflow/task-state.js'
+
+const taskLogKinds = new Set(Object.values(TASK_LOG_KIND))
+const taskLogSources = new Set(Object.values(TASK_LOG_SOURCE))
 
 export function mapTaskStatusToRuntimeStatus(status: Task['status']): TaskRuntimeStatus {
   switch (status) {
@@ -35,8 +46,19 @@ function getTaskExecutionAttempts(task: Task) {
 }
 
 function resolveTaskLogs(taskId: string) {
-  const liveLogs = getTaskLogs().get(taskId)
-  return liveLogs ?? dbService.getLogsByTaskExternalId(taskId)
+  const persistedLogs = dbService.getLogsByTaskExternalId(taskId)
+  return persistedLogs.map((entry): TaskLogEntry => {
+    return {
+      ...entry,
+      kind: taskLogKinds.has(entry.kind as TaskLogEntry['kind'])
+        ? (entry.kind as TaskLogEntry['kind'])
+        : TASK_LOG_KIND.LIFECYCLE,
+      source: taskLogSources.has(entry.source as TaskLogEntry['source'])
+        ? (entry.source as TaskLogEntry['source'])
+        : TASK_LOG_SOURCE.SYSTEM,
+      groupId: entry.groupId ?? undefined,
+    }
+  })
 }
 
 export function serializeTaskForApi(task: Task) {

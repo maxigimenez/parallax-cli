@@ -1,7 +1,7 @@
+import { TASK_LOG_KIND, TASK_LOG_SOURCE } from '@parallax/common'
 import { TASK_STATUS, type TaskStatus } from './task-constants'
 import type { TaskInfo } from '@/hooks/useParallax'
-
-const MAX_LOG_ENTRIES = 500
+import { canonicalizeTaskLogMessage } from './log-normalization'
 
 type TaskLogEntry = TaskInfo['logs'][number]
 
@@ -12,10 +12,14 @@ type IncomingApiTask = Omit<TaskInfo, 'status'> & {
 
 type LogEvent = {
   taskId: string
+  title?: string
   msg: string
   icon: string
   level: TaskLogEntry['level']
   timestamp: number
+  kind?: TaskLogEntry['kind']
+  source?: TaskLogEntry['source']
+  groupId?: string
 }
 
 type StatusEvent = {
@@ -27,31 +31,53 @@ export function hasTaskState(tasks: Record<string, TaskInfo>, taskId: string): b
   return taskId in tasks
 }
 
-function canonicalizeLogMessage(message: string, icon: string): string {
-  const withoutTaskPrefix = message.replace(/^\[[^\]]+\]\s*/, '').trim()
-  const escapedIcon = icon.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return withoutTaskPrefix.replace(new RegExp(`^${escapedIcon}\\s+`), '').trim()
+function getLogSignature(log: TaskLogEntry) {
+  const normalizedMessage = canonicalizeTaskLogMessage(log)
+  return `${log.timestamp}|${log.icon}|${normalizedMessage}|${log.level}|${log.kind}|${log.source}|${log.groupId ?? ''}`
 }
 
-function getLogSignature(log: TaskLogEntry) {
-  const normalizedMessage = canonicalizeLogMessage(log.message, log.icon)
-  return `${log.timestamp}|${log.icon}|${normalizedMessage}|${log.level}`
+function choosePreferredLogEntry(existing: TaskLogEntry | undefined, incoming: TaskLogEntry) {
+  if (!existing) {
+    return incoming
+  }
+
+  const existingScore =
+    (existing.title ? 1 : 0) +
+    (existing.groupId ? 1 : 0)
+  const incomingScore =
+    (incoming.title ? 1 : 0) +
+    (incoming.groupId ? 1 : 0)
+
+  return incomingScore >= existingScore ? incoming : existing
+}
+
+function normalizeLogEntry(log: TaskLogEntry): TaskLogEntry {
+  return {
+    ...log,
+    kind: log.kind ?? TASK_LOG_KIND.LIFECYCLE,
+    source: log.source ?? TASK_LOG_SOURCE.SYSTEM,
+    groupId: log.groupId ?? undefined,
+  }
 }
 
 function mergeTaskLogs(existing: TaskLogEntry[], incoming: TaskLogEntry[]) {
   const signatureToLog = new Map<string, TaskLogEntry>()
 
   for (const log of existing) {
-    signatureToLog.set(getLogSignature(log), log)
+    const normalized = normalizeLogEntry(log)
+    const signature = getLogSignature(normalized)
+    signatureToLog.set(signature, choosePreferredLogEntry(signatureToLog.get(signature), normalized))
   }
 
   for (const log of incoming) {
-    signatureToLog.set(getLogSignature(log), log)
+    const normalized = normalizeLogEntry(log)
+    const signature = getLogSignature(normalized)
+    signatureToLog.set(signature, choosePreferredLogEntry(signatureToLog.get(signature), normalized))
   }
 
   const merged = Array.from(signatureToLog.values())
   merged.sort((a, b) => a.timestamp - b.timestamp)
-  return merged.slice(-MAX_LOG_ENTRIES)
+  return merged
 }
 
 export function normalizeTaskStatus(status: string): TaskStatus {
@@ -91,11 +117,10 @@ export function replaceTasksFromApi(
   const next: Record<string, TaskInfo> = {}
 
   for (const task of incoming) {
-    const previousTask = previous[task.id]
     next[task.id] = {
       ...task,
       status: normalizeTaskStatus(task.status),
-      logs: mergeTaskLogs(previousTask?.logs ?? [], task.logs ?? []),
+      logs: mergeTaskLogs([], task.logs ?? []),
     }
   }
 
@@ -126,10 +151,14 @@ export function applyTaskLogEvent(
     return previous
   }
   const incoming: TaskLogEntry = {
+    title: event.title,
     message: event.msg,
     icon: event.icon,
     level: event.level,
     timestamp: event.timestamp,
+    kind: event.kind ?? TASK_LOG_KIND.LIFECYCLE,
+    source: event.source ?? TASK_LOG_SOURCE.SYSTEM,
+    groupId: event.groupId,
   }
   const latest = task.logs[task.logs.length - 1]
   if (latest && getLogSignature(latest) === getLogSignature(incoming)) {

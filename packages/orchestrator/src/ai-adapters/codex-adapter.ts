@@ -9,6 +9,7 @@ import {
 } from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
 import { extractExecutionMetadata } from './execution-metadata.js'
+import { CodexEventCollector } from './codex-event-collector.js'
 
 interface CodexPlanOutput {
   status?: PlanResultStatus
@@ -69,6 +70,7 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
+    command.push('--json')
     command.push('--', prompt)
 
     this.logger.info(
@@ -77,53 +79,6 @@ export class CodexAdapter extends BaseAgentAdapter {
     )
 
     return command
-  }
-
-  private handleLogChunk(task: Task, chunk: { stream: 'stdout' | 'stderr'; line: string }) {
-    const line = chunk.line.trim()
-    if (!line) {
-      return
-    }
-
-    if (chunk.stream === 'stderr') {
-      if (this.isCodexBannerLine(line)) {
-        return
-      }
-
-      const lowerLine = line.toLowerCase()
-      if (lowerLine.includes('retry') || lowerLine.includes('warning')) {
-        this.logger.warn(line, task.id)
-      } else if (
-        lowerLine.includes('error') ||
-        lowerLine.includes('failed') ||
-        lowerLine.includes('fatal') ||
-        lowerLine.includes('exception')
-      ) {
-        this.logger.error(line, task.id)
-      } else {
-        this.logger.info(line, task.id)
-      }
-      return
-    }
-
-    this.logger.info(line, task.id)
-  }
-
-  private isCodexBannerLine(line: string): boolean {
-    const normalized = line.toLowerCase()
-    return (
-      normalized.startsWith('openai codex ') ||
-      normalized === '--------' ||
-      normalized.startsWith('workdir:') ||
-      normalized.startsWith('model:') ||
-      normalized.startsWith('provider:') ||
-      normalized.startsWith('approval:') ||
-      normalized.startsWith('sandbox:') ||
-      normalized.startsWith('reasoning effort:') ||
-      normalized.startsWith('reasoning summaries:') ||
-      normalized.startsWith('session id:') ||
-      normalized === 'user'
-    )
   }
 
   private extractJsonCandidates(output: string): string[] {
@@ -365,15 +320,14 @@ export class CodexAdapter extends BaseAgentAdapter {
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     const command = this.buildCommand(task, project, this.buildPlanPrompt(task))
     const env = await this.resolveProjectEnv(project)
+    const collector = new CodexEventCollector(this.logger, task, 'plan')
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
-      onData: (chunk) => {
-        if (chunk.stream === 'stderr') {
-          this.handleLogChunk(task, chunk)
-          return
-        }
-      },
+      onData: (chunk) =>
+        chunk.stream === 'stdout'
+          ? collector.handleStdoutLine(chunk.line)
+          : collector.handleStderrLine(chunk.line),
       env,
     })
 
@@ -395,7 +349,8 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
-    return this.parsePlanOutput(result.output)
+    const { finalMessage } = collector.getResult()
+    return this.parsePlanOutput(finalMessage || result.stdout || result.output)
   }
 
   async runTask(
@@ -420,10 +375,14 @@ export class CodexAdapter extends BaseAgentAdapter {
       this.buildExecutionPrompt(task, approvedPlan, outputMode)
     )
     const env = await this.resolveProjectEnv(project)
+    const collector = new CodexEventCollector(this.logger, task, 'task')
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
-      onData: (chunk) => this.handleLogChunk(task, chunk),
+      onData: (chunk) =>
+        chunk.stream === 'stdout'
+          ? collector.handleStdoutLine(chunk.line)
+          : collector.handleStderrLine(chunk.line),
       env,
     })
 
@@ -435,10 +394,13 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
+    const { finalMessage } = collector.getResult()
+    const parsedOutput = finalMessage || result.stdout || result.output
+
     return {
       success: result.exitCode === 0,
-      output: result.output,
-      ...extractExecutionMetadata(result.output),
+      output: parsedOutput,
+      ...extractExecutionMetadata(parsedOutput),
       error: result.exitCode !== 0 ? `Codex exited with code ${result.exitCode}` : undefined,
     }
   }
@@ -484,7 +446,11 @@ export class CodexAdapter extends BaseAgentAdapter {
     const outputInstruction =
       outputMode === 'commit'
         ? 'At the end include a single-line commit message in PARALLAX_COMMIT_MESSAGE format.'
-        : 'At the end include PR title and summary in PARALLAX_PR_TITLE and PARALLAX_PR_SUMMARY format.'
+        : [
+            'At the end include PR title and summary in PARALLAX_PR_TITLE and PARALLAX_PR_SUMMARY format.',
+            'PARALLAX_PR_SUMMARY must be a concise human summary with maximum 10 lines.',
+            'Do not include code, diffs, commands, file patches, stack traces, or raw output in PARALLAX_PR_SUMMARY.',
+          ].join(' ')
 
     return [
       'You are executing an implementation plan.',

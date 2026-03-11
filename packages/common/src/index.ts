@@ -85,6 +85,48 @@ export const LOG_LEVEL = {
 
 export type LogLevel = (typeof LOG_LEVEL)[keyof typeof LOG_LEVEL]
 
+export const TASK_LOG_LEVEL = {
+  INFO: 'info',
+  WARNING: 'warning',
+  ERROR: 'error',
+} as const
+
+export type TaskLogLevel = (typeof TASK_LOG_LEVEL)[keyof typeof TASK_LOG_LEVEL]
+
+export const TASK_LOG_KIND = {
+  LIFECYCLE: 'lifecycle',
+  AGENT_MESSAGE: 'agent_message',
+  REASONING: 'reasoning',
+  COMMAND: 'command',
+  FILE_CHANGE: 'file_change',
+  MCP: 'mcp',
+  WARNING: 'warning',
+  ERROR: 'error',
+  RESULT: 'result',
+} as const
+
+export type TaskLogKind = (typeof TASK_LOG_KIND)[keyof typeof TASK_LOG_KIND]
+
+export const TASK_LOG_SOURCE = {
+  SYSTEM: 'system',
+  AGENT: 'agent',
+  GIT: 'git',
+  GITHUB: 'github',
+} as const
+
+export type TaskLogSource = (typeof TASK_LOG_SOURCE)[keyof typeof TASK_LOG_SOURCE]
+
+export interface TaskLogEntry {
+  title?: string
+  message: string
+  icon: string
+  level: TaskLogLevel
+  timestamp: number
+  kind: TaskLogKind
+  source: TaskLogSource
+  groupId?: string
+}
+
 export interface Task {
   id: string
   externalId: string
@@ -176,6 +218,16 @@ export interface Logger {
   success: (msg: string, taskId?: string) => void
   warn: (msg: string, taskId?: string) => void
   error: (msg: string, taskId?: string) => void
+  event: (entry: {
+    taskId: string
+    title?: string
+    message: string
+    level?: TaskLogLevel
+    kind: TaskLogKind
+    source: TaskLogSource
+    icon?: string
+    groupId?: string
+  }) => void
 }
 
 export async function sleep(ms: number): Promise<void> {

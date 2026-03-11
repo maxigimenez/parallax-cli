@@ -1,5 +1,5 @@
 import { Server as SocketServer } from 'socket.io'
-import type { TaskLogEntry } from './task-log-store.js'
+import type { TaskLogEntry } from '@parallax/common'
 import type { TaskRuntimeStatus } from '@parallax/common'
 
 let io: SocketServer | undefined
@@ -19,10 +19,14 @@ export function emitTaskRemoved(taskId: string) {
 export function emitTaskLog(taskId: string, entry: TaskLogEntry) {
   io?.emit('log', {
     taskId,
+    title: entry.title,
     msg: entry.message,
     icon: entry.icon,
     level: entry.level,
     timestamp: entry.timestamp,
+    kind: entry.kind,
+    source: entry.source,
+    groupId: entry.groupId,
   })
 }
 

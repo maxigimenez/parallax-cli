@@ -42,10 +42,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS task_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     taskExternalId TEXT NOT NULL,
+    title TEXT,
     message TEXT NOT NULL,
     icon TEXT NOT NULL,
     level TEXT NOT NULL,
-    timestamp INTEGER NOT NULL
+    timestamp INTEGER NOT NULL,
+    kind TEXT,
+    source TEXT,
+    groupId TEXT
   );
 `)
 
@@ -79,6 +83,26 @@ ensureColumn('approvedBy', 'TEXT')
 ensureColumn('approvedAt', 'INTEGER')
 ensureColumn('executionAttempts', 'INTEGER DEFAULT 0')
 ensureColumn('lastAgent', 'TEXT')
+
+const existingLogColumns = new Set(
+  (db.prepare('PRAGMA table_info(task_logs)').all() as Array<{ name: string }>).map(
+    (column) => column.name
+  )
+)
+
+const ensureLogColumn = (name: string, definition: string) => {
+  if (existingLogColumns.has(name)) {
+    return
+  }
+
+  db.exec(`ALTER TABLE task_logs ADD COLUMN ${name} ${definition}`)
+  existingLogColumns.add(name)
+}
+
+ensureLogColumn('kind', 'TEXT')
+ensureLogColumn('source', 'TEXT')
+ensureLogColumn('groupId', 'TEXT')
+ensureLogColumn('title', 'TEXT')
 
 export const dbService = {
   saveTask(task: Task) {
@@ -148,13 +172,17 @@ export const dbService = {
   getLogsByTaskExternalId(taskExternalId: string) {
     return db
       .prepare(
-        'SELECT message, icon, level, timestamp FROM task_logs WHERE taskExternalId = ? ORDER BY timestamp ASC, id ASC LIMIT 1000'
+        'SELECT title, message, icon, level, timestamp, kind, source, groupId FROM task_logs WHERE taskExternalId = ? ORDER BY timestamp ASC, id ASC'
       )
       .all(taskExternalId) as Array<{
+      title?: string
       message: string
       icon: string
       level: 'info' | 'warning' | 'error'
       timestamp: number
+      kind?: string
+      source?: string
+      groupId?: string
     }>
   },
 
@@ -272,27 +300,28 @@ export const dbService = {
 
   appendTaskLog(entry: {
     taskExternalId: string
+    title?: string
     message: string
     icon: string
     level: 'info' | 'warning' | 'error'
     timestamp: number
+    kind?: string
+    source?: string
+    groupId?: string
   }) {
     db.prepare(
-      'INSERT INTO task_logs (taskExternalId, message, icon, level, timestamp) VALUES (?, ?, ?, ?, ?)'
-    ).run(entry.taskExternalId, entry.message, entry.icon, entry.level, entry.timestamp)
-
-    db.prepare(
-      `
-        DELETE FROM task_logs
-        WHERE taskExternalId = ?
-          AND id NOT IN (
-            SELECT id FROM task_logs
-            WHERE taskExternalId = ?
-            ORDER BY timestamp DESC, id DESC
-            LIMIT 1000
-          )
-      `
-    ).run(entry.taskExternalId, entry.taskExternalId)
+      'INSERT INTO task_logs (taskExternalId, title, message, icon, level, timestamp, kind, source, groupId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      entry.taskExternalId,
+      entry.title ?? null,
+      entry.message,
+      entry.icon,
+      entry.level,
+      entry.timestamp,
+      entry.kind ?? null,
+      entry.source ?? null,
+      entry.groupId ?? null
+    )
   },
 
   clearTaskLogs(taskExternalId: string) {
@@ -336,7 +365,8 @@ export const dbService = {
       return db
         .prepare(
           `
-            SELECT taskExternalId, message, icon, level, timestamp
+            SELECT taskExternalId, title, message, icon, level, timestamp
+            , kind, source, groupId
             FROM task_logs
             WHERE taskExternalId = ? AND timestamp >= ?
             ORDER BY timestamp ASC, id ASC
@@ -345,17 +375,21 @@ export const dbService = {
         )
         .all(taskExternalId, since, limit) as Array<{
         taskExternalId: string
+        title?: string
         message: string
         icon: string
         level: 'info' | 'warning' | 'error'
         timestamp: number
+        kind?: string
+        source?: string
+        groupId?: string
       }>
     }
 
     return db
       .prepare(
         `
-          SELECT taskExternalId, message, icon, level, timestamp
+          SELECT taskExternalId, title, message, icon, level, timestamp, kind, source, groupId
           FROM task_logs
           WHERE timestamp >= ?
           ORDER BY timestamp ASC, id ASC
@@ -364,10 +398,14 @@ export const dbService = {
       )
       .all(since, limit) as Array<{
       taskExternalId: string
+      title?: string
       message: string
       icon: string
       level: 'info' | 'warning' | 'error'
       timestamp: number
+      kind?: string
+      source?: string
+      groupId?: string
     }>
   },
 }

@@ -15,14 +15,14 @@ export interface LocalExecutor {
   executeCommand(
     cmd: string[],
     options: ExecutionOptions
-  ): Promise<{ exitCode: number; output: string }>
+  ): Promise<{ exitCode: number; output: string; stdout: string; stderr: string }>
 }
 
 export class HostExecutor implements LocalExecutor {
   async executeCommand(
     cmd: string[],
     options: ExecutionOptions
-  ): Promise<{ exitCode: number; output: string }> {
+  ): Promise<{ exitCode: number; output: string; stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
       const [executable, ...args] = cmd
 
@@ -34,12 +34,19 @@ export class HostExecutor implements LocalExecutor {
       })
 
       let output = ''
+      let stdout = ''
+      let stderr = ''
       let stdoutBuffer = ''
       let stderrBuffer = ''
 
       const createHandler = (stream: 'stdout' | 'stderr') => (chunk: { toString(): string }) => {
         const text = chunk.toString().replace(/[\uFFFD]/g, '')
         output += text
+        if (stream === 'stdout') {
+          stdout += text
+        } else {
+          stderr += text
+        }
 
         if (!options.onData) {
           return
@@ -79,6 +86,8 @@ export class HostExecutor implements LocalExecutor {
         resolve({
           exitCode: code ?? 0,
           output: output.trim(),
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
         })
       })
 
@@ -87,6 +96,8 @@ export class HostExecutor implements LocalExecutor {
           resolve({
             exitCode: 127,
             output: `Command not found: ${executable}. Check your PATH or ensure the tool is installed.`,
+            stdout: '',
+            stderr: '',
           })
           return
         }
