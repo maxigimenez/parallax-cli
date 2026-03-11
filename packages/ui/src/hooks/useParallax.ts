@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
-import type { AppConfig, TaskPlanState, TaskReviewState } from '@parallax/common'
+import type {
+  AppConfig,
+  TaskLogEntry,
+  TaskPlanState,
+  TaskReviewState,
+} from '@parallax/common'
 import { getRequiredApiBase } from '@/lib/runtime-config'
 import { TASK_STATUS, type TaskStatus } from '@/lib/task-constants'
 import {
@@ -30,12 +35,7 @@ export interface TaskInfo {
   executionAttempts: number
   approvedBy?: string
   approvedAt?: number
-  logs: Array<{
-    message: string
-    icon: string
-    level: 'info' | 'warning' | 'error' | 'debug'
-    timestamp: number
-  }>
+  logs: TaskLogEntry[]
   branchName?: string
   prUrl?: string
   prNumber?: number

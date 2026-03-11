@@ -1,14 +1,5 @@
 import stripAnsi from 'strip-ansi'
-import { TASK_RUNTIME_STATUS, type TaskRuntimeStatus } from '@parallax/common'
-
-export type TaskLogLevel = 'info' | 'warning' | 'error'
-
-export type TaskLogEntry = {
-  message: string
-  icon: string
-  level: TaskLogLevel
-  timestamp: number
-}
+import { TASK_RUNTIME_STATUS, type TaskLogEntry, type TaskRuntimeStatus } from '@parallax/common'
 
 export type TaskStatusSnapshot = {
   msg: string
@@ -16,10 +7,22 @@ export type TaskStatusSnapshot = {
   status: TaskRuntimeStatus
 }
 
-const MAX_LOG_ENTRIES = 1000
-
 const taskStatuses = new Map<string, TaskStatusSnapshot>()
 const taskLogs = new Map<string, TaskLogEntry[]>()
+
+function escapeForRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function canonicalizeMessage(entry: TaskLogEntry) {
+  const withoutTaskPrefix = entry.message.replace(/^\[[^\]]+\]\s*/, '').trim()
+  const withoutIcon = withoutTaskPrefix.replace(new RegExp(`^${escapeForRegex(entry.icon)}\\s+`), '').trim()
+  return withoutIcon
+}
+
+function getLogSignature(entry: TaskLogEntry) {
+  return `${entry.timestamp}|${entry.level}|${entry.kind}|${entry.source}|${entry.groupId ?? ''}|${canonicalizeMessage(entry)}`
+}
 
 export function getTaskStatuses() {
   return taskStatuses
@@ -58,9 +61,10 @@ export function touchTaskStatus(taskId: string, message: string) {
 
 export function appendTaskLog(taskId: string, entry: TaskLogEntry) {
   const current = taskLogs.get(taskId) ?? []
-  current.push(entry)
-  if (current.length > MAX_LOG_ENTRIES) {
-    current.shift()
+  const signature = getLogSignature(entry)
+  if (current.some((candidate) => getLogSignature(candidate) === signature)) {
+    return
   }
+  current.push(entry)
   taskLogs.set(taskId, current)
 }

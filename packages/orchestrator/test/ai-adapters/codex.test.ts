@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { CodexAdapter } from '../../src/ai-adapters/codex-adapter.js'
-import { PlanResultStatus } from '@parallax/common'
+import { PlanResultStatus, TASK_LOG_KIND, TASK_LOG_LEVEL, TASK_LOG_SOURCE } from '@parallax/common'
 
 describe('CodexAdapter plan mode', () => {
   const mockLogger = {
@@ -8,6 +8,7 @@ describe('CodexAdapter plan mode', () => {
     success: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
+    event: vi.fn(),
   }
 
   it('parses PLAN_READY responses with enum status', async () => {
@@ -278,6 +279,7 @@ describe('CodexAdapter plan mode', () => {
       success: vi.fn(),
       warn: vi.fn(),
       error: vi.fn(),
+      event: vi.fn(),
     }
     const mockExecutor = {
       executeCommand: vi.fn().mockImplementation(async (_command: string[], options: any) => {
@@ -304,6 +306,13 @@ describe('CodexAdapter plan mode', () => {
       'OpenAI Codex v0.110.0 (research preview)',
       task.id
     )
-    expect(localLogger.warn).toHaveBeenCalledWith('actual warning from codex', task.id)
+    expect(localLogger.event).toHaveBeenCalledWith({
+      taskId: task.id,
+      title: 'Codex stderr',
+      message: 'actual warning from codex',
+      level: TASK_LOG_LEVEL.WARNING,
+      kind: TASK_LOG_KIND.WARNING,
+      source: TASK_LOG_SOURCE.AGENT,
+    })
   })
 })

@@ -6,12 +6,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import type { AppConfig, TaskPlanState } from '@parallax/common'
+import { TASK_LOG_KIND, type AppConfig, type TaskLogEntry, type TaskPlanState } from '@parallax/common'
 import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
+import { buildActivityItems, normalizeLogMessage } from '@/lib/log-presentation'
 
 const MIN_ACTION_DELAY_MS = 400
 const ACTION_ACCENT_CLASS = 'border-orange-700 bg-orange-950/30 text-orange-200'
+
+const ACTIVITY_KIND_LABEL: Record<string, string> = {
+  lifecycle: 'Lifecycle',
+  result: 'Result',
+  command: 'Command',
+  file_change: 'File Change',
+  reasoning: 'Reasoning',
+  agent_message: 'Agent Message',
+  mcp: 'MCP',
+  warning: 'Warning',
+  error: 'Error',
+}
 
 const STATUS_ACCENT_CLASS: Record<TaskStatus, string> = {
   [TASK_STATUS.QUEUED]: 'text-zinc-300',
@@ -46,12 +59,7 @@ interface LogViewerProps {
   msg?: string
   description?: string
   projectId?: string
-  logs: Array<{
-    message: string
-    icon: string
-    level: 'info' | 'warning' | 'error' | 'debug'
-    timestamp: number
-  }>
+  logs: TaskLogEntry[]
   status: TaskStatus
   branchName?: string
   prUrl?: string
@@ -98,6 +106,7 @@ export function LogViewer({
   const [rejectPending, setRejectPending] = useState(false)
   const [retryPending, setRetryPending] = useState(false)
   const [cancelPending, setCancelPending] = useState(false)
+  const [logView, setLogView] = useState<'activity' | 'transcript'>('activity')
 
   const provider = resolveProjectProvider(config, projectId)
   const actionGuard = planActionsState(planState)
@@ -120,6 +129,7 @@ export function LogViewer({
     }
     return logs.filter((entry) => entry.level === activeLevel)
   }, [activeLevel, logs])
+  const activityItems = useMemo(() => buildActivityItems(filteredLogs as TaskLogEntry[]), [filteredLogs])
 
   const onApprove = async () => {
     if (!onApprovePlan || !canEditPlan) {
@@ -294,24 +304,108 @@ export function LogViewer({
               </button>
             ))}
           </div>
-          <div className="h-[calc(100%-40px)] overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs">
-            {filteredLogs.map((entry, index) => (
-              <div
-                key={`${entry.timestamp}-${index}`}
-                className={`mb-1 ${
-                  entry.level === 'error'
-                    ? 'text-red-300'
-                    : entry.level === 'warning'
-                      ? 'text-amber-300'
-                      : 'text-zinc-300'
-                }`}
-              >
-                <span className="text-zinc-500">{new Date(entry.timestamp).toLocaleTimeString()}</span>{' '}
-                <span className="uppercase text-zinc-500">{entry.level}</span>{' '}
-                <span>{entry.icon}</span> {entry.message}
-              </div>
-            ))}
+          <div className="mb-3 flex gap-2">
+            <button
+              onClick={() => setLogView('activity')}
+              className={`rounded border px-2 py-1 text-xs ${
+                logView === 'activity'
+                  ? 'border-orange-600 bg-orange-950/40 text-orange-300'
+                  : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+              }`}
+            >
+              Activity
+            </button>
+            <button
+              onClick={() => setLogView('transcript')}
+              className={`rounded border px-2 py-1 text-xs ${
+                logView === 'transcript'
+                  ? 'border-orange-600 bg-orange-950/40 text-orange-300'
+                  : 'border-zinc-700 bg-zinc-900 text-zinc-400'
+              }`}
+            >
+              Transcript
+            </button>
           </div>
+          {logView === 'activity' ? (
+            <div className="h-[calc(100%-80px)] space-y-3 overflow-y-auto">
+              {activityItems.length === 0 ? (
+                <div className="rounded border border-zinc-800 bg-zinc-950/70 px-4 py-6 text-sm text-zinc-500">
+                  No activity captured for the selected filters.
+                </div>
+              ) : (
+                activityItems.map((item) =>
+                  item.type === 'compact' ? (
+                    <div
+                      key={item.id}
+                      className="rounded border border-zinc-800 bg-zinc-950/70 px-4 py-3"
+                    >
+                      <div className="mb-1 flex items-center gap-2 text-xs text-zinc-500">
+                        <span>{new Date(item.timestamp).toLocaleTimeString()}</span>
+                        <span className="uppercase">{ACTIVITY_KIND_LABEL[item.kind] ?? item.kind}</span>
+                      </div>
+                      <div
+                        className={
+                          item.level === 'error'
+                            ? 'text-red-300'
+                            : item.level === 'warning'
+                              ? 'text-amber-300'
+                              : item.kind === TASK_LOG_KIND.RESULT
+                                ? 'text-emerald-300'
+                                : 'text-zinc-200'
+                        }
+                      >
+                        <span className="mr-2">{item.icon}</span>
+                        <span className="mr-2 text-zinc-400">{item.title}</span>
+                        {item.message}
+                      </div>
+                    </div>
+                  ) : (
+                    <details
+                      key={item.id}
+                      className="rounded border border-zinc-800 bg-zinc-950/70"
+                    >
+                      <summary className="cursor-pointer list-none px-4 py-3 text-sm text-zinc-200">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <span className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-zinc-400">
+                              {ACTIVITY_KIND_LABEL[item.kind] ?? item.kind}
+                            </span>
+                            <span>{item.title}</span>
+                          </div>
+                          <span className="text-xs text-zinc-500">
+                            {new Date(item.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </summary>
+                      <pre className="overflow-x-auto border-t border-zinc-800 px-4 py-3 font-mono text-xs text-zinc-400">
+                        {item.body}
+                      </pre>
+                    </details>
+                  )
+                )
+              )}
+            </div>
+          ) : (
+            <div className="h-[calc(100%-80px)] overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-3 font-mono text-xs">
+              {filteredLogs.map((entry, index) => (
+                <div
+                  key={`${entry.timestamp}-${index}`}
+                  className={`mb-1 ${
+                    entry.level === 'error'
+                      ? 'text-red-300'
+                      : entry.level === 'warning'
+                        ? 'text-amber-300'
+                        : 'text-zinc-300'
+                  }`}
+                >
+                  <span className="text-zinc-500">{new Date(entry.timestamp).toLocaleTimeString()}</span>{' '}
+                  <span className="uppercase text-zinc-500">{entry.level}</span>{' '}
+                  <span>{entry.icon}</span>{' '}
+                  {normalizeLogMessage(entry.message, entry.title, entry.kind)}
+                </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="plan" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
