@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { AGENT_PROVIDER, APPROVAL_MODE, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
-import { planActionsState, projectColor, resolveProjectProvider } from '@/lib/task-helpers'
+import {
+  buildTaskSummaryStatusModel,
+  formatPlanStateLabel,
+  planActionsState,
+  projectColor,
+  resolveProjectProvider,
+} from '@/lib/task-helpers'
+import { TASK_STATUS } from '@/lib/task-constants'
 
 describe('task helpers', () => {
   it('returns deterministic project color', () => {
@@ -39,5 +46,27 @@ describe('task helpers', () => {
   it('allows plan actions only for approval states', () => {
     expect(planActionsState(TaskPlanState.PLAN_READY).canEdit).toBe(true)
     expect(planActionsState(TaskPlanState.PLAN_APPROVED).canEdit).toBe(false)
+  })
+
+  it('builds an approval-focused status model when a plan is waiting', () => {
+    const model = buildTaskSummaryStatusModel(TASK_STATUS.QUEUED, TaskPlanState.PLAN_READY, false)
+
+    expect(model.title).toBe('Waiting for plan approval')
+    expect(model.tone).toBe('warning')
+    expect(model.alert?.title).toBe('Plan approval required')
+  })
+
+  it('builds a success status model for completed PR tasks', () => {
+    const model = buildTaskSummaryStatusModel(TASK_STATUS.DONE, TaskPlanState.PLAN_APPROVED, true)
+
+    expect(model.title).toBe('Completed and delivered')
+    expect(model.description).toContain('pull request')
+    expect(model.tone).toBe('success')
+  })
+
+  it('formats plan state labels for display', () => {
+    expect(formatPlanStateLabel(TaskPlanState.PLAN_REQUIRES_CLARIFICATION)).toBe(
+      'Plan Requires Clarification'
+    )
   })
 })

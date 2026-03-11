@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Tooltip,
@@ -7,7 +7,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { TASK_LOG_KIND, type AppConfig, type TaskLogEntry, type TaskPlanState } from '@parallax/common'
-import { planActionsState, resolveProjectProvider } from '@/lib/task-helpers'
+import {
+  buildTaskSummaryStatusModel,
+  formatPlanStateLabel,
+  planActionsState,
+  resolveProjectProvider,
+} from '@/lib/task-helpers'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
 import { buildActivityItems, normalizeLogMessage } from '@/lib/log-presentation'
 
@@ -130,6 +135,14 @@ export function LogViewer({
     return logs.filter((entry) => entry.level === activeLevel)
   }, [activeLevel, logs])
   const activityItems = useMemo(() => buildActivityItems(filteredLogs as TaskLogEntry[]), [filteredLogs])
+  const summaryStatus = useMemo(
+    () => buildTaskSummaryStatusModel(status, planState, Boolean(prUrl)),
+    [status, planState, prUrl]
+  )
+  const summaryToneClass = SUMMARY_TONE_CLASS[summaryStatus.tone]
+  const planStateLabel = planState ? formatPlanStateLabel(planState) : null
+  const showPlanStateMeta = Boolean(planState && planState !== 'NOT_REQUIRED' && planState !== 'PLAN_APPROVED')
+  const reviewCommand = `parallax pr-review ${taskId}`
 
   const onApprove = async () => {
     if (!onApprovePlan || !canEditPlan) {
@@ -253,38 +266,90 @@ export function LogViewer({
         </div>
 
         <TabsContent value="summary" className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-          <div className="space-y-3 text-sm">
-            <SummaryRow label="Source Provider" value={provider} />
-            <SummaryRow label="Project" value={projectId || 'unknown'} />
-            <SummaryRow
-              label="Status"
-              value={
-                <span className={`inline-flex items-center gap-2 ${STATUS_ACCENT_CLASS[status]}`}>
-                  <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASS[status]}`} />
-                  <span>{TASK_STATUS_LABEL[status]}</span>
+          <div className="space-y-4">
+            <section className={`rounded-xl border px-5 py-5 ${summaryToneClass}`}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Workflow status</p>
+                  <div className="mt-2 flex items-center gap-3">
+                    <span className={`h-3 w-3 rounded-full ${STATUS_DOT_CLASS[status]}`} />
+                    <h3 className="text-2xl font-semibold text-zinc-100">{summaryStatus.title}</h3>
+                  </div>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${STATUS_ACCENT_CLASS[status]} border-current/20 bg-black/20`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT_CLASS[status]}`} />
+                  {TASK_STATUS_LABEL[status]}
                 </span>
-              }
-            />
-            <SummaryRow label="Run Result" value={msg || 'No result yet'} />
-            <SummaryRow label="Plan State" value={planState || 'unknown'} />
-            <SummaryRow
-              label="PR Link"
-              value={
-                prUrl ? (
-                  <a
-                    href={prUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sky-300 underline decoration-sky-800 underline-offset-4 hover:text-sky-200"
-                  >
-                    {prUrl}
-                  </a>
-                ) : (
-                  'Not created yet'
-                )
-              }
-            />
-            <SummaryRow label="Branch" value={branchName || 'n/a'} />
+              </div>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-300">
+                {summaryStatus.description}
+              </p>
+              {summaryStatus.alert ? (
+                <div className="mt-4 rounded-lg border border-amber-700/60 bg-amber-950/40 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-200">{summaryStatus.alert.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-amber-100/85">
+                    {summaryStatus.alert.description}
+                  </p>
+                </div>
+              ) : null}
+            </section>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-5 py-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Outcome</p>
+                <h3 className="mt-2 text-lg font-semibold text-zinc-100">Delivery result</h3>
+                <p className="mt-1 text-sm text-zinc-400">
+                  Review the generated branch and pull request details for this task.
+                </p>
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <SummaryInfoBlock
+                    label="Pull Request"
+                    value={
+                      prUrl ? (
+                        <a
+                          href={prUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-all text-sky-300 underline decoration-sky-800 underline-offset-4 hover:text-sky-200"
+                        >
+                          {prUrl}
+                        </a>
+                      ) : (
+                        'Not created yet'
+                      )
+                    }
+                  />
+                  <SummaryInfoBlock label="Branch" value={branchName || 'Not available'} />
+                </div>
+
+                {prUrl ? (
+                  <div className="mt-5 rounded-lg border border-orange-800/70 bg-orange-950/30 px-4 py-3">
+                    <p className="text-sm font-medium text-orange-200">PR review shortcut</p>
+                    <p className="mt-1 text-sm leading-6 text-orange-100/85">
+                      If the pull request gets comments, run the review flow directly from your terminal.
+                    </p>
+                    <code className="mt-3 block rounded-md border border-orange-800/60 bg-black/30 px-3 py-2 text-sm text-orange-100">
+                      {reviewCommand}
+                    </code>
+                  </div>
+                ) : null}
+              </section>
+
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/70 px-5 py-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-zinc-500">Metadata</p>
+                <h3 className="mt-2 text-lg font-semibold text-zinc-100">Task context</h3>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <SummaryMetaChip label="Source Provider" value={provider} />
+                  <SummaryMetaChip label="Project" value={projectId || 'unknown'} />
+                  {showPlanStateMeta && planStateLabel ? (
+                    <SummaryMetaChip label="Plan State" value={planStateLabel} />
+                  ) : null}
+                </div>
+              </section>
+            </div>
           </div>
         </TabsContent>
 
@@ -464,11 +529,28 @@ export function LogViewer({
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: ReactNode }) {
+const SUMMARY_TONE_CLASS = {
+  neutral: 'border-zinc-800 bg-zinc-950/70',
+  info: 'border-sky-900/60 bg-sky-950/20',
+  success: 'border-emerald-900/60 bg-emerald-950/20',
+  warning: 'border-amber-900/60 bg-amber-950/20',
+  danger: 'border-red-900/60 bg-red-950/20',
+} as const
+
+function SummaryInfoBlock({ label, value }: { label: string; value: string | JSX.Element }) {
   return (
-    <div className="grid grid-cols-[180px_1fr] gap-3 border-b border-zinc-900 py-2">
-      <span className="text-xs uppercase tracking-[0.14em] text-zinc-500">{label}</span>
-      <span className="break-all text-zinc-200">{value}</span>
+    <div className="rounded-lg border border-zinc-800 bg-black/20 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+      <div className="mt-2 break-all text-sm text-zinc-200">{value}</div>
+    </div>
+  )
+}
+
+function SummaryMetaChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-black/20 px-4 py-3">
+      <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+      <p className="mt-2 text-sm text-zinc-200">{value}</p>
     </div>
   )
 }
