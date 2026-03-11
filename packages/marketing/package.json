@@ -2,6 +2,7 @@
   "name": "@parallax/marketing",
   "private": true,
   "version": "0.0.3",
+  "type": "module",
   "scripts": {
     "dev": "node ./scripts/sync-docs.mjs && vite",
     "build": "node ./scripts/sync-docs.mjs && vite build",

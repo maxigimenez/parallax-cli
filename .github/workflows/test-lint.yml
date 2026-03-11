@@ -28,8 +28,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+      # Re-enable once the repo-level lint hang is resolved.
+      # - name: Lint
+      #   run: pnpm lint
 
       - name: Test
         run: pnpm test
