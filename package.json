@@ -1,23 +1,23 @@
 {
   "name": "parallax",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "pnpm exec eslint .",
+    "lint:fix": "pnpm exec eslint . --fix",
     "parallax": "NODE_ENV=dev pnpm --filter parallax-cli start",
     "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
     "release:pack": "pnpm --filter parallax-cli pack:tarball",
     "release:publish": "pnpm --dir packages/cli publish:package"
   },
   "devDependencies": {
-    "@eslint/js": "10.0.1",
+    "@eslint/js": "9.32.0",
     "@typescript-eslint/eslint-plugin": "8.56.1",
     "@typescript-eslint/parser": "8.56.1",
-    "eslint": "10.0.2",
+    "eslint": "9.32.0",
     "eslint-plugin-prettier": "5.5.5",
     "eslint-plugin-react": "7.37.5",
     "globals": "17.3.0",

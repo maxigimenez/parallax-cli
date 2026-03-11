@@ -25,6 +25,10 @@ export type CancelCommandOptions = {
   taskId: string
 }
 
+export type PrReviewCommandOptions = {
+  taskId: string
+}
+
 export type LogsCommandOptions = {
   taskId?: string
 }

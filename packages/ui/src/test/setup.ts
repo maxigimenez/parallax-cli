@@ -1,4 +1,4 @@
-import "@testing-library/jest-dom";
+export {}
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,

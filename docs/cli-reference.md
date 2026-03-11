@@ -105,6 +105,22 @@ Cancel a pending or running task.
 parallax cancel <task-id>
 ```
 
+## `parallax pr-review`
+
+Experimental on-demand trigger for applying open human PR review comments to an existing PR branch.
+
+```bash
+parallax pr-review <task-id>
+```
+
+Notes:
+
+- prints a prominent experimental warning before triggering
+- uses the existing task/project context to locate the repo and branch
+- fails unless the task already has a related open PR
+- ignores automated/bot review comments
+- attempts to resolve the fetched review threads after a successful push
+
 ## `parallax logs`
 
 Tail logs from orchestrator API.

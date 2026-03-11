@@ -8,7 +8,4 @@ export default defineConfig({
       '@parallax/common/executor': path.resolve(__dirname, '../common/src/executor.ts'),
     },
   },
-  test: {
-    exclude: ['workspaces/**', 'worktrees/**', 'node_modules/**', 'dist/**'],
-  },
 })

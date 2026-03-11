@@ -26,6 +26,7 @@ type TaskDiffFile = {
 type ApiServerDependencies = {
   getConfig: () => AppConfig
   reloadRuntime: () => Promise<AppConfig>
+  triggerPullRequestReview: (taskId: string) => Promise<{ reviewTaskId: string; prNumber: number }>
   gitService: GitService
   activeTasks: Set<string>
   canceledTasks: Set<string>
@@ -53,7 +54,15 @@ export async function createApiServer(
   dependencies: ApiServerDependencies
 ): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: false })
-  const { getConfig, reloadRuntime, gitService, activeTasks, canceledTasks, activeWorktrees } = dependencies
+  const {
+    getConfig,
+    reloadRuntime,
+    triggerPullRequestReview,
+    gitService,
+    activeTasks,
+    canceledTasks,
+    activeWorktrees,
+  } = dependencies
 
   await fastify.register(cors, { origin: '*' })
 
@@ -288,6 +297,36 @@ export async function createApiServer(
       activeTasks.has(task.id) ? 'Cancellation requested' : 'Task canceled'
     )
     return { ok: true }
+  })
+
+  fastify.post('/tasks/:taskId/pr-review', async (request, reply) => {
+    const { taskId } = request.params as { taskId: string }
+    const task = dbService.getTaskByLookup(taskId)
+    if (!task) {
+      return reply.status(404).send({ error: 'Task not found' })
+    }
+
+    if (!task.prNumber || task.prNumber < 1) {
+      return reply.status(409).send({
+        error: `Task ${task.id} does not have a related open PR.`,
+      })
+    }
+
+    if (activeTasks.has(task.id)) {
+      return reply.status(409).send({ error: 'Task is already running.' })
+    }
+
+    try {
+      const queued = await triggerPullRequestReview(task.id)
+      return reply.status(202).send({
+        ok: true,
+        sourceTaskId: task.id,
+        reviewTaskId: queued.reviewTaskId,
+        prNumber: queued.prNumber,
+      })
+    } catch (error) {
+      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+    }
   })
 
   return fastify

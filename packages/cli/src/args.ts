@@ -4,6 +4,7 @@ import type {
   LogsCommandOptions,
   PendingCommandOptions,
   PreflightCommandOptions,
+  PrReviewCommandOptions,
   RegisterCommandOptions,
   RetryCommandOptions,
   StartCommandOptions,
@@ -162,6 +163,22 @@ export function parseCancelOptions(args: string[]): CancelCommandOptions {
 
   if (args.length > 1) {
     throw new Error('parallax cancel does not accept flags.')
+  }
+
+  return {
+    taskId,
+  }
+}
+
+export function parsePrReviewOptions(args: string[]): PrReviewCommandOptions {
+  const taskId = args[0]
+
+  if (!taskId || taskId.startsWith('--')) {
+    throw new Error('parallax pr-review requires <task-id>.')
+  }
+
+  if (args.length > 1) {
+    throw new Error('parallax pr-review does not accept flags.')
   }
 
   return {

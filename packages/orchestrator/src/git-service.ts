@@ -4,6 +4,7 @@ import { HostExecutor } from '@parallax/common/executor'
 import fs from 'fs/promises'
 import path from 'path'
 import { PARALLAX_MANAGED_LABEL } from './github/constants.js'
+import { buildDefaultCommitMessage, sanitizeCommitMessage } from './ai-adapters/execution-metadata.js'
 
 export class GitService {
   constructor(private executor: HostExecutor) {}
@@ -160,6 +161,10 @@ export class GitService {
   }
 
   async createWorktree(task: Task, project: ProjectConfig, tempBaseDir: string): Promise<string> {
+    if (task.branchName) {
+      return this.createWorktreeForExistingBranch(task, project, tempBaseDir)
+    }
+
     const git: SimpleGit = simpleGit(project.workspaceDir)
     const worktreePath = path.join(tempBaseDir, task.externalId)
     const branchName = `task/${task.externalId.toLowerCase()}`
@@ -195,6 +200,7 @@ export class GitService {
 
     const git: SimpleGit = simpleGit(project.workspaceDir)
     const worktreePath = path.join(tempBaseDir, task.externalId)
+    const localBranchName = `${task.branchName}-parallax-${task.id.slice(0, 8)}`
 
     await fs.mkdir(tempBaseDir, { recursive: true })
 
@@ -208,13 +214,12 @@ export class GitService {
     await git.fetch('origin', task.branchName)
 
     try {
-      await git.raw(['branch', '-D', task.branchName])
+      await git.raw(['branch', '-D', localBranchName])
     } catch {
       // Ignore
     }
 
-    await git.raw(['branch', task.branchName, `origin/${task.branchName}`])
-    await git.raw(['worktree', 'add', worktreePath, task.branchName])
+    await git.raw(['worktree', 'add', '-B', localBranchName, worktreePath, `origin/${task.branchName}`])
 
     return worktreePath
   }
@@ -244,9 +249,13 @@ export class GitService {
     await git.raw(['merge', '--ff-only', 'origin/main'])
   }
 
-  async commitAndPush(worktreePath: string, task: Task): Promise<string | null> {
+  async commitAndPush(
+    worktreePath: string,
+    task: Task,
+    options?: { commitMessage?: string }
+  ): Promise<string | null> {
     const git: SimpleGit = simpleGit(worktreePath)
-    const branchName = task.branchName || `task/${task.externalId.toLowerCase()}`
+    const remoteBranchName = task.branchName || `task/${task.externalId.toLowerCase()}`
 
     const status = await git.status()
     if (status.isClean()) {
@@ -254,10 +263,13 @@ export class GitService {
     }
 
     await git.add('.')
-    await git.commit(`Parallax: ${task.externalId} - ${task.title}`)
-    await git.push('origin', branchName, ['-u', '--force'])
+    await git.commit(
+      sanitizeCommitMessage(options?.commitMessage) ??
+        buildDefaultCommitMessage(task.externalId, task.title)
+    )
+    await git.raw(['push', 'origin', `HEAD:${remoteBranchName}`, '--set-upstream'])
 
-    return branchName
+    return remoteBranchName
   }
 
   async removeWorktree(worktreePath: string, repoPath: string): Promise<void> {

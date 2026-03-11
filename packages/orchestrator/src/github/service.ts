@@ -1,6 +1,7 @@
 import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
 import { createTaskId } from '../task-id.js'
+import { parseGitHubIssueNumber, requireGitHubRepoDetails } from './repository.js'
 
 interface GitHubIssueSummary {
   number: number
@@ -11,29 +12,8 @@ interface GitHubIssueSummary {
 export class GitHubService {
   constructor(private executor: HostExecutor) {}
 
-  private getRepoDetails(project: ProjectConfig) {
-    const { owner, repo } = project.pullFrom.filters
-
-    if (!owner || !repo) {
-      throw new Error(
-        `GitHub provider for project "${project.id}" requires pullFrom.filters.owner and pullFrom.filters.repo`
-      )
-    }
-
-    return { owner, repo }
-  }
-
-  private getIssueNumber(externalId: string): number {
-    const match = externalId.match(/#(\d+)$/)
-    if (!match) {
-      throw new Error(`Unable to parse GitHub issue number from external ID "${externalId}"`)
-    }
-
-    return Number.parseInt(match[1], 10)
-  }
-
   private buildIssueListCommand(project: ProjectConfig): string[] {
-    const { owner, repo } = this.getRepoDetails(project)
+    const { owner, repo } = requireGitHubRepoDetails(project)
     const { state = 'open', labels } = project.pullFrom.filters
 
     const command = [
@@ -66,7 +46,7 @@ export class GitHubService {
       return []
     }
 
-    const { owner, repo } = this.getRepoDetails(project)
+    const { owner, repo } = requireGitHubRepoDetails(project)
     const result = await this.executor.executeCommand(this.buildIssueListCommand(project), {
       cwd: project.workspaceDir,
     })
@@ -98,8 +78,8 @@ export class GitHubService {
       return
     }
 
-    const { owner, repo } = this.getRepoDetails(project)
-    const issueNumber = this.getIssueNumber(externalId)
+    const { owner, repo } = requireGitHubRepoDetails(project)
+    const issueNumber = parseGitHubIssueNumber(externalId)
     const result = await this.executor.executeCommand(
       [
         'gh',

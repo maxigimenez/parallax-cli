@@ -8,6 +8,7 @@ import {
   PlanResultStatus,
 } from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
+import { extractExecutionMetadata } from './execution-metadata.js'
 
 interface CodexPlanOutput {
   status?: PlanResultStatus
@@ -401,7 +402,8 @@ export class CodexAdapter extends BaseAgentAdapter {
     task: Task,
     workingDir: string,
     project: ProjectConfig,
-    approvedPlan?: string
+    approvedPlan?: string,
+    outputMode: 'pr' | 'commit' = 'pr'
   ): Promise<AgentResult> {
     if (approvedPlan && /(?:^|\n)\s*-\s*step\s+\d+\s*$/im.test(approvedPlan)) {
       return {
@@ -412,7 +414,11 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
-    const command = this.buildCommand(task, project, this.buildExecutionPrompt(task, approvedPlan))
+    const command = this.buildCommand(
+      task,
+      project,
+      this.buildExecutionPrompt(task, approvedPlan, outputMode)
+    )
     const env = await this.resolveProjectEnv(project)
 
     const result = await this.executor.executeCommand(command, {
@@ -432,6 +438,7 @@ export class CodexAdapter extends BaseAgentAdapter {
     return {
       success: result.exitCode === 0,
       output: result.output,
+      ...extractExecutionMetadata(result.output),
       error: result.exitCode !== 0 ? `Codex exited with code ${result.exitCode}` : undefined,
     }
   }
@@ -471,9 +478,13 @@ export class CodexAdapter extends BaseAgentAdapter {
     ].join('\n')
   }
 
-  private buildExecutionPrompt(task: Task, approvedPlan?: string): string {
+  private buildExecutionPrompt(task: Task, approvedPlan?: string, outputMode: 'pr' | 'commit' = 'pr'): string {
     const base = `Task ID: ${task.externalId}\nTitle: ${task.title}\nDescription:\n${task.description}`
     const planLine = approvedPlan ? `\n\nApproved Plan:\n${approvedPlan}` : ''
+    const outputInstruction =
+      outputMode === 'commit'
+        ? 'At the end include a single-line commit message in PARALLAX_COMMIT_MESSAGE format.'
+        : 'At the end include PR title and summary in PARALLAX_PR_TITLE and PARALLAX_PR_SUMMARY format.'
 
     return [
       'You are executing an implementation plan.',
@@ -481,7 +492,7 @@ export class CodexAdapter extends BaseAgentAdapter {
       'If blocked, return a short explanation and stop without guessing.',
       base,
       planLine,
-      'At the end include PR title and summary in PARALLAX_PR_TITLE and PARALLAX_PR_SUMMARY format.',
+      outputInstruction,
     ].join('\n')
   }
 }

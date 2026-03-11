@@ -7,10 +7,17 @@ import {
   ProjectConfig,
   Task,
   TaskPlanState,
+  TASK_STATUS,
+  TASK_REVIEW_STATE,
 } from '@parallax/common'
 import { BaseAgentAdapter, CodexAdapter, GeminiAdapter } from '../ai-adapters/index.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitService } from '../git-service.js'
+import {
+  formatPullRequestReviewComments,
+  GitHubReviewService,
+  type PullRequestReviewComment,
+} from '../github/review-service.js'
 import { logger } from '../logger.js'
 import { dbService } from '../database.js'
 import { taskLifecycle } from '../task-lifecycle.js'
@@ -229,6 +236,146 @@ export async function processTask(
 
     logger.error(`Critical error: ${error.message}`, task.id)
     taskLifecycle.fail(task.id, `Critical error: ${error.message}`)
+  } finally {
+    activeWorktrees.delete(task.id)
+    if (worktreePath) {
+      await gitService.removeWorktree(worktreePath, project.workspaceDir)
+    }
+  }
+}
+
+function buildPullRequestReviewDescription(
+  task: Task,
+  prNumber: number,
+  comments: PullRequestReviewComment[]
+) {
+  const commentsBlock = formatPullRequestReviewComments(comments)
+
+  return [
+    `Original Task: ${task.title}`,
+    '',
+    'Goal:',
+    `Address the requested review changes on PR #${prNumber} by updating the existing branch only.`,
+    '',
+    'Original Task Description:',
+    task.description || 'No original task description provided.',
+    '',
+    'Open Review Comments:',
+    commentsBlock,
+  ].join('\n')
+}
+
+function buildPullRequestReviewPlan(comments: PullRequestReviewComment[]) {
+  return [
+    'Apply only the requested review changes listed below.',
+    'Use the referenced files and lines as the primary scope.',
+    'Do not expand scope beyond satisfying these comments.',
+    'Keep the existing PR branch intact and prepare the changes to be pushed back to the same PR.',
+    '',
+    formatPullRequestReviewComments(comments),
+  ].join('\n')
+}
+
+export async function processPullRequestReview(
+  task: Task,
+  project: ProjectConfig,
+  adapter: BaseAgentAdapter,
+  gitService: GitService,
+  reviewService: GitHubReviewService,
+  comments: PullRequestReviewComment[],
+  canceledTasks: Set<string>,
+  activeWorktrees: Map<string, string>
+) {
+  if (!task.prNumber) {
+    throw new Error(`Task ${task.id} does not have an attached PR number.`)
+  }
+
+  const prNumber = task.prNumber
+  logger.warn(`[experimental] Starting PR review run for PR #${prNumber}`, task.id)
+  dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.APPLYING_REVIEW)
+  dbService.updateTaskStatus(task.id, TASK_STATUS.IN_PROGRESS)
+  dbService.updateTaskReviewEventAt(task.id, new Date().toISOString())
+  taskLifecycle.run(task.id, `Applying PR review comments for #${prNumber}`)
+
+  let worktreePath: string | undefined
+
+  try {
+    throwIfCancellationRequested(task.id, canceledTasks)
+    if (!task.branchName) {
+      throw new Error(`Task ${task.id} is missing a PR branch for review application.`)
+    }
+
+    const tempBaseDir = resolveWorktreeBaseDir()
+    worktreePath = await gitService.createWorktreeForExistingBranch(task, project, tempBaseDir)
+    activeWorktrees.set(task.id, worktreePath)
+
+    logger.info(`Review worktree created: ${worktreePath}`, task.id)
+    logger.info(`Applying ${comments.length} open human review comment(s).`, task.id)
+
+    const reviewTask: Task = {
+      ...task,
+      title: `PR Review: ${task.title}`,
+      description: buildPullRequestReviewDescription(task, prNumber, comments),
+    }
+
+    throwIfCancellationRequested(task.id, canceledTasks)
+    const result = await adapter.runTask(
+      reviewTask,
+      worktreePath,
+      project,
+      buildPullRequestReviewPlan(comments),
+      'commit'
+    )
+    throwIfCancellationRequested(task.id, canceledTasks)
+
+    if (!result.success) {
+      logger.error(`PR review run failed: ${result.error}`, task.id)
+      dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.NONE)
+      taskLifecycle.fail(task.id, `PR review run failed: ${result.error}`)
+      return
+    }
+
+    const branchName = await gitService.commitAndPush(worktreePath, task, {
+      commitMessage: result.commitMessage,
+    })
+    if (!branchName) {
+      dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.NONE)
+      logger.error('No changes made while applying PR review comments.', task.id)
+      taskLifecycle.fail(task.id, 'No changes made while applying PR review comments.')
+      return
+    }
+
+    dbService.updateTaskPullRequestInfo(task.id, {
+      branchName,
+      prUrl: task.prUrl!,
+      prNumber,
+    })
+    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.REVISION_PUSHED)
+    dbService.updateTaskReviewEventAt(task.id, new Date().toISOString())
+    logger.success(`Review updates pushed to PR #${prNumber}`, task.id)
+
+    try {
+      await reviewService.resolveReviewThreads(
+        project,
+        comments.map((comment) => comment.threadId)
+      )
+      logger.success(`Resolved ${new Set(comments.map((comment) => comment.threadId)).size} review thread(s).`, task.id)
+    } catch (error: any) {
+      logger.warn(`Pushed changes but could not resolve review threads: ${error.message}`, task.id)
+    }
+
+    taskLifecycle.complete(task.id, `Review updates pushed to PR #${prNumber}`)
+  } catch (error: any) {
+    if (error instanceof TaskCanceledError) {
+      dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.NONE)
+      taskLifecycle.cancel(task.id, 'PR review run canceled')
+      logger.warn('PR review run canceled.', task.id)
+      return
+    }
+
+    dbService.updateTaskReviewState(task.id, TASK_REVIEW_STATE.NONE)
+    logger.error(`PR review critical error: ${error.message}`, task.id)
+    taskLifecycle.fail(task.id, `PR review critical error: ${error.message}`)
   } finally {
     activeWorktrees.delete(task.id)
     if (worktreePath) {

@@ -1,5 +1,6 @@
 import { Task, ProjectConfig, AgentResult, Logger, PlanResult, PlanResultStatus } from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
+import { extractExecutionMetadata } from './execution-metadata.js'
 
 interface ParsedPlanOutput {
   status: string
@@ -31,19 +32,6 @@ export class GeminiAdapter extends BaseAgentAdapter {
 
   private formatInstructions(instructions: string[]): string {
     return instructions.map((instruction, index) => `${index + 1}. ${instruction}`).join('\n')
-  }
-
-  private extractPrMetadata(output: string): { prTitle?: string; prSummary?: string } {
-    const titleMatch = output.match(/PARALLAX_PR_TITLE:\s*(.+)/i)
-    const summaryMatch = output.match(/PARALLAX_PR_SUMMARY:\s*([\s\S]*?)(?:\nPARALLAX_|$)/i)
-
-    const prTitle = titleMatch?.[1]?.trim()
-    const prSummary = summaryMatch?.[1]?.trim()
-
-    return {
-      prTitle: prTitle || undefined,
-      prSummary: prSummary || undefined,
-    }
   }
 
   private handleLogChunk(task: Task, chunk: { stream: 'stdout' | 'stderr'; line: string }) {
@@ -213,7 +201,11 @@ export class GeminiAdapter extends BaseAgentAdapter {
     ].join('\n')
   }
 
-  private constructExecutionPrompt(task: Task, approvedPlan?: string): string {
+  private constructExecutionPrompt(
+    task: Task,
+    approvedPlan?: string,
+    outputMode: 'pr' | 'commit' = 'pr'
+  ): string {
     const instructions = [
       'Implement only the plan that was approved. Do not expand scope.',
       'Run only the tests/checks needed to validate the changed area.',
@@ -222,12 +214,19 @@ export class GeminiAdapter extends BaseAgentAdapter {
       'Do not redo issue discovery and do not create extra files not needed by the plan.',
       'Keep PR context focused on changed files only.',
       ...this.buildSharedInstructions(),
-      'At the end of your response, include:',
-      'PARALLAX_PR_TITLE: <short reviewer-facing title, no task ID prefix>',
-      'PARALLAX_PR_SUMMARY:',
-      '- <key change 1>',
-      '- <key change 2>',
-      '- <tests/validation performed>',
+      ...(outputMode === 'commit'
+        ? [
+            'At the end of your response, include:',
+            'PARALLAX_COMMIT_MESSAGE: <single-line git commit message>',
+          ]
+        : [
+            'At the end of your response, include:',
+            'PARALLAX_PR_TITLE: <short reviewer-facing title, no task ID prefix>',
+            'PARALLAX_PR_SUMMARY:',
+            '- <key change 1>',
+            '- <key change 2>',
+            '- <tests/validation performed>',
+          ]),
     ]
 
     const planHint = approvedPlan ? `\n\nApproved plan:\n${approvedPlan}` : ''
@@ -272,7 +271,8 @@ export class GeminiAdapter extends BaseAgentAdapter {
     task: Task,
     workingDir: string,
     project: ProjectConfig,
-    approvedPlan?: string
+    approvedPlan?: string,
+    outputMode: 'pr' | 'commit' = 'pr'
   ): Promise<AgentResult> {
     try {
       await this.setupWorkspace(task, workingDir)
@@ -280,8 +280,8 @@ export class GeminiAdapter extends BaseAgentAdapter {
         task,
         workingDir,
         project,
-        this.constructExecutionPrompt(task, approvedPlan),
-        true
+        this.constructExecutionPrompt(task, approvedPlan, outputMode),
+        outputMode === 'pr' || outputMode === 'commit'
       )
     } catch (error: any) {
       return { success: false, output: '', error: error.message }
@@ -293,7 +293,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
     workingDir: string,
     project: ProjectConfig,
     prompt: string,
-    extractPrMetadata = false
+    includeExecutionMetadata = false
   ): Promise<AgentResult> {
     const command = this.buildCommand(task, project, prompt)
     const env = await this.resolveProjectEnv(project)
@@ -316,7 +316,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
     return {
       success: result.exitCode === 0,
       output: result.output,
-      ...(extractPrMetadata ? this.extractPrMetadata(result.output) : {}),
+      ...(includeExecutionMetadata ? extractExecutionMetadata(result.output) : {}),
       error: result.exitCode !== 0 ? `Agent exited with code ${result.exitCode}` : undefined,
     }
   }
