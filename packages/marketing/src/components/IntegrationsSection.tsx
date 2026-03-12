@@ -42,8 +42,8 @@ const steps = [
     label: "Running",
     items: [
       { href: "https://openai.com/codex", logo: "/logos/codex.svg", label: "Codex", imgClass: "invert" },
-      { href: "https://deepmind.google/technologies/gemini", logo: "/logos/gemini.svg", label: "Gemini" },
       { href: "https://claude.ai/code", logo: "/logos/claude.svg", label: "Claude Code" },
+      { href: "https://deepmind.google/technologies/gemini", logo: "/logos/gemini.svg", label: "Gemini" },
     ],
   },
   {
