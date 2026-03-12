@@ -1,7 +1,20 @@
 {
   "name": "parallax-cli",
   "version": "0.0.6",
+  "description": "Local-first AI orchestration CLI for software tasks, plans, approvals, and pull requests.",
   "type": "module",
+  "keywords": [
+    "ai",
+    "cli",
+    "developer-tools",
+    "automation",
+    "coding-agent",
+    "linear",
+    "github",
+    "pull-request",
+    "orchestrator",
+    "parallax"
+  ],
   "bin": {
     "parallax": "dist/cli/src/index.js"
   },

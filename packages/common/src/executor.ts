@@ -31,6 +31,7 @@ export class HostExecutor implements LocalExecutor {
         cwd: options.cwd,
         env: { ...process.env, ...options.env },
         shell: false,
+        stdio: 'pipe',
       })
 
       let output = ''
@@ -70,10 +71,7 @@ export class HostExecutor implements LocalExecutor {
         }
       }
 
-      // Avoid interactions, needed for claude to run
-      // @ts-ignore
       if (child.stdin) {
-        // @ts-ignore
         child.stdin.end()
       }
 
