@@ -1,5 +1,10 @@
 declare module 'child_process' {
+  interface WritableProcessStream {
+    end(): void
+  }
+
   interface SpawnedProcess {
+    stdin?: WritableProcessStream | null
     stdout: {
       on(event: 'data', listener: (chunk: { toString(): string }) => void): void
     }
@@ -14,6 +19,7 @@ declare module 'child_process' {
     cwd?: string
     env?: Record<string, string | undefined>
     shell?: boolean
+    stdio?: 'pipe' | 'ignore' | Array<'pipe' | 'ignore'>
   }
 
   export function spawn(command: string, args?: string[], options?: SpawnOptions): SpawnedProcess
