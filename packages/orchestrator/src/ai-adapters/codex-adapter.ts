@@ -1,5 +1,4 @@
 import {
-  APPROVAL_MODE,
   Task,
   ProjectConfig,
   AgentResult,
@@ -36,45 +35,22 @@ export class CodexAdapter extends BaseAgentAdapter {
     super(executor, logger)
   }
 
-  private resolveSandboxMode(project: ProjectConfig): 'workspace-write' | 'danger-full-access' {
-    return project.agent.sandbox === false ? 'danger-full-access' : 'workspace-write'
-  }
-
   private buildCommand(task: Task, project: ProjectConfig, prompt: string): string[] {
     const command = ['codex', 'exec']
-    const sandboxMode = this.resolveSandboxMode(project)
-    const autoEdit = project.agent.approvalMode === APPROVAL_MODE.AUTO_EDIT
+    const sandboxMode = 'workspace-write'
 
     if (project.agent.model) {
       command.push('--model', project.agent.model)
     }
 
-    if (project.agent.sandbox === false) {
-      command.push('--dangerously-bypass-approvals-and-sandbox')
-    } else if (autoEdit) {
-      command.push('--full-auto')
-    } else {
-      command.push('--sandbox', sandboxMode)
-    }
-
-    if (project.agent.extraArgs?.length) {
-      command.push(...project.agent.extraArgs)
-    }
-
-    if (project.agent.disableMcp) {
-      command.push('-c', 'features.experimental_use_rmcp_client=false', '-c', 'mcp_servers={}')
-
-      const knownServers = ['linear', 'nuxt', 'playwright', 'shadcn', 'notion']
-      for (const server of knownServers) {
-        command.push('-c', `mcp_servers.${server}.enabled=false`)
-      }
-    }
+    command.push('--sandbox', sandboxMode)
+    command.push('--full-auto')
 
     command.push('--json')
     command.push('--', prompt)
 
     this.logger.info(
-      `Codex command profile: model=${project.agent.model ?? 'default'}, approval=${project.agent.approvalMode}, sandbox=${sandboxMode}`,
+      `Codex command profile: model=${project.agent.model ?? 'default'}, approval=full-auto, sandbox=${sandboxMode}`,
       task.id
     )
 

@@ -53,8 +53,6 @@ For flags such as custom ports, concurrency, or `--env-file`, use the hosted doc
   agent:
     provider: codex
     model: gpt-5.4
-    sandbox: true
-    disableMcp: true
 ```
 
 ## How it works

@@ -155,4 +155,40 @@ describe('config-loader', () => {
 
     await expect(loadConfig()).rejects.toThrow('Unsupported agent provider "claude-code"')
   })
+
+  it('rejects unknown agent fields', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
+    const dataDir = path.join(root, '.parallax')
+    const workspace = path.join(root, 'workspace')
+    const configPath = path.join(root, 'parallax.yml')
+    const registryPath = path.join(dataDir, 'registry.json')
+    await fs.mkdir(workspace, { recursive: true })
+    await fs.mkdir(dataDir, { recursive: true })
+    await fs.writeFile(
+      configPath,
+      [
+        '- id: test',
+        `  workspaceDir: ${workspace}`,
+        '  pullFrom:',
+        '    provider: github',
+        '    filters:',
+        '      owner: org',
+        '      repo: repo',
+        '  agent:',
+        '    provider: codex',
+        '    sandbox: true',
+      ].join('\n')
+    )
+    await fs.writeFile(
+      registryPath,
+      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
+    )
+
+    process.env.PARALLAX_DATA_DIR = dataDir
+    process.chdir(root)
+
+    await expect(loadConfig()).rejects.toThrow(
+      'project.agent for "test" in'
+    )
+  })
 })

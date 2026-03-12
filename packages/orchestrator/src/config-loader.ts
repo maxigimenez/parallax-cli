@@ -5,7 +5,6 @@ import os from 'os'
 import dotenv from 'dotenv'
 import {
   AGENT_PROVIDER,
-  APPROVAL_MODE,
   AppConfig,
   DEFAULT_API_PORT,
   DEFAULT_UI_PORT,
@@ -103,6 +102,17 @@ function assertOptionalString(value: unknown, label: string): string | undefined
   }
 
   return assertNonEmptyString(value, label)
+}
+
+function assertNoUnknownKeys(
+  value: Record<string, unknown>,
+  allowedKeys: string[],
+  label: string
+) {
+  const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.includes(key))
+  if (unknownKeys.length > 0) {
+    throw new Error(`${label} contains unsupported fields: ${unknownKeys.join(', ')}.`)
+  }
 }
 
 function parseLogs(raw: unknown, source: string): LogLevel[] {
@@ -247,6 +257,7 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
 
   const agent = raw.agent
   assertObject(agent, `project.agent for "${id}" in ${source}`)
+  assertNoUnknownKeys(agent, ['provider', 'model'], `project.agent for "${id}" in ${source}`)
   const agentProviderRaw = assertNonEmptyString(
     agent.provider,
     `project.agent.provider for "${id}" in ${source}`
@@ -262,47 +273,6 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
   }
   const agentProvider = agentProviderRaw as ProjectConfig['agent']['provider']
 
-  const approvalModeRaw = agent.approvalMode
-  if (
-    approvalModeRaw !== undefined &&
-    approvalModeRaw !== APPROVAL_MODE.DEFAULT &&
-    approvalModeRaw !== APPROVAL_MODE.AUTO_EDIT
-  ) {
-    throw new Error(
-      `project.agent.approvalMode for "${id}" in ${source} must be "default" or "auto_edit".`
-    )
-  }
-
-  const sandboxRaw = agent.sandbox
-  if (sandboxRaw !== undefined && typeof sandboxRaw !== 'boolean') {
-    throw new Error(`project.agent.sandbox for "${id}" in ${source} must be boolean.`)
-  }
-
-  const disableMcpRaw = agent.disableMcp
-  if (disableMcpRaw !== undefined && typeof disableMcpRaw !== 'boolean') {
-    throw new Error(`project.agent.disableMcp for "${id}" in ${source} must be boolean.`)
-  }
-
-  const allowedToolsRaw = agent.allowedTools
-  if (allowedToolsRaw !== undefined && !Array.isArray(allowedToolsRaw)) {
-    throw new Error(`project.agent.allowedTools for "${id}" in ${source} must be an array.`)
-  }
-  const allowedTools = Array.isArray(allowedToolsRaw)
-    ? allowedToolsRaw.map((tool) =>
-        assertNonEmptyString(tool, `project.agent.allowedTools[] for "${id}" in ${source}`)
-      )
-    : undefined
-
-  const extraArgsRaw = agent.extraArgs
-  if (extraArgsRaw !== undefined && !Array.isArray(extraArgsRaw)) {
-    throw new Error(`project.agent.extraArgs for "${id}" in ${source} must be an array.`)
-  }
-  const extraArgs = Array.isArray(extraArgsRaw)
-    ? extraArgsRaw.map((arg) =>
-        assertNonEmptyString(arg, `project.agent.extraArgs[] for "${id}" in ${source}`)
-      )
-    : undefined
-
   return {
     id,
     workspaceDir,
@@ -313,11 +283,6 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
     agent: {
       provider: agentProvider,
       model: assertOptionalString(agent.model, `project.agent.model for "${id}" in ${source}`),
-      approvalMode: (approvalModeRaw ?? APPROVAL_MODE.DEFAULT) as ProjectConfig['agent']['approvalMode'],
-      sandbox: (sandboxRaw ?? true) as boolean,
-      disableMcp: (disableMcpRaw ?? false) as boolean,
-      allowedTools,
-      extraArgs,
     },
   }
 }

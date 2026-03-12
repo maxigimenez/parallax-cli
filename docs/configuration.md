@@ -74,28 +74,7 @@ Provider-specific requirement:
 
 - model string forwarded to the selected agent provider
 
-#### agent.approvalMode (optional)
-
-- allowed values: `default`, `auto_edit`
-- defaults to `default`
-
-#### agent.sandbox (optional)
-
-- boolean
-- defaults to `true`
-
-#### agent.disableMcp (optional)
-
-- boolean
-- defaults to `false`
-
-#### agent.allowedTools (optional)
-
-- array of non-empty strings
-
-#### agent.extraArgs (optional)
-
-- array of non-empty strings
+Parallax always runs supported agents in a sandbox. Approval behavior and MCP/runtime flags are built in and are not configured in `parallax.yml`.
 
 ## Example: GitHub
 
@@ -112,8 +91,6 @@ Provider-specific requirement:
   agent:
     provider: codex
     model: gpt-5.4
-    sandbox: true
-    disableMcp: true
 ```
 
 ## Example: Linear
@@ -129,7 +106,6 @@ Provider-specific requirement:
   agent:
     provider: gemini
     model: gemini-2.5-pro
-    sandbox: true
 ```
 
 ## Validation failures you may see

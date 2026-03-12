@@ -70,8 +70,6 @@ Example:
   agent:
     provider: codex
     model: gpt-5.4
-    sandbox: true
-    disableMcp: true
 ```
 
 For field details and more examples, see [Configuration Reference](./configuration.md).

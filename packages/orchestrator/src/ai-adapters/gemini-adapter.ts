@@ -59,25 +59,13 @@ export class GeminiAdapter extends BaseAgentAdapter {
       command.push('--model', project.agent.model)
     }
 
-    const approvalMode = project.agent.approvalMode
-    command.push('--approval-mode', approvalMode)
-
-    if (project.agent.sandbox) {
-      command.push('--sandbox')
-    }
-
-    if (project.agent.allowedTools?.length) {
-      command.push('--allowed-tools', project.agent.allowedTools.join(','))
-    }
-
-    if (project.agent.extraArgs?.length) {
-      command.push(...project.agent.extraArgs)
-    }
+    command.push('--approval-mode', 'auto_edit')
+    command.push('--sandbox')
 
     command.push('--prompt', prompt)
 
     this.logger.info(
-      `Gemini command profile: approval=${approvalMode}, sandbox=${project.agent.sandbox ? 'on' : 'off'}`,
+      'Gemini command profile: approval=auto_edit, sandbox=on',
       task.id
     )
 

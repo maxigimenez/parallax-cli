@@ -18,9 +18,6 @@ describe('GeminiAdapter', () => {
     const project = {
       agent: {
         model: 'flash',
-        approvalMode: 'auto_edit',
-        sandbox: true,
-        allowedTools: ['read_file'],
       },
     } as any
 
@@ -37,7 +34,6 @@ describe('GeminiAdapter', () => {
     expect(command).toContain('--approval-mode')
     expect(command).toContain('auto_edit')
     expect(command).toContain('--sandbox')
-    expect(command).toContain('--allowed-tools')
     expect(command).toContain('--prompt')
     expect(command).toContain('--model')
     expect(command).toContain('flash')

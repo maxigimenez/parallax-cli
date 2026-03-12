@@ -12,9 +12,7 @@ const configExample = `- id: www
       labels: [ai-ready]
   agent:
     provider: codex
-    model: gpt-5.4
-    sandbox: true
-    disableMcp: true`;
+    model: gpt-5.4`;
 
 const ConfigSection = () => {
   return (
