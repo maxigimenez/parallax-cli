@@ -69,13 +69,6 @@ export const AGENT_PROVIDER = {
 
 export type AgentProvider = (typeof AGENT_PROVIDER)[keyof typeof AGENT_PROVIDER]
 
-export const APPROVAL_MODE = {
-  DEFAULT: 'default',
-  AUTO_EDIT: 'auto_edit',
-} as const
-
-export type ApprovalMode = (typeof APPROVAL_MODE)[keyof typeof APPROVAL_MODE]
-
 export const LOG_LEVEL = {
   INFO: 'info',
   WARN: 'warn',
@@ -169,11 +162,6 @@ export interface ProjectConfig {
   agent: {
     provider: AgentProvider
     model?: string
-    approvalMode: ApprovalMode
-    sandbox: boolean
-    disableMcp: boolean
-    allowedTools?: string[]
-    extraArgs?: string[]
   }
 }
 

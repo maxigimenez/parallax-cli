@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { AGENT_PROVIDER, APPROVAL_MODE, AppConfig, LOG_LEVEL, ProjectConfig, PULL_PROVIDER } from '../src/index'
+import { AGENT_PROVIDER, AppConfig, LOG_LEVEL, ProjectConfig, PULL_PROVIDER } from '../src/index'
 
 describe('Common Config Types', () => {
   it('should allow valid log levels', () => {
@@ -24,9 +24,7 @@ describe('Common Config Types', () => {
       },
       agent: {
         provider: AGENT_PROVIDER.GEMINI,
-        approvalMode: APPROVAL_MODE.DEFAULT,
-        sandbox: true,
-        disableMcp: false,
+        model: 'gemini-2.5-pro',
       },
     }
     expect(project.workspaceDir).toBe('/tmp/project')
@@ -50,9 +48,7 @@ describe('Common Config Types', () => {
       },
       agent: {
         provider: AGENT_PROVIDER.GEMINI,
-        approvalMode: APPROVAL_MODE.DEFAULT,
-        sandbox: true,
-        disableMcp: false,
+        model: 'gemini-2.5-pro',
       },
     }
 

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { AGENT_PROVIDER, APPROVAL_MODE, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
+import { AGENT_PROVIDER, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
 import { LogViewer } from '@/components/LogViewer'
 import { TASK_STATUS } from '@/lib/task-constants'
 
@@ -18,9 +18,6 @@ const config = {
       pullFrom: { provider: PULL_PROVIDER.LINEAR, filters: {} },
       agent: {
         provider: AGENT_PROVIDER.CODEX,
-        approvalMode: APPROVAL_MODE.DEFAULT,
-        sandbox: true,
-        disableMcp: false,
       },
     },
   ],

@@ -50,8 +50,6 @@ pnpm parallax register ./parallax.yml --env-file ./.env
   agent:
     provider: codex
     model: gpt-5.4
-    sandbox: true
-    disableMcp: true
 ```
 
 ## CLI

@@ -39,7 +39,10 @@ describe("ConfigSection", () => {
 
     expect(screen.getByText("workspaceDir")).toBeTruthy();
     expect(screen.getByText("/Users/maxi/projects/www")).toBeTruthy();
-    expect(screen.getAllByText("true").length).toBeGreaterThan(0);
     expect(screen.getByText("[ai-ready]")).toBeTruthy();
+    expect(screen.getAllByText("provider").length).toBeGreaterThan(0);
+    expect(screen.getByText("codex")).toBeTruthy();
+    expect(screen.getByText("model")).toBeTruthy();
+    expect(screen.getByText("gpt-5.4")).toBeTruthy();
   });
 });

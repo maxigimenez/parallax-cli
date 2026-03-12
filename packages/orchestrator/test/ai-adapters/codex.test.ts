@@ -100,9 +100,6 @@ describe('CodexAdapter plan mode', () => {
     const project = {
       agent: {
         model: 'codex-fast',
-        approvalMode: 'auto_edit',
-        sandbox: true,
-        extraArgs: ['--foo', 'bar'],
       },
     } as any
 
@@ -117,8 +114,6 @@ describe('CodexAdapter plan mode', () => {
         '--model',
         'codex-fast',
         '--full-auto',
-        '--foo',
-        'bar',
         '--',
       ])
     )
@@ -143,60 +138,22 @@ describe('CodexAdapter plan mode', () => {
     expect(result.commitMessage).toBe('Address review comments')
   })
 
-  it('maps default approval and disabled sandbox to codex runtime flags', async () => {
+  it('always runs codex with explicit sandboxed full-auto defaults', async () => {
     const mockExecutor = {
       executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: 'done' }),
     }
 
     const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
     const task = { id: 'task-200', externalId: 'REV-200', title: 'Execution', description: 'Do work' } as any
-    const project = {
-      agent: {
-        approvalMode: 'default',
-        sandbox: false,
-      },
-    } as any
+    const project = { agent: {} } as any
 
     await adapter.runTask(task, '/tmp/repo', project, 'approved plan')
 
     const command = mockExecutor.executeCommand.mock.calls[0][0]
-    expect(command).toEqual(
-      expect.arrayContaining([
-        '--dangerously-bypass-approvals-and-sandbox',
-      ])
-    )
-  })
-
-  it('adds codex MCP disable overrides when disableMcp is enabled', async () => {
-    const mockExecutor = {
-      executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: 'done' }),
-    }
-
-    const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
-    const task = {
-      externalId: 'REV-109',
-      title: 'Disable MCP',
-      description: 'No MCP startup',
-    } as any
-    const project = {
-      agent: {
-        disableMcp: true,
-      },
-    } as any
-
-    await adapter.runTask(task, '/tmp/repo', project, 'Approved plan: remove light mode branches')
-
-    const command = mockExecutor.executeCommand.mock.calls[0][0] as string[]
-    expect(command).toEqual(expect.arrayContaining(['-c', 'mcp_servers={}']))
-    expect(command).toEqual(
-      expect.arrayContaining([
-        '-c',
-        'features.experimental_use_rmcp_client=false',
-        '-c',
-        'mcp_servers.linear.enabled=false',
-        '-c',
-        'mcp_servers.notion.enabled=false',
-      ])
+    expect(command).toEqual(expect.arrayContaining(['--sandbox', 'workspace-write', '--full-auto']))
+    expect(command.indexOf('--sandbox')).toBeLessThan(command.indexOf('--full-auto'))
+    expect(command).not.toEqual(
+      expect.arrayContaining(['--dangerously-bypass-approvals-and-sandbox'])
     )
   })
 
