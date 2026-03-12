@@ -1,6 +1,6 @@
 {
   "name": "parallax-cli",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Local-first AI orchestration CLI for software tasks, plans, approvals, and pull requests.",
   "type": "module",
   "keywords": [
