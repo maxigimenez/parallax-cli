@@ -70,6 +70,13 @@ export class HostExecutor implements LocalExecutor {
         }
       }
 
+      // Avoid interactions, needed for claude to run
+      // @ts-ignore
+      if (child.stdin) {
+        // @ts-ignore
+        child.stdin.end()
+      }
+
       child.stdout.on('data', createHandler('stdout'))
       child.stderr.on('data', createHandler('stderr'))
 

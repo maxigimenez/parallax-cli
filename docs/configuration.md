@@ -68,7 +68,7 @@ Provider-specific requirement:
 
 #### agent.provider (required)
 
-- allowed values: `codex`, `gemini`
+- allowed values: `codex`, `gemini`, `claude-code`
 
 #### agent.model (optional)
 

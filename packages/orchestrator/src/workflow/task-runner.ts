@@ -13,7 +13,7 @@ import {
   TASK_STATUS,
   TASK_REVIEW_STATE,
 } from '@parallax/common'
-import { BaseAgentAdapter, CodexAdapter, GeminiAdapter } from '../ai-adapters/index.js'
+import { BaseAgentAdapter, ClaudeCodeAdapter, CodexAdapter, GeminiAdapter } from '../ai-adapters/index.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitService } from '../git-service.js'
 import {
@@ -62,7 +62,7 @@ export function createAgentAdapter(
     return new GeminiAdapter(executor, currentLog)
   }
   if (provider === AGENT_PROVIDER.CLAUDE_CODE) {
-    throw new Error('Agent provider "claude-code" is not implemented yet.')
+    return new ClaudeCodeAdapter(executor, currentLog)
   }
 
   throw new Error(`Agent provider "${provider}" is not supported.`)

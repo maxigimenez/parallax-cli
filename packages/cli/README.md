@@ -10,7 +10,7 @@ Parallax is a local-first AI orchestrator for software development tasks. It pul
 - `git`
 - `pnpm`
 - `gh`
-- at least one supported agent CLI (`codex` or `gemini`)
+- at least one supported agent CLI (`codex`, `gemini`, or `claude`)
 
 ## Install
 
