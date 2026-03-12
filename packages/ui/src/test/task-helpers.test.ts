@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AGENT_PROVIDER, APPROVAL_MODE, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
+import { AGENT_PROVIDER, LOG_LEVEL, PULL_PROVIDER, TaskPlanState } from '@parallax/common'
 import {
   buildTaskSummaryStatusModel,
   formatPlanStateLabel,
@@ -30,9 +30,6 @@ describe('task helpers', () => {
             pullFrom: { provider: PULL_PROVIDER.GITHUB, filters: {} },
             agent: {
               provider: AGENT_PROVIDER.CODEX,
-              approvalMode: APPROVAL_MODE.DEFAULT,
-              sandbox: true,
-              disableMcp: false,
             },
           },
         ],
