@@ -12,7 +12,6 @@ const DOC_FILES = [
   'getting-started.md',
   'configuration.md',
   'cli-reference.md',
-  'task-lifecycle.md',
   'troubleshooting.md',
 ]
 

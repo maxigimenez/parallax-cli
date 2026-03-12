@@ -10,7 +10,6 @@ const docPages = [
   { slug: "getting-started", title: "Getting Started", file: "/docs/getting-started.md" },
   { slug: "configuration", title: "Configuration", file: "/docs/configuration.md" },
   { slug: "cli-reference", title: "CLI Reference", file: "/docs/cli-reference.md" },
-  { slug: "task-lifecycle", title: "Task Lifecycle", file: "/docs/task-lifecycle.md" },
   { slug: "troubleshooting", title: "Troubleshooting", file: "/docs/troubleshooting.md" },
 ];
 

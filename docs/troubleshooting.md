@@ -1,12 +1,12 @@
 # Troubleshooting
 
-## `parallax preflight` fails
+## parallax preflight fails
 
 ### Node.js version check failed
 
 Use Node.js `>= 23.7.0`, then rerun `parallax preflight`. Older Node versions can fail when Parallax initializes SQLite.
 
-### `gh auth status` failed
+### gh auth status failed
 
 Run:
 
@@ -15,15 +15,15 @@ gh auth login
 gh auth status
 ```
 
-### Neither `codex` nor `gemini` found
+### Neither codex nor gemini found
 
 Install at least one agent CLI and ensure it is on your `PATH`.
 
-### `git` or `pnpm` not found
+### git or pnpm not found
 
 Install missing tool and reopen terminal session.
 
-## `parallax start` fails
+## parallax start fails
 
 ### No registered configs
 
@@ -51,9 +51,9 @@ parallax stop
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 ```
 
-## Task actions fail (`approve`, `retry`, `cancel`)
+## Task actions fail
 
-### `Unknown task id`
+### Unknown task id
 
 Use Parallax task id from dashboard or:
 

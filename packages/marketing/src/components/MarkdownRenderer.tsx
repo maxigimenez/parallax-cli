@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import CodeBlock from "./CodeBlock";
+import { normalizeHeadingText } from "../lib/markdown";
 
 interface MarkdownRendererProps {
   content: string;
@@ -14,6 +16,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
 
     // Code blocks
     if (line.startsWith("```")) {
+      const language = line.slice(3).trim();
       const codeLines: string[] = [];
       i++;
       while (i < lines.length && !lines[i].startsWith("```")) {
@@ -22,12 +25,12 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
       }
       i++; // skip closing ```
       elements.push(
-        <div
+        <CodeBlock
           key={`code-${i}`}
-          className="bg-card border border-border rounded-md p-4 font-mono text-xs text-muted-foreground whitespace-pre overflow-x-auto mb-6"
-        >
-          {codeLines.join("\n")}
-        </div>
+          code={codeLines.join("\n")}
+          language={language || undefined}
+          className="mb-6"
+        />
       );
       continue;
     }
@@ -39,7 +42,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           key={`h1-${i}`}
           className="font-display text-4xl font-bold text-foreground mb-4"
         >
-          {line.slice(2)}
+          {normalizeHeadingText(line.slice(2))}
         </h1>
       );
       i++;
@@ -53,7 +56,7 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           key={`h2-${i}`}
           className="font-display text-2xl font-bold text-foreground mt-12 mb-4 pb-3 border-b border-border"
         >
-          {line.slice(3)}
+          {normalizeHeadingText(line.slice(3))}
         </h2>
       );
       i++;
@@ -67,8 +70,22 @@ const MarkdownRenderer = ({ content }: MarkdownRendererProps) => {
           key={`h3-${i}`}
           className="font-display text-lg font-semibold text-foreground mt-8 mb-3"
         >
-          {line.slice(4)}
+          {normalizeHeadingText(line.slice(4))}
         </h3>
+      );
+      i++;
+      continue;
+    }
+
+    // H4
+    if (line.startsWith("#### ")) {
+      elements.push(
+        <h4
+          key={`h4-${i}`}
+          className="font-display text-base font-semibold text-foreground/95 mt-6 mb-2 tracking-tight"
+        >
+          {normalizeHeadingText(line.slice(5))}
+        </h4>
       );
       i++;
       continue;

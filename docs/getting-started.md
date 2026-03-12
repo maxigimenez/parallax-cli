@@ -1,5 +1,7 @@
 # Getting Started
 
+Parallax runs as a local service on your machine. You start it once, register repositories with `parallax.yml`, then use the dashboard to review plans and task output.
+
 ## 1. Install
 
 Requirements:
@@ -26,7 +28,7 @@ Run:
 parallax preflight
 ```
 
-`preflight` checks:
+`preflight` checks the tools Parallax needs before you start:
 
 - Node.js version (`>= 23.7.0`)
 - `git` CLI
@@ -37,9 +39,9 @@ parallax preflight
 - `gemini` CLI (optional)
 - at least one agent CLI (`codex` or `gemini`) is available
 
-If a required check fails, Parallax will not run reliably.
+If a required check fails, fix it before moving on.
 
-## 3. Authenticate external tools
+## 3. Authenticate the tools Parallax depends on
 
 GitHub CLI:
 
@@ -51,7 +53,7 @@ gh auth status
 Provider credentials:
 
 - export required provider credentials in your shell environment before starting Parallax.
-- keep credentials outside the repository when possible.
+- use `parallax register ./parallax.yml --env-file ./.env` if a project should load credentials from a repo-specific env file.
 
 ## 4. Create your config (`parallax.yml`)
 
@@ -72,16 +74,21 @@ Example:
     disableMcp: true
 ```
 
-For full field behavior, see [Configuration Reference](./configuration.md).
+For field details and more examples, see [Configuration Reference](./configuration.md).
 
 ## 5. Start Parallax
 
-Start the runtime, then register the repository config:
+Start the runtime first, then register the repository config:
 
 ```bash
-parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax start
 parallax register ./parallax.yml --env-file ./.env
 ```
+
+What this does:
+
+- `parallax start` launches the background API and dashboard from `~/.parallax`
+- `parallax register` adds this repository to the active project registry
 
 ## 6. Open dashboard
 
@@ -100,7 +107,7 @@ Use:
 parallax status
 ```
 
-This reports whether the local Parallax runtime is healthy and surfaces orchestrator issues when present.
+This reports whether the local runtime is healthy and surfaces orchestrator issues when present.
 
 ## 8. Stop Parallax
 

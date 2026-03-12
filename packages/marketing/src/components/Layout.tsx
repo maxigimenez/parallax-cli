@@ -12,7 +12,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
               parallax<span className="text-primary animate-blink">_</span>
             </span>
             <a
-              href="https://github.com/maxigimenez"
+              href="https://github.com/maxigimenez/parallax-cli"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:text-primary/80 transition-colors text-xs font-mono"

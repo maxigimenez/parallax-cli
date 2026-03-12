@@ -1,5 +1,7 @@
 # CLI Reference
 
+These are the commands most users will use day to day.
+
 ## Global usage
 
 ```bash
@@ -7,7 +9,7 @@ parallax --version
 parallax --help
 ```
 
-## `parallax preflight`
+## parallax preflight
 
 Validate local prerequisites before first run.
 
@@ -21,7 +23,7 @@ Notes:
 - returns non-zero exit code when required checks fail
 - prints a final verdict (`PASS` or `FAIL`)
 
-## `parallax status`
+## parallax status
 
 Check whether the current Parallax runtime is healthy.
 
@@ -36,7 +38,7 @@ Notes:
 - shows orchestrator PID and dashboard URL when healthy
 - prints orchestrator stderr diagnostics when the runtime has issues
 
-## `parallax start`
+## parallax start
 
 Start orchestrator and dashboard in background.
 
@@ -54,7 +56,7 @@ parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 parallax register ./parallax.yml --env-file ./.env
 ```
 
-## `parallax register`
+## parallax register
 
 Register a repository config in the global Parallax registry.
 
@@ -68,7 +70,7 @@ Notes:
 - optional `--env-file` is attached to that registered project config
 - if Parallax is already running, the runtime reloads immediately
 
-## `parallax unregister`
+## parallax unregister
 
 Remove a repository config from the global Parallax registry.
 
@@ -81,7 +83,7 @@ Notes:
 - fails if the config is not registered
 - if Parallax is already running, the runtime reloads immediately
 
-## `parallax stop`
+## parallax stop
 
 Stop background processes recorded in the running manifest.
 
@@ -89,9 +91,9 @@ Stop background processes recorded in the running manifest.
 parallax stop
 ```
 
-## `parallax pending`
+## parallax pending
 
-List pending plans and optionally approve/reject from CLI.
+List pending plans and optionally approve or reject one from the CLI.
 
 ```bash
 parallax pending [--approve <id>] [--reject <id>]
@@ -104,7 +106,7 @@ parallax pending --approve 3ed59f6e7cea
 parallax pending --reject 3ed59f6e7cea
 ```
 
-## `parallax retry`
+## parallax retry
 
 Queue a retry for a task.
 
@@ -112,7 +114,7 @@ Queue a retry for a task.
 parallax retry <task-id>
 ```
 
-## `parallax cancel`
+## parallax cancel
 
 Cancel a pending or running task.
 
@@ -120,7 +122,7 @@ Cancel a pending or running task.
 parallax cancel <task-id>
 ```
 
-## `parallax pr-review`
+## parallax pr-review
 
 Experimental on-demand trigger for applying open human PR review comments to an existing PR branch.
 
@@ -136,7 +138,7 @@ Notes:
 - ignores automated/bot review comments
 - attempts to resolve the fetched review threads after a successful push
 
-## `parallax logs`
+## parallax logs
 
 Tail logs from orchestrator API.
 
@@ -151,7 +153,7 @@ parallax logs
 parallax logs --task 3ed59f6e7cea
 ```
 
-## Data directory files
+## Runtime files
 
 Parallax stores runtime state in `~/.parallax`.
 

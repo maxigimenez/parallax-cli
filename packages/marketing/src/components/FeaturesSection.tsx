@@ -14,7 +14,7 @@ const features = [
   {
     icon: <Layers className="w-5 h-5" />,
     title: "Ticket Integration",
-    description: "Connects to Jira, Linear, GitHub Issues. Tickets become tasks automatically.",
+    description: "Connects to Linear and GitHub Issues. Tickets become tasks automatically.",
   },
   {
     icon: <Shield className="w-5 h-5" />,
@@ -30,7 +30,7 @@ const features = [
     icon: <Github className="w-5 h-5" />,
     title: "Suggest Features",
     description: "Have an idea? Help shape parallax_ by suggesting features on GitHub Issues.",
-    href: "https://github.com/maxigimenez",
+    href: "https://github.com/maxigimenez/parallax-cli",
     isExternal: true,
   },
 ];
@@ -53,7 +53,7 @@ const FeaturesSection = () => {
                 href={feature.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-6 border border-primary/40 rounded-lg bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-colors group cursor-pointer"
+                className="flex h-full flex-col p-6 border border-primary/40 rounded-lg bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-colors group cursor-pointer"
               >
                 <div className="text-primary mb-3">{feature.icon}</div>
                 <h3 className="font-display font-semibold text-primary mb-2">
@@ -66,7 +66,7 @@ const FeaturesSection = () => {
             ) : (
               <div
                 key={index}
-                className="p-6 border border-border rounded-lg bg-card hover:border-primary/30 transition-colors group"
+                className="flex h-full flex-col p-6 border border-border rounded-lg bg-card hover:border-primary/30 transition-colors group"
               >
                 <div className="text-primary mb-3 group-hover:glow-orange transition-all">
                   {feature.icon}

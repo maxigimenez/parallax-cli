@@ -1,22 +1,21 @@
 # Parallax Documentation
 
-This documentation is for users running Parallax as a local automation runtime from the CLI.
+This documentation is for people trying Parallax for the first time and running it locally from the CLI.
 
 ## Documentation map
 
-- [Getting Started](./getting-started.md): install, run preflight, create config, start Parallax.
-- [Configuration Reference](./configuration.md): full `parallax.yml` schema and examples.
-- [CLI Reference](./cli-reference.md): all commands, flags, and practical examples.
-- [Task Lifecycle](./task-lifecycle.md): how tasks move from pulled work to execution and completion.
-- [Troubleshooting](./troubleshooting.md): common setup/runtime issues and fixes.
+- [Getting Started](./getting-started.md): install Parallax, start it, register your repo, and open the dashboard.
+- [Configuration Reference](./configuration.md): what goes in `parallax.yml` and how to register it.
+- [CLI Reference](./cli-reference.md): the day-to-day commands you will actually run.
+- [Troubleshooting](./troubleshooting.md): fixes for common setup and runtime problems.
 
-## Core concepts
+## What Parallax does
 
 - Parallax pulls tasks from Linear or GitHub.
-- Each task runs in a local isolated worktree.
-- Execution is plan-first: an agent writes a plan, then execution continues only after approval.
-- State and history are stored in a local SQLite database under `~/.parallax`.
-- The API runs on `http://localhost:3000` by default and the dashboard runs on `http://localhost:8080` by default. Both ports are configurable with `parallax start` flags.
+- Each task runs in its own local isolated worktree.
+- Parallax generates a plan first, then waits for approval before making changes.
+- The dashboard is where you review plans, watch logs, retry work, and inspect PR results.
+- Local state lives under `~/.parallax`.
 
 ## Recommended first run
 

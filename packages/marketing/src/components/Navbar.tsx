@@ -6,7 +6,7 @@ const Navbar = () => {
   const links = [
     { label: "parallax_", path: "/", isLogo: true },
     { label: "docs", path: "/docs/getting-started" },
-    { label: "github", path: "https://github.com/parallax", external: true },
+    { label: "github", path: "https://github.com/maxigimenez/parallax-cli", external: true },
   ];
 
   return (

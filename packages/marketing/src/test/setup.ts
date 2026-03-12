@@ -13,3 +13,9 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+Object.assign(navigator, {
+  clipboard: {
+    writeText: async () => {},
+  },
+});
