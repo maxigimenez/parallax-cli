@@ -88,11 +88,19 @@ export async function runPreflight(args: string[]) {
       detail: geminiOk ? undefined : 'Install Gemini CLI (npm i -g @google/gemini-cli).',
     })
 
+    const claudeOk = await commandExists('claude')
     checks.push({
-      name: 'At least one agent CLI (codex or gemini)',
-      ok: codexOk || geminiOk,
+      name: 'claude CLI',
+      ok: claudeOk,
+      required: false,
+      detail: claudeOk ? undefined : 'Install Claude Code CLI (npm i -g @anthropic-ai/claude-code).',
+    })
+
+    checks.push({
+      name: 'At least one agent CLI (codex, gemini, or claude)',
+      ok: codexOk || geminiOk || claudeOk,
       required: true,
-      detail: codexOk || geminiOk ? undefined : 'Install codex or gemini.',
+      detail: codexOk || geminiOk || claudeOk ? undefined : 'Install codex, gemini, or claude.',
     })
   } finally {
     spinner?.stop()

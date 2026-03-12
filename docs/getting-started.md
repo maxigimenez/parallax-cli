@@ -37,7 +37,8 @@ parallax preflight
 - `gh auth status`
 - `codex` CLI (optional)
 - `gemini` CLI (optional)
-- at least one agent CLI (`codex` or `gemini`) is available
+- `claude` CLI (optional)
+- at least one agent CLI (`codex`, `gemini`, or `claude`) is available
 
 If a required check fails, fix it before moving on.
 

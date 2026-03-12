@@ -9,7 +9,7 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 - Issue intake from Linear and GitHub.
 - Global runtime state under `~/.parallax`.
 - CLI control plane plus dashboard UI.
-- Codex and Gemini adapters (configurable per project).
+- Codex, Gemini, and Claude Code adapters (configurable per project).
 
 ## Requirements
 

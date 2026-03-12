@@ -79,7 +79,11 @@ export async function loadConfig(): Promise<AppConfig> {
 }
 
 const ALLOWED_LOG_LEVELS: LogLevel[] = Object.values(LOG_LEVEL)
-const ALLOWED_AGENT_PROVIDERS = [AGENT_PROVIDER.CODEX, AGENT_PROVIDER.GEMINI] as const
+const ALLOWED_AGENT_PROVIDERS = [
+  AGENT_PROVIDER.CODEX,
+  AGENT_PROVIDER.GEMINI,
+  AGENT_PROVIDER.CLAUDE_CODE,
+] as const
 const ALLOWED_PULL_PROVIDERS = [PULL_PROVIDER.LINEAR, PULL_PROVIDER.GITHUB] as const
 
 function assertObject(value: unknown, label: string): asserts value is Record<string, unknown> {

@@ -15,7 +15,7 @@ gh auth login
 gh auth status
 ```
 
-### Neither codex nor gemini found
+### None of codex, gemini, or claude found
 
 Install at least one agent CLI and ensure it is on your `PATH`.
 

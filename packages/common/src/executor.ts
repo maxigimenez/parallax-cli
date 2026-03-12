@@ -31,6 +31,7 @@ export class HostExecutor implements LocalExecutor {
         cwd: options.cwd,
         env: { ...process.env, ...options.env },
         shell: false,
+        stdio: 'pipe',
       })
 
       let output = ''
@@ -68,6 +69,10 @@ export class HostExecutor implements LocalExecutor {
         for (const line of lines) {
           options.onData({ stream, line })
         }
+      }
+
+      if (child.stdin) {
+        child.stdin.end()
       }
 
       child.stdout.on('data', createHandler('stdout'))
