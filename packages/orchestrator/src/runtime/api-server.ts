@@ -64,7 +64,9 @@ export async function createApiServer(
     activeWorktrees,
   } = dependencies
 
-  await fastify.register(cors, { origin: '*' })
+  await fastify.register(cors, {
+    origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+  })
 
   fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
 
@@ -203,6 +205,9 @@ export async function createApiServer(
     }
 
     if (planMarkdown !== undefined) {
+      if (planMarkdown.length > 500_000) {
+        return reply.status(400).send({ error: 'planMarkdown exceeds maximum allowed length.' })
+      }
       const trimmed = planMarkdown.trim()
       if (!trimmed) {
         return reply.status(400).send({ error: 'planMarkdown cannot be empty when provided.' })

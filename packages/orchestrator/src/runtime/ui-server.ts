@@ -54,10 +54,11 @@ export async function startUiServer(uiDistPath: string, uiPort: number, apiPort:
     const requestPath = (request.params as { '*': string })['*'] || ''
     const normalized = requestPath.startsWith('/') ? requestPath.slice(1) : requestPath
     const decoded = decodeURIComponent(normalized)
-    const resolved = path.resolve(uiDistPath, decoded || 'index.html')
     const uiRootResolved = path.resolve(uiDistPath)
+    const resolved = path.resolve(uiRootResolved, decoded || 'index.html')
+    const relative = path.relative(uiRootResolved, resolved)
 
-    if (!resolved.startsWith(uiRootResolved)) {
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
       return reply.status(400).send({ error: 'Invalid path' })
     }
 
@@ -78,6 +79,6 @@ export async function startUiServer(uiDistPath: string, uiPort: number, apiPort:
     }
   })
 
-  await uiFastify.listen({ port: uiPort, host: '0.0.0.0' })
+  await uiFastify.listen({ port: uiPort, host: '127.0.0.1' })
   return uiFastify
 }

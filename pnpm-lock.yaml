@@ -78,8 +78,8 @@ importers:
         specifier: 6.1.0
         version: 6.1.0
       simple-git:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.32.3
+        version: 3.32.3
       socket.io:
         specifier: 4.8.3
         version: 4.8.3
@@ -353,8 +353,8 @@ importers:
         specifier: 6.1.0
         version: 6.1.0
       simple-git:
-        specifier: 3.22.0
-        version: 3.22.0
+        specifier: 3.32.3
+        version: 3.32.3
       socket.io:
         specifier: 4.8.3
         version: 4.8.3
@@ -3980,8 +3980,8 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  simple-git@3.22.0:
-    resolution: {integrity: sha512-6JujwSs0ac82jkGjMHiCnTifvf1crOiY/+tfs/Pqih6iow7VrpNKRRNdWm6RtaXpvvv/JGNYhlUtLhGFqHF+Yw==}
+  simple-git@3.32.3:
+    resolution: {integrity: sha512-56a5oxFdWlsGygOXHWrG+xjj5w9ZIt2uQbzqiIGdR/6i5iococ7WQ/bNPzWxCJdEUGUCmyMH0t9zMpRJTaKxmw==}
 
   slice-ansi@7.1.2:
     resolution: {integrity: sha512-iOBWFgUX7caIZiuutICxVgX1SdxwAVFFKwt1EvMYYec/NWO5meOJ6K5uQxhrYBdQJne4KxiqZc+KptFOWFSI9w==}
@@ -7958,7 +7958,7 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  simple-git@3.22.0:
+  simple-git@3.32.3:
     dependencies:
       '@kwsites/file-exists': 1.1.1
       '@kwsites/promise-deferred': 1.1.1

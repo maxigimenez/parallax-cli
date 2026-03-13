@@ -49,8 +49,10 @@ async function startRuntimeServers(
   })
 
   const config = getConfig()
-  await fastify.listen({ port: config.server.apiPort, host: '0.0.0.0' })
-  const io = new SocketServer(fastify.server, { cors: { origin: '*' } })
+  await fastify.listen({ port: config.server.apiPort, host: '127.0.0.1' })
+  const io = new SocketServer(fastify.server, {
+    cors: { origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/ },
+  })
   setIo(io)
 
   if (process.env.NODE_ENV === 'dev') {
