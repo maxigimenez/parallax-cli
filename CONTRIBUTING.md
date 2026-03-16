@@ -2,6 +2,14 @@
 
 Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 
+## Local prerequisites
+
+- Node.js `>= 23.7.0`
+- `pnpm`
+- `git`
+- `gh`
+- at least one supported agent CLI (`codex`, `gemini`, or `claude`)
+
 ## Project structure
 
 - `packages/orchestrator`: polling, task state machine, API.
@@ -27,6 +35,8 @@ pnpm test
 pnpm build
 pnpm lint
 ```
+
+`pnpm parallax preflight` should pass before runtime changes are tested manually.
 
 ### Local runtime
 

@@ -20,6 +20,8 @@ packages/cli/*.tgz
 # Sensitive data
 .env
 .env.local
+.env.*
+!.env.example
 
 # Logs
 logs

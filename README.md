@@ -20,14 +20,24 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 - Node.js `>= 23.7.0`
 - `pnpm` `10.x`
 - `git`
+- `gh`
+- at least one supported agent CLI (`codex`, `gemini`, or `claude`)
 - Provider credentials in your shell environment (optional per-project `.env` via `parallax register --env-file`)
 
-## Install
+## Local development setup
 
 ```bash
 pnpm install
+pnpm parallax preflight
 pnpm test
 pnpm build
+```
+
+## Install global CLI
+
+```bash
+npm i -g parallax-cli
+parallax preflight
 ```
 
 ## Configuration (`parallax.yml`)
@@ -42,13 +52,13 @@ pnpm parallax register ./parallax.yml --env-file ./.env
 `parallax.yml` is a YAML array of project entries:
 
 ```yaml
-- id: taplands
-  workspaceDir: /Users/maxi/projects/taplands
+- id: example-repo
+  workspaceDir: /absolute/path/to/your/repo
   pullFrom:
     provider: github
     filters:
-      owner: maxigimenez
-      repo: taplands
+      owner: your-github-org-or-user
+      repo: your-repo
       state: open
       labels: [ai-ready]
   agent:

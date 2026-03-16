@@ -79,13 +79,13 @@ Parallax always runs supported agents in a sandbox. Approval behavior and MCP/ru
 ## Example: GitHub
 
 ```yaml
-- id: taplands
-  workspaceDir: /Users/maxi/projects/taplands
+- id: example-repo
+  workspaceDir: /absolute/path/to/your/repo
   pullFrom:
     provider: github
     filters:
-      owner: maxigimenez
-      repo: taplands
+      owner: your-github-org-or-user
+      repo: your-repo
       state: open
       labels: [ai-ready]
   agent:

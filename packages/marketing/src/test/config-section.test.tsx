@@ -18,7 +18,7 @@ describe("ConfigSection", () => {
 
     expect(screen.getAllByText("parallax.yml").length).toBeGreaterThan(0);
     expect(screen.getByText("workspaceDir")).toBeTruthy();
-    expect(screen.getByText("/Users/maxi/projects/www")).toBeTruthy();
+    expect(screen.getByText("/absolute/path/to/your/repo")).toBeTruthy();
 
     const buttons = screen.getAllByRole("button");
     const inlineCopyButton = buttons.find((button) =>
@@ -38,7 +38,7 @@ describe("ConfigSection", () => {
     render(<ConfigSection />);
 
     expect(screen.getByText("workspaceDir")).toBeTruthy();
-    expect(screen.getByText("/Users/maxi/projects/www")).toBeTruthy();
+    expect(screen.getByText("/absolute/path/to/your/repo")).toBeTruthy();
     expect(screen.getByText("[ai-ready]")).toBeTruthy();
     expect(screen.getAllByText("provider").length).toBeGreaterThan(0);
     expect(screen.getByText("codex")).toBeTruthy();

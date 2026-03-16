@@ -1,13 +1,13 @@
 import CodeBlock from "./CodeBlock";
 import InlineCopyCode from "./InlineCopyCode";
 
-const configExample = `- id: www
-  workspaceDir: /Users/maxi/projects/www
+const configExample = `- id: example-repo
+  workspaceDir: /absolute/path/to/your/repo
   pullFrom:
     provider: github
     filters:
-      owner: maxigimenez
-      repo: www
+      owner: your-github-org-or-user
+      repo: your-repo
       state: open
       labels: [ai-ready]
   agent:
