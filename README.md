@@ -1,7 +1,11 @@
-# Parallax
+# parallax-cli
+
+> WARNING: Parallax is currently in alpha. Expect rough edges, missing polish, and occasional breaking changes.
 
 Parallax is a local AI orchestration runtime for software tasks.
 It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent in two phases (`plan` then `execute`), and requires explicit approval before implementation.
+
+![](./dashboard.png)
 
 ## First version scope
 
