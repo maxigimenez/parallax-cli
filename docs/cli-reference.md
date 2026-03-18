@@ -140,7 +140,7 @@ Notes:
 
 ## parallax logs
 
-Tail logs from orchestrator API.
+Tail new logs from orchestrator API starting from when the command begins.
 
 ```bash
 parallax logs [--task <id>]
