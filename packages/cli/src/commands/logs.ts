@@ -1,8 +1,9 @@
+import chalk from 'chalk'
 import { sleep } from '@parallax/common'
 import { parseLogsOptions } from '../args.js'
 import type { CliContext } from '../types.js'
 
-type TaskLogsApiRecord = {
+export type TaskLogsApiRecord = {
   taskExternalId: string
   message: string
   icon: string
@@ -10,8 +11,23 @@ type TaskLogsApiRecord = {
   timestamp: number
 }
 
-function formatTimestamp(epochMs: number): string {
-  return new Date(epochMs).toISOString()
+export function formatLogLine(entry: TaskLogsApiRecord, colors: typeof chalk = chalk): string {
+  const timestamp = colors.dim(new Date(entry.timestamp).toISOString())
+  const taskExternalId = colors.magenta(`[${entry.taskExternalId}]`)
+  const level =
+    entry.level === 'warning'
+      ? colors.yellow(entry.level.toUpperCase())
+      : entry.level === 'error'
+        ? colors.red(entry.level.toUpperCase())
+        : colors.blue(entry.level.toUpperCase())
+  const icon =
+    entry.level === 'warning'
+      ? colors.yellow(entry.icon)
+      : entry.level === 'error'
+        ? colors.red(entry.icon)
+        : colors.blue(entry.icon)
+
+  return `${timestamp} ${taskExternalId} ${level} ${icon} ${entry.message}`
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -26,7 +42,7 @@ async function fetchJson<T>(url: string): Promise<T> {
 export async function runLogs(args: string[], context: CliContext) {
   const options = parseLogsOptions(args)
   const apiBase = await context.resolveDefaultApiBase()
-  let cursor = 0
+  let cursor = Date.now()
   let seenAtCursor = new Set<string>()
 
   while (true) {
@@ -51,9 +67,7 @@ export async function runLogs(args: string[], context: CliContext) {
         continue
       }
 
-      console.log(
-        `${formatTimestamp(entry.timestamp)} [${entry.taskExternalId}] ${entry.level.toUpperCase()} ${entry.icon} ${entry.message}`
-      )
+      console.log(formatLogLine(entry))
       if (entry.timestamp > cursor) {
         cursor = entry.timestamp
         seenAtCursor = new Set<string>()

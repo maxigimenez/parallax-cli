@@ -25,5 +25,5 @@ Commands:
   retry      Queue a task for manual retry.
   cancel     Cancel a pending or running task.
   stop       Force-stop the running Parallax processes.
-  logs       Tail task logs from the running Parallax API.`)
+  logs       Tail new task logs from the running Parallax API.`)
 }
