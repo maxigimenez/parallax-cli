@@ -14,7 +14,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => undefined)) as { error?: string } | undefined
-    throw new Error(payload?.error ?? `Request failed: ${url} ${response.status} ${response.statusText}`)
+    throw new Error(
+      payload?.error ?? `Request failed: ${url} ${response.status} ${response.statusText}`
+    )
   }
 
   return response.json() as Promise<T>
@@ -26,12 +28,17 @@ export async function runPrReview(args: string[], context: CliContext) {
 
   console.log('')
   console.log(`${YELLOW}${BOLD}⚠ Experimental: pr-review is an early on-demand workflow.${RESET}`)
-  console.log(`${YELLOW}It will try to apply open human PR review comments to the existing PR branch.${RESET}`)
+  console.log(
+    `${YELLOW}It will try to apply open human PR review comments to the existing PR branch.${RESET}`
+  )
   console.log('')
 
   let queuedTask: { reviewTaskId: string; prNumber: number }
   try {
-    queuedTask = await postJson(`${apiBase}/tasks/${encodeURIComponent(options.taskId)}/pr-review`, {})
+    queuedTask = await postJson(
+      `${apiBase}/tasks/${encodeURIComponent(options.taskId)}/pr-review`,
+      {}
+    )
   } catch (error) {
     throw new Error(
       `Failed to queue PR review for task ${options.taskId}: ${

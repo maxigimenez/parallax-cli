@@ -40,9 +40,7 @@ function buildGroupId(kind: TaskLogKind, line: string) {
 function isMcpLifecycleLine(lowerLine: string) {
   return (
     lowerLine.startsWith('mcp:') &&
-    (lowerLine.includes('starting') ||
-      lowerLine.includes('ready') ||
-      lowerLine.includes('started'))
+    (lowerLine.includes('starting') || lowerLine.includes('ready') || lowerLine.includes('started'))
   )
 }
 
@@ -58,10 +56,7 @@ function isMcpWarningLine(lowerLine: string) {
   )
 }
 
-export function classifyAgentLogChunk(
-  line: string,
-  stream: 'stdout' | 'stderr'
-): StreamLogEvent {
+export function classifyAgentLogChunk(line: string, stream: 'stdout' | 'stderr'): StreamLogEvent {
   const normalized = line.trim()
   const lowerLine = normalized.toLowerCase()
 
@@ -114,31 +109,31 @@ export function classifyAgentLogChunk(
       }
     }
 
-      return {
-        level: TASK_LOG_LEVEL.INFO,
-        kind: TASK_LOG_KIND.AGENT_MESSAGE,
-        source: TASK_LOG_SOURCE.AGENT,
-        message: normalized,
-      }
+    return {
+      level: TASK_LOG_LEVEL.INFO,
+      kind: TASK_LOG_KIND.AGENT_MESSAGE,
+      source: TASK_LOG_SOURCE.AGENT,
+      message: normalized,
+    }
   }
 
   if (isDiffLine(normalized)) {
-      return {
-        level: TASK_LOG_LEVEL.INFO,
-        kind: TASK_LOG_KIND.FILE_CHANGE,
-        source: TASK_LOG_SOURCE.AGENT,
-        message: normalized,
+    return {
+      level: TASK_LOG_LEVEL.INFO,
+      kind: TASK_LOG_KIND.FILE_CHANGE,
+      source: TASK_LOG_SOURCE.AGENT,
+      message: normalized,
       groupId: buildGroupId(TASK_LOG_KIND.FILE_CHANGE, normalized),
-      }
+    }
   }
 
   if (normalized.startsWith('$ ') || normalized.startsWith('> ')) {
-      return {
-        level: TASK_LOG_LEVEL.INFO,
-        kind: TASK_LOG_KIND.COMMAND,
-        source: TASK_LOG_SOURCE.AGENT,
-        message: normalized,
-        groupId: 'command-output',
+    return {
+      level: TASK_LOG_LEVEL.INFO,
+      kind: TASK_LOG_KIND.COMMAND,
+      source: TASK_LOG_SOURCE.AGENT,
+      message: normalized,
+      groupId: 'command-output',
     }
   }
 

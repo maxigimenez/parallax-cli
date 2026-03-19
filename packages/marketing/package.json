@@ -8,6 +8,7 @@
     "build": "node ./scripts/sync-docs.mjs && vite build",
     "build:dev": "node ./scripts/sync-docs.mjs && vite build --mode development",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "preview": "node ./scripts/sync-docs.mjs && vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

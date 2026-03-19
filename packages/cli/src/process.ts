@@ -88,7 +88,11 @@ export async function waitForExit(pid: number, timeoutMs: number): Promise<boole
   return !isProcessAlive(pid)
 }
 
-export async function stopProcessOrThrow(pid: number, label: string, force: boolean): Promise<void> {
+export async function stopProcessOrThrow(
+  pid: number,
+  label: string,
+  force: boolean
+): Promise<void> {
   if (!isProcessAlive(pid)) {
     throw new Error(`${label} process ${pid} is not running.`)
   }
@@ -110,7 +114,11 @@ export async function stopProcessOrThrow(pid: number, label: string, force: bool
   }
 }
 
-export async function stopProcessBestEffort(pid: number | undefined, label: string, force: boolean) {
+export async function stopProcessBestEffort(
+  pid: number | undefined,
+  label: string,
+  force: boolean
+) {
   if (!pid || !Number.isFinite(pid) || pid <= 0 || !isProcessAlive(pid)) {
     return
   }
@@ -146,7 +154,11 @@ export async function waitForUrlHealth(url: string, name: string): Promise<void>
   throw new Error(`${name} failed to become ready at ${url}: ${lastError ?? 'timeout'}`)
 }
 
-export async function readFileTail(filePath: string, ensureFileExists: (filePath: string) => Promise<boolean>, maxLines: number = 30) {
+export async function readFileTail(
+  filePath: string,
+  ensureFileExists: (filePath: string) => Promise<boolean>,
+  maxLines: number = 30
+) {
   if (!(await ensureFileExists(filePath))) {
     return '(log file not found)'
   }

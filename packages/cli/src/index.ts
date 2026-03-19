@@ -4,7 +4,20 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { DEFAULT_API_PORT } from '@parallax/common'
-import { hasFlag, parseCancelOptions, parseLogsOptions, parsePendingOptions, parsePreflightOptions, parsePrReviewOptions, parseRegisterOptions, parseRetryOptions, parseStartOptions, parseStatusOptions, parseStopOptions as parseStopOptionsInternal, resolvePath } from './args.js'
+import {
+  hasFlag,
+  parseCancelOptions,
+  parseLogsOptions,
+  parsePendingOptions,
+  parsePreflightOptions,
+  parsePrReviewOptions,
+  parseRegisterOptions,
+  parseRetryOptions,
+  parseStartOptions,
+  parseStatusOptions,
+  parseStopOptions as parseStopOptionsInternal,
+  resolvePath,
+} from './args.js'
 import {
   ensureFileExists,
   loadRegistry as loadRegistryFromDisk,
@@ -56,7 +69,10 @@ function resolvePackageVersion(rootDir: string): string {
       continue
     }
 
-    const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as { version?: string; name?: string }
+    const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as {
+      version?: string
+      name?: string
+    }
     if (
       typeof parsed.version === 'string' &&
       (parsed.name === 'parallax-cli' || candidate.endsWith('/packages/cli/package.json'))

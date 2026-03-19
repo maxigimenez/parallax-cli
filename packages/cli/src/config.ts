@@ -107,7 +107,11 @@ export function parseRegistryState(raw: string, source: string): RegistryState {
     )
   }
 
-  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { configs?: unknown }).configs)) {
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !Array.isArray((parsed as { configs?: unknown }).configs)
+  ) {
     throw new Error(`Invalid config registry at ${source}.`)
   }
 
@@ -128,8 +132,7 @@ export function parseRegistryState(raw: string, source: string): RegistryState {
       return {
         configPath: (entry as { configPath: string }).configPath,
         addedAt: (entry as { addedAt: number }).addedAt,
-        envFilePath:
-          (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
+        envFilePath: (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
       }
     }),
   }
@@ -165,7 +168,10 @@ export async function resolveServerPorts(configPath: string): Promise<ServerConf
   return parseServerPortsFromConfig(await fs.readFile(configPath, 'utf8'), configPath)
 }
 
-export async function loadRunningState(dataDir: string, manifestFile: string): Promise<RunningState> {
+export async function loadRunningState(
+  dataDir: string,
+  manifestFile: string
+): Promise<RunningState> {
   const manifestPath = path.join(dataDir, manifestFile)
   if (!(await ensureFileExists(manifestPath))) {
     throw new Error(`No running instance found at ${manifestPath}. Run parallax start first.`)

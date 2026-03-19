@@ -93,7 +93,9 @@ export async function runPreflight(args: string[]) {
       name: 'claude CLI',
       ok: claudeOk,
       required: false,
-      detail: claudeOk ? undefined : 'Install Claude Code CLI (npm i -g @anthropic-ai/claude-code).',
+      detail: claudeOk
+        ? undefined
+        : 'Install Claude Code CLI (npm i -g @anthropic-ai/claude-code).',
     })
 
     checks.push({

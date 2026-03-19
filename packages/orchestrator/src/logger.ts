@@ -23,12 +23,7 @@ import {
   touchTaskStatus,
   updateTaskStatus,
 } from './logging/task-log-store.js'
-import {
-  emitTaskLog,
-  emitTaskRemoved,
-  emitTaskStatus,
-  setIo,
-} from './logging/socket-publisher.js'
+import { emitTaskLog, emitTaskRemoved, emitTaskStatus, setIo } from './logging/socket-publisher.js'
 
 let currentLogLevels: LogLevel[] = ['info', 'success', 'warn', 'error']
 
@@ -80,7 +75,9 @@ function setTaskRuntimeStatus(taskId: string, message: string, status: TaskRunti
 }
 
 function normalizeMessage(message: string) {
-  return stripAnsi(message).trim().replace(/[\uFFFD]/g, '')
+  return stripAnsi(message)
+    .trim()
+    .replace(/[\uFFFD]/g, '')
 }
 
 function formatConsoleLine(taskId: string | undefined, icon: string, message: string) {
@@ -167,7 +164,10 @@ function emitLoggerMessage(
     return
   }
 
-  const lines = normalizeMessage(message).split('\n').map((line) => line.trim()).filter(Boolean)
+  const lines = normalizeMessage(message)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
   for (const line of lines) {
     writeConsoleAndTaskLog(taskId, undefined, persistedLevel, icon, line, kind, source)
   }

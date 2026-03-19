@@ -6,6 +6,8 @@
   "scripts": {
     "start": "tsx watch src/index.ts",
     "build": "rm -rf dist && tsc",
+    "lint": "eslint src test vitest.config.ts",
+    "lint:fix": "eslint src test vitest.config.ts --fix",
     "test": "vitest run"
   },
   "dependencies": {

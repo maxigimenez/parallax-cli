@@ -26,6 +26,14 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/worktrees/**', '**/workspaces/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.next/**',
+      '**/.vite/**',
+      '**/coverage/**',
+      '**/worktrees/**',
+      '**/workspaces/**',
+    ],
   }
 )

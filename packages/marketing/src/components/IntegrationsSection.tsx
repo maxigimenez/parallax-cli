@@ -1,4 +1,12 @@
+import type { ReactNode } from "react";
 import { MessageSquareCode, RotateCcw } from "lucide-react";
+
+type IntegrationItem = {
+  href: string;
+  logo: string | ReactNode;
+  label: string;
+  imgClass?: string;
+};
 
 const IconCard = ({
   href,
@@ -7,7 +15,7 @@ const IconCard = ({
   imgClass,
 }: {
   href: string;
-  logo: string | React.ReactNode;
+  logo: string | ReactNode;
   label: string;
   imgClass?: string;
 }) => (
@@ -30,7 +38,7 @@ const IconCard = ({
   </a>
 );
 
-const steps = [
+const steps: Array<{ label: string; items: IntegrationItem[] }> = [
   {
     label: "Pulling",
     items: [
@@ -100,7 +108,7 @@ const IntegrationsSection = () => {
                         href={item.href}
                         logo={item.logo}
                         label={item.label}
-                        imgClass={"imgClass" in item ? (item as any).imgClass : undefined}
+                        imgClass={item.imgClass}
                       />
                     ))}
                   </div>
@@ -130,7 +138,7 @@ const IntegrationsSection = () => {
                     href={item.href}
                     logo={item.logo}
                     label={item.label}
-                    imgClass={"imgClass" in item ? (item as any).imgClass : undefined}
+                    imgClass={item.imgClass}
                   />
                 ))}
               </div>

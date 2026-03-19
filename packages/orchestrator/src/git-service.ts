@@ -238,7 +238,14 @@ export class GitService {
       // Ignore
     }
 
-    await git.raw(['worktree', 'add', '-B', localBranchName, worktreePath, `origin/${task.branchName}`])
+    await git.raw([
+      'worktree',
+      'add',
+      '-B',
+      localBranchName,
+      worktreePath,
+      `origin/${task.branchName}`,
+    ])
 
     return worktreePath
   }

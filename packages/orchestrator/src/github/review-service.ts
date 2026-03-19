@@ -121,9 +121,7 @@ export class GitHubReviewService {
     const owner = payload.owner?.login?.trim()
     const repo = payload.name?.trim()
     if (!owner || !repo) {
-      throw new Error(
-        `Unable to resolve GitHub repository from workspace ${project.workspaceDir}.`
-      )
+      throw new Error(`Unable to resolve GitHub repository from workspace ${project.workspaceDir}.`)
     }
 
     return { owner, repo }
@@ -135,7 +133,17 @@ export class GitHubReviewService {
     variables: Record<string, string | number>
   ): Promise<T> {
     const { owner, repo } = await this.resolveRepoDetails(project)
-    const command = ['gh', 'api', 'graphql', '-f', `query=${query}`, '-F', `owner=${owner}`, '-F', `repo=${repo}`]
+    const command = [
+      'gh',
+      'api',
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${owner}`,
+      '-F',
+      `repo=${repo}`,
+    ]
 
     for (const [key, value] of Object.entries(variables)) {
       command.push('-F', `${key}=${String(value)}`)
@@ -196,7 +204,10 @@ export class GitHubReviewService {
     }
   }
 
-  async listOpenReviewComments(project: ProjectConfig, prNumber: number): Promise<PullRequestReviewComment[]> {
+  async listOpenReviewComments(
+    project: ProjectConfig,
+    prNumber: number
+  ): Promise<PullRequestReviewComment[]> {
     const data = await this.executeGraphql<PullRequestReviewThreadsResponse>(
       project,
       `

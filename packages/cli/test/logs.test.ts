@@ -65,9 +65,7 @@ describe('runLogs', () => {
     vi.spyOn(Date, 'now').mockReturnValue(5_000)
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
-    sleepMock
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(stopLoop)
+    sleepMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(stopLoop)
 
     vi.mocked(fetch)
       .mockResolvedValueOnce({

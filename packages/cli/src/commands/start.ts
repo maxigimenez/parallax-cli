@@ -102,11 +102,7 @@ export async function runStart(args: string[], context: CliContext) {
     if (workspaceDevMode) {
       orchestratorPid = spawnDetached(
         process.execPath,
-        [
-          '--import',
-          'tsx',
-          path.resolve(context.rootDir, 'packages/orchestrator/src/index.ts'),
-        ],
+        ['--import', 'tsx', path.resolve(context.rootDir, 'packages/orchestrator/src/index.ts')],
         context.rootDir,
         env,
         {
@@ -117,7 +113,16 @@ export async function runStart(args: string[], context: CliContext) {
 
       uiPid = spawnDetached(
         'pnpm',
-        ['--filter', '@parallax/ui', 'start', '--', '--host', '0.0.0.0', '--port', String(options.uiPort)],
+        [
+          '--filter',
+          '@parallax/ui',
+          'start',
+          '--',
+          '--host',
+          '0.0.0.0',
+          '--port',
+          String(options.uiPort),
+        ],
         context.rootDir,
         {
           VITE_PARALLAX_API_BASE: `http://localhost:${options.apiPort}`,

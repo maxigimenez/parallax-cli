@@ -68,7 +68,9 @@ async function postJson(url: string, body: unknown) {
 
 function printPendingSummary(tasks: TaskPendingState[]) {
   for (const task of tasks) {
-    console.log(`- ${task.id} | project=${task.projectId} | plan=${task.planState} | agent=${task.lastAgent ?? 'n/a'}`)
+    console.log(
+      `- ${task.id} | project=${task.projectId} | plan=${task.planState} | agent=${task.lastAgent ?? 'n/a'}`
+    )
     console.log(`  title: ${task.title ?? '(no title)'}`)
     const snippet = task.planMarkdown ?? task.planResult
     if (snippet) {

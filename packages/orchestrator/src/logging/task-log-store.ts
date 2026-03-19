@@ -16,7 +16,9 @@ function escapeForRegex(value: string) {
 
 function canonicalizeMessage(entry: TaskLogEntry) {
   const withoutTaskPrefix = entry.message.replace(/^\[[^\]]+\]\s*/, '').trim()
-  const withoutIcon = withoutTaskPrefix.replace(new RegExp(`^${escapeForRegex(entry.icon)}\\s+`), '').trim()
+  const withoutIcon = withoutTaskPrefix
+    .replace(new RegExp(`^${escapeForRegex(entry.icon)}\\s+`), '')
+    .trim()
   return withoutIcon
 }
 

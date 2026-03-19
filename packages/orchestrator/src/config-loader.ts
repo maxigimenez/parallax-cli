@@ -108,11 +108,7 @@ function assertOptionalString(value: unknown, label: string): string | undefined
   return assertNonEmptyString(value, label)
 }
 
-function assertNoUnknownKeys(
-  value: Record<string, unknown>,
-  allowedKeys: string[],
-  label: string
-) {
+function assertNoUnknownKeys(value: Record<string, unknown>, allowedKeys: string[], label: string) {
   const unknownKeys = Object.keys(value).filter((key) => !allowedKeys.includes(key))
   if (unknownKeys.length > 0) {
     throw new Error(`${label} contains unsupported fields: ${unknownKeys.join(', ')}.`)
@@ -204,7 +200,11 @@ function parseRegistry(raw: string, source: string): RegistryState {
     )
   }
 
-  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { configs?: unknown }).configs)) {
+  if (
+    !parsed ||
+    typeof parsed !== 'object' ||
+    !Array.isArray((parsed as { configs?: unknown }).configs)
+  ) {
     throw new Error(`Invalid config registry at ${source}.`)
   }
 
@@ -225,8 +225,7 @@ function parseRegistry(raw: string, source: string): RegistryState {
       return {
         configPath: (entry as { configPath: string }).configPath,
         addedAt: (entry as { addedAt: number }).addedAt,
-        envFilePath:
-          (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
+        envFilePath: (entry as { envFilePath?: string }).envFilePath?.trim() || undefined,
       }
     }),
   }
@@ -267,9 +266,7 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
     `project.agent.provider for "${id}" in ${source}`
   )
   if (
-    !ALLOWED_AGENT_PROVIDERS.includes(
-      agentProviderRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number]
-    )
+    !ALLOWED_AGENT_PROVIDERS.includes(agentProviderRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number])
   ) {
     throw new Error(
       `Unsupported agent provider "${agentProviderRaw}" for project "${id}" in ${source}. Supported providers: ${ALLOWED_AGENT_PROVIDERS.join(', ')}.`
@@ -292,9 +289,7 @@ function parseProject(raw: unknown, source: string): ProjectConfig {
 }
 
 async function assertWorkspaceExists(project: ProjectConfig, source: string): Promise<void> {
-  const stat = await fs
-    .stat(project.workspaceDir)
-    .catch(() => null)
+  const stat = await fs.stat(project.workspaceDir).catch(() => null)
 
   if (!stat || !stat.isDirectory()) {
     throw new Error(
