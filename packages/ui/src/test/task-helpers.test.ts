@@ -5,6 +5,7 @@ import {
   formatPlanStateLabel,
   planActionsState,
   projectColor,
+  resolveTaskDisplayMetadata,
   resolveProjectProvider,
 } from '@/lib/task-helpers'
 import { TASK_STATUS } from '@/lib/task-constants'
@@ -38,6 +39,64 @@ describe('task helpers', () => {
     )
 
     expect(provider).toBe(PULL_PROVIDER.GITHUB)
+  })
+
+  it('resolves task display metadata using lastAgent and configured model', () => {
+    const metadata = resolveTaskDisplayMetadata(
+      {
+        concurrency: 1,
+        logs: [LOG_LEVEL.INFO],
+        server: {
+          apiPort: 3000,
+          uiPort: 8080,
+        },
+        projects: [
+          {
+            id: 'p1',
+            workspaceDir: '/tmp',
+            pullFrom: { provider: PULL_PROVIDER.GITHUB, filters: {} },
+            agent: {
+              provider: AGENT_PROVIDER.CODEX,
+              model: 'gpt-5.4',
+            },
+          },
+        ],
+      },
+      'p1',
+      AGENT_PROVIDER.GEMINI
+    )
+
+    expect(metadata.provider).toBe(PULL_PROVIDER.GITHUB)
+    expect(metadata.usedAi).toBe('Gemini')
+    expect(metadata.model).toBe('gpt-5.4')
+  })
+
+  it('falls back to configured agent when lastAgent and model are absent', () => {
+    const metadata = resolveTaskDisplayMetadata(
+      {
+        concurrency: 1,
+        logs: [LOG_LEVEL.INFO],
+        server: {
+          apiPort: 3000,
+          uiPort: 8080,
+        },
+        projects: [
+          {
+            id: 'p1',
+            workspaceDir: '/tmp',
+            pullFrom: { provider: PULL_PROVIDER.LINEAR, filters: {} },
+            agent: {
+              provider: AGENT_PROVIDER.CLAUDE_CODE,
+            },
+          },
+        ],
+      },
+      'p1'
+    )
+
+    expect(metadata.provider).toBe(PULL_PROVIDER.LINEAR)
+    expect(metadata.usedAi).toBe('Claude Code')
+    expect(metadata.model).toBeUndefined()
   })
 
   it('allows plan actions only for approval states', () => {

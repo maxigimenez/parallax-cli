@@ -28,7 +28,7 @@ Execution does not proceed until the plan is approved (unless plan is marked `NO
 
 Plan approval can be done from:
 
-- dashboard plan tab
+- task dashboard plan section
 - CLI via `parallax pending --approve <id>`
 
 Rejection:

@@ -1,4 +1,4 @@
-import type { AppConfig, TaskPlanState } from '@parallax/common'
+import { AGENT_PROVIDER, type AppConfig, type TaskPlanState } from '@parallax/common'
 import { PLAN_EDITABLE_STATES, PROJECT_COLOR_PALETTE } from './task-constants'
 import { PLAN_STATE, TASK_STATUS, type TaskStatus } from './task-constants'
 
@@ -28,6 +28,58 @@ export function resolveProjectProvider(config: AppConfig | null, projectId?: str
   }
 
   return project.pullFrom.provider
+}
+
+type TaskDisplayMetadata = {
+  provider: string
+  usedAi: string
+  model?: string
+}
+
+function resolveProject(config: AppConfig | null, projectId?: string) {
+  if (!config) {
+    throw new Error('Parallax config is not loaded.')
+  }
+
+  if (!projectId) {
+    throw new Error('Task is missing projectId.')
+  }
+
+  const project = config.projects.find((candidate) => candidate.id === projectId)
+  if (!project) {
+    throw new Error(`Project "${projectId}" is not present in config.`)
+  }
+
+  return project
+}
+
+function formatAgentLabel(agent: string | undefined) {
+  if (!agent) {
+    return 'Unknown'
+  }
+
+  if (agent === AGENT_PROVIDER.CLAUDE_CODE) {
+    return 'Claude Code'
+  }
+
+  return agent
+    .split('-')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export function resolveTaskDisplayMetadata(
+  config: AppConfig | null,
+  projectId?: string,
+  lastAgent?: string
+): TaskDisplayMetadata {
+  const project = resolveProject(config, projectId)
+
+  return {
+    provider: project.pullFrom.provider,
+    usedAi: formatAgentLabel(lastAgent ?? project.agent.provider),
+    model: project.agent.model || undefined,
+  }
 }
 
 export function planActionsState(planState?: TaskPlanState) {
