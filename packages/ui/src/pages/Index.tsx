@@ -10,17 +10,18 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
 const TASK_VIEW = 'tasks'
 const SETTINGS_VIEW = 'settings'
-const SUMMARY_TAB = 'summary'
+const DASHBOARD_VIEW = 'dashboard'
+const LOGS_VIEW = 'logs'
 
 type ActiveView = typeof TASK_VIEW | typeof SETTINGS_VIEW
-type ActiveTab = typeof SUMMARY_TAB | 'logs' | 'plan'
+type TaskDetailView = typeof DASHBOARD_VIEW | typeof LOGS_VIEW
 
 function resolveActiveView(pathname: string): ActiveView {
   return pathname.startsWith('/settings') ? SETTINGS_VIEW : TASK_VIEW
 }
 
-function resolveActiveTab(tab: string | undefined): ActiveTab {
-  return tab === 'logs' || tab === 'plan' ? tab : SUMMARY_TAB
+function resolveTaskDetailView(pathname: string): TaskDetailView {
+  return pathname.endsWith('/logs') ? LOGS_VIEW : DASHBOARD_VIEW
 }
 
 const Index = () => {
@@ -38,9 +39,8 @@ const Index = () => {
     useParallax()
   const navigate = useNavigate()
   const location = useLocation()
-  const { taskId, tab, projectIndex } = useParams<{
+  const { taskId, projectIndex } = useParams<{
     taskId?: string
-    tab?: string
     projectIndex?: string
   }>()
 
@@ -49,7 +49,7 @@ const Index = () => {
   }
 
   const activeView = resolveActiveView(location.pathname)
-  const activeTab = resolveActiveTab(tab)
+  const taskDetailView = resolveTaskDetailView(location.pathname)
   const selectedTask = taskId ? tasks[taskId] ?? null : null
   const selectedTaskId = taskId ?? null
   const selectedSettingsId = projectIndex ? `project-${projectIndex}` : null
@@ -66,19 +66,11 @@ const Index = () => {
       return
     }
 
-    navigate(`/tasks/${id}/${SUMMARY_TAB}`)
+    navigate(`/tasks/${id}`)
   }
 
   const handleViewChange = (view: ActiveView) => {
     navigate(view === SETTINGS_VIEW ? '/settings' : '/')
-  }
-
-  const handleTabChange = (nextTab: ActiveTab) => {
-    if (!taskId) {
-      return
-    }
-
-    navigate(`/tasks/${taskId}/${nextTab}`)
   }
 
   return (
@@ -99,13 +91,15 @@ const Index = () => {
             planMarkdown={selectedTask.planMarkdown}
             planPrompt={selectedTask.planPrompt}
             planResult={selectedTask.planResult}
+            lastAgent={selectedTask.lastAgent}
             config={config}
             onRetry={retryTask}
             onCancel={cancelTask}
             onApprovePlan={approvePlan}
             onRejectPlan={rejectPlan}
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
+            viewMode={taskDetailView}
+            onOpenLogs={() => navigate(`/tasks/${selectedTask.id}/logs`)}
+            onOpenDashboard={() => navigate(`/tasks/${selectedTask.id}`)}
           />
         ) : activeView === SETTINGS_VIEW && projectIndex !== undefined ? (
           <SettingsViewer projectIndex={Number.parseInt(projectIndex, 10)} config={config} />

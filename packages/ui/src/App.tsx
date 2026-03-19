@@ -17,7 +17,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/tasks/:taskId" element={<Index />} />
-          <Route path="/tasks/:taskId/:tab" element={<Index />} />
+          <Route path="/tasks/:taskId/logs" element={<Index />} />
           <Route path="/settings" element={<Index />} />
           <Route path="/settings/:projectIndex" element={<Index />} />
           <Route path="*" element={<NotFound />} />
