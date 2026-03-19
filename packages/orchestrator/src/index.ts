@@ -3,7 +3,14 @@ import { Server as SocketServer } from 'socket.io'
 import { dbService } from './database.js'
 import { GitService } from './git-service.js'
 import { BaseAgentAdapter } from './ai-adapters/index.js'
-import { ProjectConfig, TASK_REVIEW_STATE, TASK_STATUS, TaskPlanState, type Task, sleep } from '@parallax/common'
+import {
+  ProjectConfig,
+  TASK_REVIEW_STATE,
+  TASK_STATUS,
+  TaskPlanState,
+  type Task,
+  sleep,
+} from '@parallax/common'
 import { loadConfig } from './config-loader.js'
 import { logger, setIo, setLogLevels } from './logger.js'
 import { HostExecutor } from '@parallax/common/executor'
@@ -166,7 +173,6 @@ async function pollProjects(
           }
         })
       }
-
     } catch (projectError: any) {
       logger.error(`Project poll error (${project.id}): ${projectError.message}`)
     }
@@ -257,7 +263,10 @@ async function main() {
       throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
     }
 
-    const pullRequestDetails = await reviewService.getPullRequestDetails(project, sourceTask.prNumber)
+    const pullRequestDetails = await reviewService.getPullRequestDetails(
+      project,
+      sourceTask.prNumber
+    )
     if (pullRequestDetails.state !== 'OPEN') {
       throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
     }

@@ -1,4 +1,11 @@
-import { Task, ProjectConfig, AgentResult, Logger, PlanResult, PlanResultStatus } from '@parallax/common'
+import {
+  Task,
+  ProjectConfig,
+  AgentResult,
+  Logger,
+  PlanResult,
+  PlanResultStatus,
+} from '@parallax/common'
 import { BaseAgentAdapter } from './base-adapter.js'
 import { extractExecutionMetadata } from './execution-metadata.js'
 import { classifyAgentLogChunk } from './stream-log.js'
@@ -64,10 +71,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
 
     command.push('--prompt', prompt)
 
-    this.logger.info(
-      'Gemini command profile: approval=auto_edit, sandbox=on',
-      task.id
-    )
+    this.logger.info('Gemini command profile: approval=auto_edit, sandbox=on', task.id)
 
     return command
   }

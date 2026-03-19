@@ -118,7 +118,11 @@ describe('ClaudeCodeAdapter', () => {
     }
 
     const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
-    const task = { externalId: 'REV-404', title: 'Auth refresh', description: 'Refresh flow' } as any
+    const task = {
+      externalId: 'REV-404',
+      title: 'Auth refresh',
+      description: 'Refresh flow',
+    } as any
     const project = { agent: { model: 'sonnet' } } as any
 
     const result = await adapter.runPlan(task, '/tmp/repo', project)
@@ -170,7 +174,12 @@ describe('ClaudeCodeAdapter', () => {
     }
 
     const adapter = new ClaudeCodeAdapter(mockExecutor as any, localLogger as any)
-    const task = { id: 'task-405', externalId: 'REV-405', title: 'Review', description: 'Desc' } as any
+    const task = {
+      id: 'task-405',
+      externalId: 'REV-405',
+      title: 'Review',
+      description: 'Desc',
+    } as any
     const project = { agent: { model: 'sonnet' } } as any
 
     vi.spyOn(adapter, 'setupWorkspace').mockResolvedValue()

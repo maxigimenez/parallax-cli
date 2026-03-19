@@ -86,13 +86,11 @@ describe('CodexAdapter plan mode', () => {
 
   it('builds codex execution command with model and extra args', async () => {
     const mockExecutor = {
-      executeCommand: vi
-        .fn()
-        .mockResolvedValue({
-          exitCode: 0,
-          output:
-            'done\nPARALLAX_PR_TITLE: Improve auth loading\nPARALLAX_PR_SUMMARY:\n- Updated auth flow',
-        }),
+      executeCommand: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        output:
+          'done\nPARALLAX_PR_TITLE: Improve auth loading\nPARALLAX_PR_SUMMARY:\n- Updated auth flow',
+      }),
     }
 
     const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
@@ -108,14 +106,7 @@ describe('CodexAdapter plan mode', () => {
 
     const command = mockExecutor.executeCommand.mock.calls[0][0]
     expect(command).toEqual(
-      expect.arrayContaining([
-        'codex',
-        'exec',
-        '--model',
-        'codex-fast',
-        '--full-auto',
-        '--',
-      ])
+      expect.arrayContaining(['codex', 'exec', '--model', 'codex-fast', '--full-auto', '--'])
     )
     expect(command[command.length - 1]).toContain('You are executing an implementation plan.')
     expect(result.prTitle).toBe('Improve auth loading')
@@ -124,9 +115,10 @@ describe('CodexAdapter plan mode', () => {
 
   it('extracts commit message for review execution output', async () => {
     const mockExecutor = {
-      executeCommand: vi
-        .fn()
-        .mockResolvedValue({ exitCode: 0, output: 'done\nPARALLAX_COMMIT_MESSAGE: Address review comments' }),
+      executeCommand: vi.fn().mockResolvedValue({
+        exitCode: 0,
+        output: 'done\nPARALLAX_COMMIT_MESSAGE: Address review comments',
+      }),
     }
 
     const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
@@ -144,7 +136,12 @@ describe('CodexAdapter plan mode', () => {
     }
 
     const adapter = new CodexAdapter(mockExecutor as any, mockLogger as any)
-    const task = { id: 'task-200', externalId: 'REV-200', title: 'Execution', description: 'Do work' } as any
+    const task = {
+      id: 'task-200',
+      externalId: 'REV-200',
+      title: 'Execution',
+      description: 'Do work',
+    } as any
     const project = { agent: {} } as any
 
     await adapter.runTask(task, '/tmp/repo', project, 'approved plan')

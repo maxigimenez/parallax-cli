@@ -416,7 +416,11 @@ export class CodexAdapter extends BaseAgentAdapter {
     ].join('\n')
   }
 
-  private buildExecutionPrompt(task: Task, approvedPlan?: string, outputMode: 'pr' | 'commit' = 'pr'): string {
+  private buildExecutionPrompt(
+    task: Task,
+    approvedPlan?: string,
+    outputMode: 'pr' | 'commit' = 'pr'
+  ): string {
     const base = `Task ID: ${task.externalId}\nTitle: ${task.title}\nDescription:\n${task.description}`
     const planLine = approvedPlan ? `\n\nApproved Plan:\n${approvedPlan}` : ''
     const outputInstruction =

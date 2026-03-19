@@ -329,7 +329,10 @@ export const dbService = {
   },
 
   resetExecutionAttempts(id: string) {
-    db.prepare('UPDATE tasks SET executionAttempts = 0, updatedAt = ? WHERE id = ?').run(Date.now(), id)
+    db.prepare('UPDATE tasks SET executionAttempts = 0, updatedAt = ? WHERE id = ?').run(
+      Date.now(),
+      id
+    )
   },
 
   clearTaskPullRequestInfo(id: string) {

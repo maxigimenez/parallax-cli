@@ -12,7 +12,11 @@ export function parseRetryMode(value: string | undefined): RetryMode {
   throw new Error(`Invalid retry mode '${value}'. Use 'full' or 'execution'.`)
 }
 
-export function parseNonNegativeInteger(value: string | undefined, label: string, defaultValue: number) {
+export function parseNonNegativeInteger(
+  value: string | undefined,
+  label: string,
+  defaultValue: number
+) {
   if (value === undefined) {
     return defaultValue
   }
@@ -25,7 +29,11 @@ export function parseNonNegativeInteger(value: string | undefined, label: string
   return parsed
 }
 
-export function parsePositiveInteger(value: string | undefined, label: string, defaultValue: number) {
+export function parsePositiveInteger(
+  value: string | undefined,
+  label: string,
+  defaultValue: number
+) {
   if (value === undefined) {
     return defaultValue
   }

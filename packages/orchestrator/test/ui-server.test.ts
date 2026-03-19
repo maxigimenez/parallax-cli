@@ -5,7 +5,10 @@ import path from 'node:path'
  * Tests for the path traversal prevention logic in the UI server.
  * We test the resolution logic directly rather than spinning up the server.
  */
-function resolveAndValidate(uiDistPath: string, requestPath: string): { ok: boolean; resolved?: string } {
+function resolveAndValidate(
+  uiDistPath: string,
+  requestPath: string
+): { ok: boolean; resolved?: string } {
   const normalized = requestPath.startsWith('/') ? requestPath.slice(1) : requestPath
   const decoded = decodeURIComponent(normalized)
   const uiRootResolved = path.resolve(uiDistPath)

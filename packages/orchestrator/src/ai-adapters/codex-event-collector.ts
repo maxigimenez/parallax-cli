@@ -129,9 +129,9 @@ export class CodexEventCollector {
   private emitBlock(args: {
     title: string
     message: string
-    kind: typeof TASK_LOG_KIND[keyof typeof TASK_LOG_KIND]
-    level?: typeof TASK_LOG_LEVEL[keyof typeof TASK_LOG_LEVEL]
-    source?: typeof TASK_LOG_SOURCE[keyof typeof TASK_LOG_SOURCE]
+    kind: (typeof TASK_LOG_KIND)[keyof typeof TASK_LOG_KIND]
+    level?: (typeof TASK_LOG_LEVEL)[keyof typeof TASK_LOG_LEVEL]
+    source?: (typeof TASK_LOG_SOURCE)[keyof typeof TASK_LOG_SOURCE]
   }) {
     this.logger.event({
       taskId: this.task.id,
@@ -145,7 +145,8 @@ export class CodexEventCollector {
 
   private handleCommandExecution(item: Record<string, unknown>) {
     const command = extractTextContent(item.command) ?? 'Command'
-    const output = extractTextContent(item.aggregated_output) ?? extractTextContent(item.output) ?? '(no output)'
+    const output =
+      extractTextContent(item.aggregated_output) ?? extractTextContent(item.output) ?? '(no output)'
     const exitCode =
       typeof item.exit_code === 'number'
         ? item.exit_code
@@ -297,7 +298,11 @@ export class CodexEventCollector {
       return
     }
 
-    if (lowerLine.includes('error') || lowerLine.includes('failed') || lowerLine.includes('fatal')) {
+    if (
+      lowerLine.includes('error') ||
+      lowerLine.includes('failed') ||
+      lowerLine.includes('fatal')
+    ) {
       this.emitBlock({
         title: 'Codex stderr',
         message: normalized,

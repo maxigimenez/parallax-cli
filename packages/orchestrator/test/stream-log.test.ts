@@ -23,7 +23,9 @@ describe('classifyAgentLogChunk', () => {
   })
 
   it('does not classify generic stderr chatter as hard errors', () => {
-    expect(classifyAgentLogChunk('Second line should be: SUMMARY: <one sentence>', 'stderr')).toEqual({
+    expect(
+      classifyAgentLogChunk('Second line should be: SUMMARY: <one sentence>', 'stderr')
+    ).toEqual({
       level: TASK_LOG_LEVEL.INFO,
       kind: TASK_LOG_KIND.AGENT_MESSAGE,
       source: TASK_LOG_SOURCE.AGENT,

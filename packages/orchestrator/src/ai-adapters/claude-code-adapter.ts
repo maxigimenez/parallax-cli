@@ -196,7 +196,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
 
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
-      onData: (chunk) => 
+      onData: (chunk) =>
         chunk.stream === 'stdout'
           ? collector.handleStdoutLine(chunk.line)
           : collector.handleStderrLine(chunk.line),
@@ -283,7 +283,8 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
         success: result.exitCode === 0,
         output: parsedOutput,
         ...extractExecutionMetadata(parsedOutput),
-        error: result.exitCode !== 0 ? `Claude Code exited with code ${result.exitCode}` : undefined,
+        error:
+          result.exitCode !== 0 ? `Claude Code exited with code ${result.exitCode}` : undefined,
       }
     } catch (error: any) {
       return { success: false, output: '', error: error.message }

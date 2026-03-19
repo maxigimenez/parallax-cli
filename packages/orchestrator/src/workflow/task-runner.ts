@@ -13,7 +13,12 @@ import {
   TASK_STATUS,
   TASK_REVIEW_STATE,
 } from '@parallax/common'
-import { BaseAgentAdapter, ClaudeCodeAdapter, CodexAdapter, GeminiAdapter } from '../ai-adapters/index.js'
+import {
+  BaseAgentAdapter,
+  ClaudeCodeAdapter,
+  CodexAdapter,
+  GeminiAdapter,
+} from '../ai-adapters/index.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitService } from '../git-service.js'
 import {
@@ -364,7 +369,10 @@ export async function processPullRequestReview(
         project,
         comments.map((comment) => comment.threadId)
       )
-      logger.success(`Resolved ${new Set(comments.map((comment) => comment.threadId)).size} review thread(s).`, task.id)
+      logger.success(
+        `Resolved ${new Set(comments.map((comment) => comment.threadId)).size} review thread(s).`,
+        task.id
+      )
     } catch (error: any) {
       logger.warn(`Pushed changes but could not resolve review threads: ${error.message}`, task.id)
     }
@@ -404,8 +412,4 @@ async function emitWorktreeDiffLogs(task: Task, gitService: GitService, worktree
   }
 }
 
-export {
-  isTaskExecutable,
-  normalizePlanState,
-  requiresPlan,
-}
+export { isTaskExecutable, normalizePlanState, requiresPlan }

@@ -86,7 +86,9 @@ export async function createApiServer(
     try {
       return await readOrchestratorErrors()
     } catch (error) {
-      return reply.status(500).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(500)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
@@ -96,7 +98,9 @@ export async function createApiServer(
       emitConfigUpdated()
       return { ok: true, projectCount: config.projects.length }
     } catch (error) {
-      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
@@ -116,7 +120,9 @@ export async function createApiServer(
         }),
       }
     } catch (error) {
-      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
@@ -131,7 +137,9 @@ export async function createApiServer(
     try {
       project = resolveTaskProject(getConfig(), task.projectId)
     } catch (error) {
-      return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(404)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     const liveWorktree = activeWorktrees.get(task.id)
@@ -164,7 +172,9 @@ export async function createApiServer(
     try {
       project = resolveTaskProject(getConfig(), task.projectId)
     } catch (error) {
-      return reply.status(404).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(404)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     const liveWorktree = activeWorktrees.get(task.id)
@@ -257,7 +267,9 @@ export async function createApiServer(
     try {
       mode = parseRetryMode(rawMode)
     } catch (error) {
-      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
 
     if (mode === 'execution') {
@@ -330,7 +342,9 @@ export async function createApiServer(
         prNumber: queued.prNumber,
       })
     } catch (error) {
-      return reply.status(400).send({ error: error instanceof Error ? error.message : String(error) })
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 

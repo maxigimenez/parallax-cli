@@ -46,7 +46,9 @@ function extractPrSummary(output: string) {
   return normalized || undefined
 }
 
-export function extractExecutionMetadata(output: string): Pick<AgentResult, 'prTitle' | 'prSummary' | 'commitMessage'> {
+export function extractExecutionMetadata(
+  output: string
+): Pick<AgentResult, 'prTitle' | 'prSummary' | 'commitMessage'> {
   const titleMatch = output.match(/PARALLAX_PR_TITLE:\s*(.+)/i)
   const commitMessageMatch = output.match(/PARALLAX_COMMIT_MESSAGE:\s*(.+)/i)
 

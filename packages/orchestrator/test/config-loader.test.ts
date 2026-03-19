@@ -221,8 +221,6 @@ describe('config-loader', () => {
     process.env.PARALLAX_DATA_DIR = dataDir
     process.chdir(root)
 
-    await expect(loadConfig()).rejects.toThrow(
-      'project.agent for "test" in'
-    )
+    await expect(loadConfig()).rejects.toThrow('project.agent for "test" in')
   })
 })

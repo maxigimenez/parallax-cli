@@ -6,8 +6,8 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
-    "lint": "pnpm exec eslint .",
-    "lint:fix": "pnpm exec eslint . --fix",
+    "lint": "pnpm --filter './packages/*' -r lint && pnpm exec eslint eslint.config.js",
+    "lint:fix": "pnpm --filter './packages/*' -r lint:fix && pnpm exec eslint eslint.config.js --fix",
     "parallax": "NODE_ENV=dev pnpm --filter parallax-cli start",
     "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
     "release:pack": "pnpm --filter parallax-cli pack:tarball",

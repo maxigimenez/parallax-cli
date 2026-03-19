@@ -20,6 +20,8 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc",
+    "lint": "eslint src test scripts vitest.config.ts",
+    "lint:fix": "eslint src test scripts vitest.config.ts --fix",
     "prepack": "node ./scripts/prepare-package.mjs",
     "postpack": "node ./scripts/restore-workspace-links.mjs",
     "pack:check": "npm_config_cache=.npm-cache npm pack --dry-run",

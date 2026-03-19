@@ -89,8 +89,7 @@ export function parseStartOptions(args: string[]): StartCommandOptions {
   const apiPort = parseStrictPort(args, 'server-api-port', 3000)
   const uiPort = parseStrictPort(args, 'server-ui-port', 8080)
   const rawConcurrency = parseOptionalArg(args, 'concurrency')
-  const concurrency =
-    rawConcurrency === undefined ? 2 : Number.parseInt(rawConcurrency, 10)
+  const concurrency = rawConcurrency === undefined ? 2 : Number.parseInt(rawConcurrency, 10)
 
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16) {
     throw new Error('--concurrency must be an integer between 1 and 16.')
@@ -260,15 +259,13 @@ export function parseRegisterOptions(
     throw new Error('parallax unregister does not accept flags.')
   }
 
-  const positionalArgs = args
-    .slice(1)
-    .filter((entry, index, entries) => {
-      const previous = entries[index - 1]
-      if (previous === '--env-file') {
-        return false
-      }
-      return !entry.startsWith('--')
-    })
+  const positionalArgs = args.slice(1).filter((entry, index, entries) => {
+    const previous = entries[index - 1]
+    if (previous === '--env-file') {
+      return false
+    }
+    return !entry.startsWith('--')
+  })
   if (positionalArgs.length > 0) {
     throw new Error(`parallax ${command} accepts exactly one <config-file>.`)
   }

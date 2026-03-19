@@ -20,7 +20,9 @@ async function reloadRunningRuntime(context: CliContext) {
   })
   if (!response.ok) {
     const payload = (await response.json().catch(() => undefined)) as { error?: string } | undefined
-    throw new Error(payload?.error ?? `Failed to reload running Parallax instance (${response.status}).`)
+    throw new Error(
+      payload?.error ?? `Failed to reload running Parallax instance (${response.status}).`
+    )
   }
 
   return true

@@ -40,7 +40,9 @@ describe('parseNonNegativeInteger', () => {
   })
 
   it('throws for negative values', () => {
-    expect(() => parseNonNegativeInteger('-1', 'since', 0)).toThrow('since must be a non-negative integer')
+    expect(() => parseNonNegativeInteger('-1', 'since', 0)).toThrow(
+      'since must be a non-negative integer'
+    )
   })
 
   it('throws for non-numeric strings', () => {
@@ -64,7 +66,9 @@ describe('parsePositiveInteger', () => {
   })
 
   it('throws for zero', () => {
-    expect(() => parsePositiveInteger('0', 'limit', 200)).toThrow('limit must be a positive integer')
+    expect(() => parsePositiveInteger('0', 'limit', 200)).toThrow(
+      'limit must be a positive integer'
+    )
   })
 
   it('throws for negative values', () => {

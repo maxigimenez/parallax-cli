@@ -1,12 +1,6 @@
 import fs from 'node:fs/promises'
 import dotenv from 'dotenv'
-import {
-  Task,
-  Logger,
-  ProjectConfig,
-  AgentResult,
-  PlanResult,
-} from '@parallax/common'
+import { Task, Logger, ProjectConfig, AgentResult, PlanResult } from '@parallax/common'
 import { LocalExecutor } from '@parallax/common/executor'
 
 export abstract class BaseAgentAdapter {
@@ -21,7 +15,9 @@ export abstract class BaseAgentAdapter {
     this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
   }
 
-  protected async resolveProjectEnv(project: ProjectConfig): Promise<Record<string, string> | undefined> {
+  protected async resolveProjectEnv(
+    project: ProjectConfig
+  ): Promise<Record<string, string> | undefined> {
     if (!project.envFilePath) {
       return undefined
     }

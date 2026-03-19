@@ -58,8 +58,8 @@ export class ClaudeCodeEventCollector {
   private emitBlock(args: {
     title: string
     message: string
-    kind: typeof TASK_LOG_KIND[keyof typeof TASK_LOG_KIND]
-    level?: typeof TASK_LOG_LEVEL[keyof typeof TASK_LOG_LEVEL]
+    kind: (typeof TASK_LOG_KIND)[keyof typeof TASK_LOG_KIND]
+    level?: (typeof TASK_LOG_LEVEL)[keyof typeof TASK_LOG_LEVEL]
   }) {
     this.logger.event({
       taskId: this.task.id,

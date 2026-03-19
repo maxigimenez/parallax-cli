@@ -116,7 +116,9 @@ describe('GET /tasks', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns empty array when no tasks', async () => {
     const res = await server.inject({ method: 'GET', url: '/tasks' })
@@ -132,7 +134,9 @@ describe('GET /logs', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns 200 with default params', async () => {
     const res = await server.inject({ method: 'GET', url: '/logs' })
@@ -162,7 +166,9 @@ describe('GET /tasks/:taskId/diff/files', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns 404 when task not found', async () => {
     const res = await server.inject({ method: 'GET', url: '/tasks/nonexistent/diff/files' })
@@ -180,7 +186,9 @@ describe('POST /tasks/:taskId/approve', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns 404 when task not found', async () => {
     vi.mocked(dbService.getTaskByLookup).mockReturnValue(null)
@@ -232,7 +240,9 @@ describe('POST /tasks/:taskId/retry', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns 404 when task not found', async () => {
     vi.mocked(dbService.getTaskByLookup).mockReturnValue(null)
@@ -250,9 +260,7 @@ describe('POST /tasks/:taskId/retry', () => {
   })
 
   it('returns 400 for invalid retry mode', async () => {
-    vi.mocked(dbService.getTaskByLookup).mockReturnValue(
-      makeTask({ status: TASK_STATUS.FAILED })
-    )
+    vi.mocked(dbService.getTaskByLookup).mockReturnValue(makeTask({ status: TASK_STATUS.FAILED }))
     const res = await server.inject({
       method: 'POST',
       url: '/tasks/task-1/retry',
@@ -272,7 +280,9 @@ describe('POST /tasks/:taskId/cancel', () => {
     server = await createApiServer(buildDependencies())
   })
 
-  afterEach(async () => { await server.close() })
+  afterEach(async () => {
+    await server.close()
+  })
 
   it('returns 404 when task not found', async () => {
     vi.mocked(dbService.getTaskByLookup).mockReturnValue(null)
