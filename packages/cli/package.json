@@ -65,5 +65,8 @@
   },
   "files": [
     "dist"
-  ]
+  ],
+  "repository": {
+    "url": "https://github.com/maxigimenez/parallax-cli"
+  }
 }
