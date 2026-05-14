@@ -159,7 +159,9 @@ describe('ClaudeCodeAdapter', () => {
 
   it('adds --resume flag when task.agentSessionId is set', async () => {
     const mockExecutor = {
-      executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
     }
     const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
     const task = {
@@ -182,7 +184,9 @@ describe('ClaudeCodeAdapter', () => {
 
   it('does not add --resume flag when task has no agentSessionId', async () => {
     const mockExecutor = {
-      executeCommand: vi.fn().mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
     }
     const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
     const task = { id: 't3', externalId: 'REV-502', title: 'Fresh', description: 'Desc' } as any

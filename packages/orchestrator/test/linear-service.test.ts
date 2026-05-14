@@ -69,9 +69,7 @@ describe('LinearService', () => {
       json: async () => ({
         data: {
           issues: {
-            nodes: [
-              { id: 'lin_2', identifier: 'TEST-2', title: 'No labels', description: null },
-            ],
+            nodes: [{ id: 'lin_2', identifier: 'TEST-2', title: 'No labels', description: null }],
           },
         },
       }),

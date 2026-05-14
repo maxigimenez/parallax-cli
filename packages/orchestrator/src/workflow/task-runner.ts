@@ -150,9 +150,7 @@ async function persistPlanResult(
     taskLifecycle.queue(task.id, 'Plan ready. Awaiting approval.')
     const updatedTask = dbService.getTaskById(task.id)
     if (updatedTask) {
-      const agentDef = config?.agents.find(
-        (a) => a.name === (project.agent.name ?? task.agentName)
-      )
+      const agentDef = config?.agents.find((a) => a.name === (project.agent.name ?? task.agentName))
       getSlackBot()
         ?.notify({ task: updatedTask, event: 'plan_ready', agentDef })
         .catch(() => {})
@@ -214,9 +212,7 @@ export async function processTask(
       dbService.updateAgentSessionId(task.id, result.sessionId)
     }
 
-    const agentDef = config?.agents.find(
-      (a) => a.name === (project.agent.name ?? task.agentName)
-    )
+    const agentDef = config?.agents.find((a) => a.name === (project.agent.name ?? task.agentName))
 
     if (result.success) {
       await emitWorktreeDiffLogs(task, gitService, worktreePath)
