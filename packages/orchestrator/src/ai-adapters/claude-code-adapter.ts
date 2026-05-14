@@ -221,7 +221,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     try {
       await this.setupWorkspace(task, workingDir)
-      const contextPrefix = await this.buildContextPrefix(project, task)
+      const contextPrefix = this.buildContextPrefix(project, task)
       const command = this.buildCommand(task, project, this.buildPlanPrompt(task, contextPrefix))
       const collector = new ClaudeCodeEventCollector(this.logger, task, 'plan')
       const result = await this.executeClaudeCommand(workingDir, project, command, collector)
@@ -269,7 +269,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
   ): Promise<AgentResult> {
     try {
       await this.setupWorkspace(task, workingDir)
-      const contextPrefix = await this.buildContextPrefix(project, task)
+      const contextPrefix = this.buildContextPrefix(project, task)
       const command = this.buildCommand(
         task,
         project,

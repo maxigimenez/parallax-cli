@@ -191,34 +191,6 @@ Use `agent.name` instead of `agent.provider` on a project entry:
 
 In this example, tickets labeled `ai-frontend` or `ai-security` are handled by the `reviewer` agent; all other tickets go to `developer`.
 
-## Agent memory
-
-Each named agent can have a persistent memory file at:
-
-```
-~/.parallax/agents/<name>/memory.md
-```
-
-The content of this file is prepended to every prompt sent to that agent. It is not reset between tasks. Use it to accumulate conventions, project decisions, and recurring context that you want the agent to remember across sessions.
-
-### Creating a memory file
-
-```bash
-mkdir -p ~/.parallax/agents/developer
-nano ~/.parallax/agents/developer/memory.md
-```
-
-Example content:
-
-```markdown
-## Conventions
-- This repo uses pnpm, not npm.
-- Always run `pnpm test` before committing.
-- SQLite migrations use the ensureColumn pattern, never DROP/recreate tables.
-```
-
-You can update this file at any time. The next task the agent handles will pick up the latest content.
-
 ## Slack bot integration
 
 ### The `slack:` top-level item

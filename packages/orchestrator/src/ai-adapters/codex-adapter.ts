@@ -294,7 +294,7 @@ export class CodexAdapter extends BaseAgentAdapter {
   }
 
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
-    const contextPrefix = await this.buildContextPrefix(project, task)
+    const contextPrefix = this.buildContextPrefix(project, task)
     const command = this.buildCommand(task, project, this.buildPlanPrompt(task, contextPrefix))
     const env = await this.resolveProjectEnv(project)
     const collector = new CodexEventCollector(this.logger, task, 'plan')
@@ -346,7 +346,7 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
-    const contextPrefix = await this.buildContextPrefix(project, task)
+    const contextPrefix = this.buildContextPrefix(project, task)
     const command = this.buildCommand(
       task,
       project,
