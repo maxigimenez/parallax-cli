@@ -237,6 +237,7 @@ export async function processTask(
       const prUrl = await gitService.createPullRequest(worktreePath, task, {
         prTitle: result.prTitle,
         prSummary: result.prSummary,
+        head: branchName,
       })
       const prNumberMatch = prUrl.match(/\/pull\/(\d+)/)
       if (prNumberMatch) {

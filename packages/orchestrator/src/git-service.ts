@@ -328,7 +328,7 @@ export class GitService {
   async createPullRequest(
     worktreePath: string,
     task: Task,
-    options?: { prTitle?: string; prSummary?: string }
+    options?: { prTitle?: string; prSummary?: string; head?: string }
   ): Promise<string> {
     await this.ensureManagedLabelExists(worktreePath)
 
@@ -346,27 +346,29 @@ export class GitService {
       task.description || 'No task description provided.',
     ].join('\n')
 
+    const ghArgs = [
+      'gh',
+      'pr',
+      'create',
+      '--title',
+      title,
+      '--body',
+      body,
+      '--base',
+      'main',
+      '--label',
+      PARALLAX_MANAGED_LABEL,
+    ]
+    if (options?.head) {
+      ghArgs.push('--head', options.head)
+    }
+
     // NOTE: Removed literal quotes from arguments because we use shell: false
-    const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'pr',
-        'create',
-        '--title',
-        title,
-        '--body',
-        body,
-        '--base',
-        'main',
-        '--label',
-        PARALLAX_MANAGED_LABEL,
-      ],
-      {
-        cwd: worktreePath,
-        // Force gh to use its own authenticated host session for PR creation.
-        env: { GITHUB_TOKEN: undefined, GH_TOKEN: undefined },
-      }
-    )
+    const result = await this.executor.executeCommand(ghArgs, {
+      cwd: worktreePath,
+      // Force gh to use its own authenticated host session for PR creation.
+      env: { GITHUB_TOKEN: undefined, GH_TOKEN: undefined },
+    })
 
     if (result.exitCode !== 0) {
       if (result.output.includes('Resource not accessible by personal access token')) {
