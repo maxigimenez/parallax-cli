@@ -7,6 +7,8 @@ This documentation is for people trying Parallax for the first time and running 
 - [Getting Started](./getting-started.md): install Parallax, start it, register your repo, and open the dashboard.
 - [Configuration Reference](./configuration.md): what goes in `parallax.yml` and how to register it.
 - [CLI Reference](./cli-reference.md): the day-to-day commands you will actually run.
+- [Task Lifecycle](./task-lifecycle.md): how Parallax processes tasks from pull to PR.
+- [Slack Bot](./slack-bot.md): connect Parallax to Slack for plan approvals and task notifications.
 - [Troubleshooting](./troubleshooting.md): fixes for common setup and runtime problems.
 
 ## What Parallax does

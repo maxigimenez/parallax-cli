@@ -294,7 +294,8 @@ export class CodexAdapter extends BaseAgentAdapter {
   }
 
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
-    const command = this.buildCommand(task, project, this.buildPlanPrompt(task))
+    const contextPrefix = await this.buildContextPrefix(project, task)
+    const command = this.buildCommand(task, project, this.buildPlanPrompt(task, contextPrefix))
     const env = await this.resolveProjectEnv(project)
     const collector = new CodexEventCollector(this.logger, task, 'plan')
 
@@ -345,10 +346,11 @@ export class CodexAdapter extends BaseAgentAdapter {
       }
     }
 
+    const contextPrefix = await this.buildContextPrefix(project, task)
     const command = this.buildCommand(
       task,
       project,
-      this.buildExecutionPrompt(task, approvedPlan, outputMode)
+      this.buildExecutionPrompt(task, approvedPlan, outputMode, contextPrefix)
     )
     const env = await this.resolveProjectEnv(project)
     const collector = new CodexEventCollector(this.logger, task, 'task')
@@ -381,8 +383,9 @@ export class CodexAdapter extends BaseAgentAdapter {
     }
   }
 
-  private buildPlanPrompt(task: Task): string {
+  private buildPlanPrompt(task: Task, contextPrefix?: string): string {
     return [
+      ...(contextPrefix ? [contextPrefix, ''] : []),
       'You are running plan mode for a coding task.',
       'Return plain text only (no JSON, no markdown code fences).',
       `First line must be exactly: STATUS: ${PlanResultStatus.PLAN_READY}|${PlanResultStatus.NEEDS_CLARIFICATION}|${PlanResultStatus.PLAN_FAILED}`,
@@ -419,7 +422,8 @@ export class CodexAdapter extends BaseAgentAdapter {
   private buildExecutionPrompt(
     task: Task,
     approvedPlan?: string,
-    outputMode: 'pr' | 'commit' = 'pr'
+    outputMode: 'pr' | 'commit' = 'pr',
+    contextPrefix?: string
   ): string {
     const base = `Task ID: ${task.externalId}\nTitle: ${task.title}\nDescription:\n${task.description}`
     const planLine = approvedPlan ? `\n\nApproved Plan:\n${approvedPlan}` : ''
@@ -433,6 +437,7 @@ export class CodexAdapter extends BaseAgentAdapter {
           ].join(' ')
 
     return [
+      ...(contextPrefix ? [contextPrefix, ''] : []),
       'You are executing an implementation plan.',
       'Only perform steps described in the approved plan and keep scope bounded.',
       'If blocked, return a short explanation and stop without guessing.',

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import dotenv from 'dotenv'
 import { Task, Logger, ProjectConfig, AgentResult, PlanResult } from '@parallax/common'
 import { LocalExecutor } from '@parallax/common/executor'
+import { readAgentMemory } from './agent-memory.js'
 
 export abstract class BaseAgentAdapter {
   private envFileCache = new Map<string, Record<string, string>>()
@@ -13,6 +14,23 @@ export abstract class BaseAgentAdapter {
 
   async setupWorkspace(task: Task, workingDir: string): Promise<void> {
     this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
+  }
+
+  protected async buildContextPrefix(project: ProjectConfig, task: Task): Promise<string> {
+    const parts: string[] = []
+
+    if (project.agent.systemPrompt) {
+      parts.push(project.agent.systemPrompt)
+    }
+
+    if (project.agent.name) {
+      const memory = await readAgentMemory(project.agent.name)
+      if (memory) {
+        parts.push(`## Agent Memory\n${memory}`)
+      }
+    }
+
+    return parts.join('\n\n')
   }
 
   protected async resolveProjectEnv(

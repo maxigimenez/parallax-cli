@@ -1,5 +1,6 @@
 import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
 import { createTaskId } from '../task-id.js'
+import type { TaskWithLabels } from '../github/service.js'
 
 type GraphqlResponse<T> = {
   data?: T
@@ -11,6 +12,7 @@ type IssueNode = {
   identifier: string
   title: string
   description?: string | null
+  labels?: { nodes: Array<{ name: string }> }
 }
 
 type WorkflowStateNode = {
@@ -53,7 +55,7 @@ export class LinearService {
     return body.data
   }
 
-  async fetchNewIssues(project: ProjectConfig): Promise<Task[]> {
+  async fetchNewIssues(project: ProjectConfig): Promise<TaskWithLabels[]> {
     if (project.pullFrom.provider !== PULL_PROVIDER.LINEAR) {
       return []
     }
@@ -83,6 +85,11 @@ export class LinearService {
               identifier
               title
               description
+              labels {
+                nodes {
+                  name
+                }
+              }
             }
           }
         }
@@ -97,6 +104,7 @@ export class LinearService {
       description: issue.description ?? '',
       status: TASK_STATUS.PENDING,
       projectId: project.id,
+      labels: issue.labels?.nodes.map((l) => l.name) ?? [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }))

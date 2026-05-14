@@ -30,11 +30,13 @@ Plan approval can be done from:
 
 - task dashboard plan section
 - CLI via `parallax pending --approve <id>`
+- Slack, by clicking the **Approve** button in the plan-ready message (requires the [Slack bot](./slack-bot.md) to be configured)
 
 Rejection:
 
 - dashboard
 - CLI via `parallax pending --reject <id>`
+- Slack, by clicking the **Reject** button in the plan-ready message
 
 ## 4. Execution phase
 

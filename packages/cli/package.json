@@ -37,6 +37,7 @@
     "@fastify/cors": "11.2.0",
     "@parallax/common": "workspace:*",
     "@parallax/orchestrator": "workspace:*",
+    "@parallax/slack": "workspace:*",
     "@parallax/ui": "workspace:*",
     "chalk": "4",
     "dotenv": "16.4.7",
@@ -53,6 +54,7 @@
   "bundleDependencies": [
     "@parallax/common",
     "@parallax/orchestrator",
+    "@parallax/slack",
     "@parallax/ui"
   ],
   "devDependencies": {

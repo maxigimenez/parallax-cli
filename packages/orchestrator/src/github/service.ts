@@ -3,10 +3,13 @@ import { HostExecutor } from '@parallax/common/executor'
 import { createTaskId } from '../task-id.js'
 import { parseGitHubIssueNumber, requireGitHubRepoDetails } from './repository.js'
 
+export type TaskWithLabels = Task & { labels: string[] }
+
 interface GitHubIssueSummary {
   number: number
   title: string
   body?: string | null
+  labels?: Array<{ name: string }>
 }
 
 export class GitHubService {
@@ -23,7 +26,7 @@ export class GitHubService {
       '--repo',
       `${owner}/${repo}`,
       '--json',
-      'number,title,body',
+      'number,title,body,labels',
       '--limit',
       '100',
     ]
@@ -41,7 +44,7 @@ export class GitHubService {
     return command
   }
 
-  async fetchNewIssues(project: ProjectConfig): Promise<Task[]> {
+  async fetchNewIssues(project: ProjectConfig): Promise<TaskWithLabels[]> {
     if (project.pullFrom.provider !== PULL_PROVIDER.GITHUB) {
       return []
     }
@@ -68,6 +71,7 @@ export class GitHubService {
       description: issue.body ?? '',
       status: TASK_STATUS.PENDING,
       projectId: project.id,
+      labels: issue.labels?.map((l) => l.name) ?? [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     }))

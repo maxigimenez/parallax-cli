@@ -83,6 +83,8 @@ ensureColumn('approvedBy', 'TEXT')
 ensureColumn('approvedAt', 'INTEGER')
 ensureColumn('executionAttempts', 'INTEGER DEFAULT 0')
 ensureColumn('lastAgent', 'TEXT')
+ensureColumn('agentName', 'TEXT')
+ensureColumn('agentSessionId', 'TEXT')
 
 const existingLogColumns = new Set(
   (db.prepare('PRAGMA table_info(task_logs)').all() as Array<{ name: string }>).map(
@@ -107,8 +109,8 @@ ensureLogColumn('title', 'TEXT')
 export const dbService = {
   saveTask(task: Task) {
     const upsert = db.prepare(`
-      INSERT INTO tasks (id, externalId, title, description, status, projectId, branchName, prUrl, prNumber, lastReviewEventAt, reviewState, planState, planMarkdown, planPrompt, planResult, approvedBy, approvedAt, executionAttempts, lastAgent, createdAt, updatedAt)
-      VALUES (@id, @externalId, @title, @description, @status, @projectId, @branchName, @prUrl, @prNumber, @lastReviewEventAt, @reviewState, @planState, @planMarkdown, @planPrompt, @planResult, @approvedBy, @approvedAt, @executionAttempts, @lastAgent, @createdAt, @updatedAt)
+      INSERT INTO tasks (id, externalId, title, description, status, projectId, branchName, prUrl, prNumber, lastReviewEventAt, reviewState, planState, planMarkdown, planPrompt, planResult, approvedBy, approvedAt, executionAttempts, lastAgent, agentName, agentSessionId, createdAt, updatedAt)
+      VALUES (@id, @externalId, @title, @description, @status, @projectId, @branchName, @prUrl, @prNumber, @lastReviewEventAt, @reviewState, @planState, @planMarkdown, @planPrompt, @planResult, @approvedBy, @approvedAt, @executionAttempts, @lastAgent, @agentName, @agentSessionId, @createdAt, @updatedAt)
       ON CONFLICT(externalId) DO UPDATE SET
         title=excluded.title,
         description=excluded.description,
@@ -121,6 +123,8 @@ export const dbService = {
         approvedAt=COALESCE(excluded.approvedAt, approvedAt),
         executionAttempts=COALESCE(excluded.executionAttempts, executionAttempts),
         lastAgent=COALESCE(excluded.lastAgent, lastAgent),
+        agentName=COALESCE(excluded.agentName, agentName),
+        agentSessionId=COALESCE(excluded.agentSessionId, agentSessionId),
         updatedAt=excluded.updatedAt
     `)
 
@@ -138,6 +142,8 @@ export const dbService = {
       approvedAt: null,
       executionAttempts: 0,
       lastAgent: task.lastAgent || null,
+      agentName: null,
+      agentSessionId: null,
       ...task,
     })
   },
@@ -353,10 +359,19 @@ export const dbService = {
           approvedBy = NULL,
           approvedAt = NULL,
           executionAttempts = 0,
+          agentSessionId = NULL,
           updatedAt = ?
         WHERE id = ?
       `
     ).run(TaskPlanState.PLAN_GENERATING, Date.now(), id)
+  },
+
+  updateAgentSessionId(id: string, sessionId: string) {
+    db.prepare('UPDATE tasks SET agentSessionId = ?, updatedAt = ? WHERE id = ?').run(
+      sessionId,
+      Date.now(),
+      id
+    )
   },
 
   listTaskLogs(options?: { since?: number; taskExternalId?: string; limit?: number }) {

@@ -154,7 +154,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
     return JSON.stringify(payload, null, 2)
   }
 
-  private buildPlanPrompt(task: Task): string {
+  private buildPlanPrompt(task: Task, contextPrefix?: string): string {
     const instructions = [
       'You are generating an implementation plan, not executing code.',
       'No tool usage is allowed in this pass.',
@@ -179,7 +179,8 @@ export class GeminiAdapter extends BaseAgentAdapter {
       `- Return ${PlanResultStatus.PLAN_FAILED} only when execution is impossible without unsafe assumptions.`,
     ]
 
-    return `\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nDescription:\n${task.description}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
+    const prefix = contextPrefix ? `${contextPrefix}\n\n` : ''
+    return `${prefix}\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nDescription:\n${task.description}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
   }
 
   private buildPlanPromptTemplate() {
@@ -192,7 +193,8 @@ export class GeminiAdapter extends BaseAgentAdapter {
   private constructExecutionPrompt(
     task: Task,
     approvedPlan?: string,
-    outputMode: 'pr' | 'commit' = 'pr'
+    outputMode: 'pr' | 'commit' = 'pr',
+    contextPrefix?: string
   ): string {
     const instructions = [
       'Implement only the plan that was approved. Do not expand scope.',
@@ -220,14 +222,16 @@ export class GeminiAdapter extends BaseAgentAdapter {
     ]
 
     const planHint = approvedPlan ? `\n\nApproved plan:\n${approvedPlan}` : ''
+    const prefix = contextPrefix ? `${contextPrefix}\n\n` : ''
 
-    return `\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nDescription:\n${task.description}${planHint}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
+    return `${prefix}\nTask ID: ${task.externalId}\nTitle: ${task.title}\n\nDescription:\n${task.description}${planHint}\n\nInstructions:\n${this.formatInstructions(instructions)}`.trim()
   }
 
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     try {
       await this.setupWorkspace(task, workingDir)
-      const prompt = this.buildPlanPrompt(task)
+      const contextPrefix = await this.buildContextPrefix(project, task)
+      const prompt = this.buildPlanPrompt(task, contextPrefix)
       const command = this.buildCommand(task, project, prompt)
       const env = await this.resolveProjectEnv(project)
       const result = await this.executor.executeCommand(command, {
@@ -266,11 +270,12 @@ export class GeminiAdapter extends BaseAgentAdapter {
   ): Promise<AgentResult> {
     try {
       await this.setupWorkspace(task, workingDir)
+      const contextPrefix = await this.buildContextPrefix(project, task)
       return this.executeAgent(
         task,
         workingDir,
         project,
-        this.constructExecutionPrompt(task, approvedPlan, outputMode),
+        this.constructExecutionPrompt(task, approvedPlan, outputMode, contextPrefix),
         outputMode === 'pr' || outputMode === 'commit'
       )
     } catch (error: any) {

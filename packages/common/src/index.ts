@@ -140,8 +140,23 @@ export interface Task {
   prNumber?: number
   lastReviewEventAt?: string
   reviewState?: TaskReviewState
+  agentName?: string
+  agentSessionId?: string
   createdAt: number
   updatedAt: number
+}
+
+export interface AgentDefinition {
+  name: string
+  provider: AgentProvider
+  model?: string
+  systemPrompt?: string
+}
+
+export interface SlackConfig {
+  botToken: string
+  appToken: string
+  channel: string
 }
 
 export interface ProjectConfig {
@@ -162,7 +177,10 @@ export interface ProjectConfig {
   agent: {
     provider: AgentProvider
     model?: string
+    name?: string
+    systemPrompt?: string
   }
+  agentLabels?: Record<string, string>
 }
 
 export interface ServerConfig {
@@ -176,8 +194,10 @@ export const DEFAULT_CONCURRENCY = 2
 
 export interface AppConfig {
   projects: ProjectConfig[]
+  agents: AgentDefinition[]
+  slack?: SlackConfig
   concurrency: number
-  logs: LogLevel[] // Replaces logLevel
+  logs: LogLevel[]
   server: ServerConfig
 }
 
@@ -189,6 +209,7 @@ export interface AgentResult {
   prSummary?: string
   commitMessage?: string
   planMarkdown?: string
+  sessionId?: string
 }
 
 export interface PlanResult {
@@ -199,6 +220,7 @@ export interface PlanResult {
   planPrompt?: string
   summary?: string
   error?: string
+  sessionId?: string
 }
 
 export interface Logger {
