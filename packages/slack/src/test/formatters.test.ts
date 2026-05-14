@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPlanApprovalMessage, buildEventMessage } from '../formatters'
+import { buildPlanApprovalMessage, buildEventMessage } from '../formatters.js'
 import type { AgentDefinition, Task } from '@parallax/common'
 
 const baseTask: Task = {

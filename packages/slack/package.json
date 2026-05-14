@@ -18,6 +18,6 @@
     "dist"
   ],
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/slack/src/index.js"
   }
 }

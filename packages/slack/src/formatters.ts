@@ -1,5 +1,5 @@
 import type { AgentDefinition, Task } from '@parallax/common'
-import type { Block, KnownBlock } from '@slack/bolt'
+import type { Block, KnownBlock } from '@slack/web-api'
 
 const MAX_PLAN_LENGTH = 2500
 const MAX_DESCRIPTION_LENGTH = 300
