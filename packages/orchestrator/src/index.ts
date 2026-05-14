@@ -4,7 +4,6 @@ import { dbService } from './database.js'
 import { GitService } from './git-service.js'
 import { BaseAgentAdapter } from './ai-adapters/index.js'
 import {
-  AppConfig,
   ProjectConfig,
   TASK_REVIEW_STATE,
   TASK_STATUS,

@@ -9,8 +9,6 @@ import {
   AppConfig,
   DEFAULT_API_PORT,
   DEFAULT_UI_PORT,
-  LOG_LEVEL,
-  LogLevel,
   PULL_PROVIDER,
   ProjectConfig,
   ServerConfig,
@@ -80,7 +78,6 @@ export async function loadConfig(): Promise<AppConfig> {
   return mergeConfigs(configs)
 }
 
-const ALLOWED_LOG_LEVELS: LogLevel[] = Object.values(LOG_LEVEL)
 const ALLOWED_AGENT_PROVIDERS = [
   AGENT_PROVIDER.CODEX,
   AGENT_PROVIDER.GEMINI,
@@ -115,25 +112,6 @@ function assertNoUnknownKeys(value: Record<string, unknown>, allowedKeys: string
   if (unknownKeys.length > 0) {
     throw new Error(`${label} contains unsupported fields: ${unknownKeys.join(', ')}.`)
   }
-}
-
-function parseLogs(raw: unknown, source: string): LogLevel[] {
-  if (raw === undefined) {
-    return ['info', 'success', 'warn', 'error']
-  }
-
-  if (!Array.isArray(raw)) {
-    throw new Error(`logs in ${source} must be an array.`)
-  }
-
-  const parsed = raw.map((entry) => assertNonEmptyString(entry, `logs entry in ${source}`))
-  for (const level of parsed) {
-    if (!ALLOWED_LOG_LEVELS.includes(level as LogLevel)) {
-      throw new Error(`Unsupported log level "${level}" in ${source}.`)
-    }
-  }
-
-  return [...new Set(parsed)] as LogLevel[]
 }
 
 function parseRuntimeConcurrency(): number {
@@ -257,7 +235,9 @@ function parseAgentDefinitions(raw: unknown, source: string): AgentDefinition[] 
       entry.provider,
       `agents[${index}].provider in ${source}`
     )
-    if (!ALLOWED_AGENT_PROVIDERS.includes(providerRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number])) {
+    if (
+      !ALLOWED_AGENT_PROVIDERS.includes(providerRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number])
+    ) {
       throw new Error(
         `Unsupported agent provider "${providerRaw}" for agent "${name}" in ${source}.`
       )
@@ -296,7 +276,9 @@ function parseAgentLabels(
   source: string,
   knownAgentNames: Set<string>
 ): Record<string, string> {
-  if (raw === undefined) return {}
+  if (raw === undefined) {
+    return {}
+  }
   assertObject(raw, `project.agentLabels for "${projectId}" in ${source}`)
   const result: Record<string, string> = {}
   for (const [label, agentName] of Object.entries(raw)) {
@@ -315,11 +297,7 @@ function parseAgentLabels(
   return result
 }
 
-function parseProject(
-  raw: unknown,
-  source: string,
-  agents: AgentDefinition[]
-): ProjectConfig {
+function parseProject(raw: unknown, source: string, agents: AgentDefinition[]): ProjectConfig {
   assertObject(raw, `project entry in ${source}`)
 
   const id = assertNonEmptyString(raw.id, `project.id in ${source}`)
@@ -354,7 +332,10 @@ function parseProject(
     `project.agent for "${id}" in ${source}`
   )
 
-  const agentName = assertOptionalString(agentRaw.name, `project.agent.name for "${id}" in ${source}`)
+  const agentName = assertOptionalString(
+    agentRaw.name,
+    `project.agent.name for "${id}" in ${source}`
+  )
   const knownAgentNames = new Set(agents.map((a) => a.name))
 
   let agentProvider: ProjectConfig['agent']['provider']
@@ -388,7 +369,10 @@ function parseProject(
       )
     }
     agentProvider = agentProviderRaw as ProjectConfig['agent']['provider']
-    agentModel = assertOptionalString(agentRaw.model, `project.agent.model for "${id}" in ${source}`)
+    agentModel = assertOptionalString(
+      agentRaw.model,
+      `project.agent.model for "${id}" in ${source}`
+    )
   }
 
   const agentLabels = parseAgentLabels(raw.agentLabels, id, source, knownAgentNames)

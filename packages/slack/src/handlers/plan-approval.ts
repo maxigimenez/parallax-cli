@@ -7,7 +7,10 @@ export function registerPlanApprovalHandlers(app: App, apiBaseUrl: string): void
     try {
       const res = await fetch(`${apiBaseUrl}/tasks/${taskId}/approve`, { method: 'POST' })
       if (!res.ok) {
-        await respond({ text: `Failed to approve plan for task ${taskId}: ${res.statusText}`, replace_original: false })
+        await respond({
+          text: `Failed to approve plan for task ${taskId}: ${res.statusText}`,
+          replace_original: false,
+        })
         return
       }
       await respond({ text: `✅ Plan approved for task \`${taskId}\`.`, replace_original: false })
@@ -22,7 +25,10 @@ export function registerPlanApprovalHandlers(app: App, apiBaseUrl: string): void
     try {
       const res = await fetch(`${apiBaseUrl}/tasks/${taskId}/reject`, { method: 'POST' })
       if (!res.ok) {
-        await respond({ text: `Failed to reject plan for task ${taskId}: ${res.statusText}`, replace_original: false })
+        await respond({
+          text: `Failed to reject plan for task ${taskId}: ${res.statusText}`,
+          replace_original: false,
+        })
         return
       }
       await respond({ text: `❌ Plan rejected for task \`${taskId}\`.`, replace_original: false })

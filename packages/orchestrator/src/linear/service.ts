@@ -1,4 +1,4 @@
-import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
+import { PULL_PROVIDER, TASK_STATUS, ProjectConfig } from '@parallax/common'
 import { createTaskId } from '../task-id.js'
 import type { TaskWithLabels } from '../github/service.js'
 

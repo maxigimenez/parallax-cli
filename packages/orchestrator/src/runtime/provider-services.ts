@@ -50,12 +50,14 @@ export async function fetchProjectTasks(
 export function resolveAgentNameForTask(
   taskLabels: string[],
   project: ProjectConfig,
-  config: AppConfig
+  _config: AppConfig
 ): string | undefined {
   if (project.agentLabels) {
     for (const label of taskLabels) {
       const agentName = project.agentLabels[label]
-      if (agentName) return agentName
+      if (agentName) {
+        return agentName
+      }
     }
   }
   return project.agent.name
@@ -67,10 +69,14 @@ export function resolveAgentForTask(
   config: AppConfig
 ): ProjectConfig {
   const agentName = task.agentName ?? project.agent.name
-  if (!agentName) return project
+  if (!agentName) {
+    return project
+  }
 
   const namedAgent = config.agents.find((a) => a.name === agentName)
-  if (!namedAgent) return project
+  if (!namedAgent) {
+    return project
+  }
 
   return {
     ...project,

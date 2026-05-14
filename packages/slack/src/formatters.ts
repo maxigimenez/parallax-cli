@@ -5,18 +5,28 @@ const MAX_PLAN_LENGTH = 2500
 const MAX_DESCRIPTION_LENGTH = 300
 
 function agentIdentityLine(agentDef?: AgentDefinition): string {
-  if (!agentDef) return 'Unknown agent'
+  if (!agentDef) {
+    return 'Unknown agent'
+  }
   const model = agentDef.model ? ` / ${agentDef.model}` : ''
   return `${agentDef.name} (${agentDef.provider}${model})`
 }
 
 function truncate(text: string, max: number): string {
-  if (text.length <= max) return text
+  if (text.length <= max) {
+    return text
+  }
   return `${text.slice(0, max)}… (truncated)`
 }
 
-export function buildPlanApprovalMessage(task: Task, agentDef?: AgentDefinition): (Block | KnownBlock)[] {
-  const description = truncate(task.description || 'No description provided.', MAX_DESCRIPTION_LENGTH)
+export function buildPlanApprovalMessage(
+  task: Task,
+  agentDef?: AgentDefinition
+): (Block | KnownBlock)[] {
+  const description = truncate(
+    task.description || 'No description provided.',
+    MAX_DESCRIPTION_LENGTH
+  )
   const planText = task.planMarkdown
     ? truncate(task.planMarkdown, MAX_PLAN_LENGTH)
     : 'No plan content available.'

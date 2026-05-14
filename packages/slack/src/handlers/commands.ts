@@ -57,7 +57,9 @@ export function registerSlashCommands(app: App, apiBaseUrl: string): void {
           break
         }
         default:
-          await respond(`Unknown subcommand \`${subcommand}\`. Use: retry | cancel | status | pr-review`)
+          await respond(
+            `Unknown subcommand \`${subcommand}\`. Use: retry | cancel | status | pr-review`
+          )
       }
     } catch (err: any) {
       await respond(`Error: ${err.message}`)
