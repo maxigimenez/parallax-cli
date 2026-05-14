@@ -28,11 +28,24 @@ describe('buildPlanApprovalMessage', () => {
     expect(header?.text?.text).toContain('claude-opus-4-5')
   })
 
-  it('includes task externalId and title in section fields', () => {
+  it('includes task externalId and title in the section block', () => {
     const blocks = buildPlanApprovalMessage(baseTask, agentDef)
     const json = JSON.stringify(blocks)
     expect(json).toContain('ORG/REPO#42')
     expect(json).toContain('Add rate limiting')
+  })
+
+  it('shows project before task in the section block', () => {
+    const blocks = buildPlanApprovalMessage(baseTask, agentDef)
+    const section = blocks.find((b: any) => b.type === 'section' && b.text) as any
+    const text: string = section?.text?.text ?? ''
+    expect(text.indexOf('my-repo')).toBeLessThan(text.indexOf('ORG/REPO#42'))
+  })
+
+  it('does not include description text', () => {
+    const blocks = buildPlanApprovalMessage(baseTask, agentDef)
+    const json = JSON.stringify(blocks)
+    expect(json).not.toContain('Protect the API from abuse')
   })
 
   it('includes Approve and Reject action buttons', () => {

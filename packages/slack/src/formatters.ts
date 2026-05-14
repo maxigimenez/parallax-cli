@@ -2,7 +2,6 @@ import type { AgentDefinition, Task } from '@parallax/common'
 import type { Block, KnownBlock } from '@slack/web-api'
 
 const MAX_PLAN_LENGTH = 2500
-const MAX_DESCRIPTION_LENGTH = 300
 
 function agentIdentityLine(agentDef?: AgentDefinition): string {
   if (!agentDef) {
@@ -35,10 +34,6 @@ export function buildPlanApprovalMessage(
   task: Task,
   agentDef?: AgentDefinition
 ): (Block | KnownBlock)[] {
-  const description = truncate(
-    task.description || 'No description provided.',
-    MAX_DESCRIPTION_LENGTH
-  )
   const planText = task.planMarkdown
     ? truncate(task.planMarkdown, MAX_PLAN_LENGTH)
     : 'No plan content available.'
@@ -54,11 +49,10 @@ export function buildPlanApprovalMessage(
     },
     {
       type: 'section',
-      fields: [
-        { type: 'mrkdwn', text: `*Task:* ${task.externalId} · ${task.title}` },
-        { type: 'mrkdwn', text: `*Project:* ${task.projectId}` },
-        { type: 'mrkdwn', text: `*Description:*\n${description}` },
-      ],
+      text: {
+        type: 'mrkdwn',
+        text: `*Project:* ${task.projectId}\n*Task:* ${task.externalId} · ${task.title}`,
+      },
     },
     { type: 'divider' },
     {

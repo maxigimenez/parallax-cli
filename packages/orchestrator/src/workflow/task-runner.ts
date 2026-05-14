@@ -162,7 +162,15 @@ async function persistPlanResult(
     return
   }
 
-  taskLifecycle.fail(task.id, planResult.error ?? 'Plan generation failed')
+  const failMessage = planResult.error ?? 'Plan generation failed'
+  taskLifecycle.fail(task.id, failMessage)
+  const failedTask = dbService.getTaskById(task.id)
+  if (failedTask) {
+    const agentDef = config?.agents.find((a) => a.name === (project.agent.name ?? task.agentName))
+    getSlackBot()
+      ?.notify({ task: failedTask, event: 'failed', agentDef, extra: failMessage })
+      .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
+  }
 }
 
 export async function processTask(
@@ -281,8 +289,16 @@ export async function processTask(
       return
     }
 
-    logger.error(`Critical error: ${error.message}`, task.id)
-    taskLifecycle.fail(task.id, `Critical error: ${error.message}`)
+    const criticalMsg = `Critical error: ${error.message}`
+    logger.error(criticalMsg, task.id)
+    taskLifecycle.fail(task.id, criticalMsg)
+    const failedTask = dbService.getTaskById(task.id)
+    if (failedTask) {
+      const agentDef = config?.agents.find((a) => a.name === (project.agent.name ?? task.agentName))
+      getSlackBot()
+        ?.notify({ task: failedTask, event: 'failed', agentDef, extra: error.message })
+        .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
+    }
   } finally {
     activeWorktrees.delete(task.id)
     if (worktreePath) {
