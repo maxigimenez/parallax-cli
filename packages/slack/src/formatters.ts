@@ -19,6 +19,18 @@ function truncate(text: string, max: number): string {
   return `${text.slice(0, max)}… (truncated)`
 }
 
+function markdownToMrkdwn(text: string): string {
+  return (
+    text
+      // Headers → bold line
+      .replace(/^#{1,6}\s+(.+)$/gm, '*$1*')
+      // **bold** → *bold*
+      .replace(/\*\*(.+?)\*\*/gs, '*$1*')
+      // [text](url) → <url|text>
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<$2|$1>')
+  )
+}
+
 export function buildPlanApprovalMessage(
   task: Task,
   agentDef?: AgentDefinition
@@ -53,7 +65,7 @@ export function buildPlanApprovalMessage(
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Proposed Plan*\n\`\`\`\n${planText}\n\`\`\``,
+        text: `*Proposed Plan*\n${markdownToMrkdwn(planText)}`,
       },
     },
     {

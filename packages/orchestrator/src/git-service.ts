@@ -10,6 +10,10 @@ import {
   sanitizeCommitMessage,
 } from './ai-adapters/execution-metadata.js'
 
+function sanitizeBranchName(name: string): string {
+  return name.replace(/[#\s]/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '')
+}
+
 export class GitService {
   constructor(private executor: HostExecutor) {}
 
@@ -281,20 +285,33 @@ export class GitService {
     options?: { commitMessage?: string }
   ): Promise<string | null> {
     const git: SimpleGit = simpleGit(worktreePath)
-    const remoteBranchName = task.branchName || `task/${task.externalId.toLowerCase()}`
+    const remoteBranchName =
+      task.branchName || sanitizeBranchName(`task/${task.externalId.toLowerCase()}`)
 
     const status = await git.status()
-    if (status.isClean()) {
+    if (!status.isClean()) {
+      await git.add('.')
+      await git.commit(
+        sanitizeCommitMessage(options?.commitMessage) ??
+          buildDefaultCommitMessage(task.externalId, task.title)
+      )
+    }
+
+    // Push if there are local commits ahead of origin/main (covers agent self-commits)
+    let hasCommitsToPush = false
+    try {
+      const log = await git.log(['origin/main..HEAD'])
+      hasCommitsToPush = log.total > 0
+    } catch {
+      // Can't compare (e.g. fresh repo) — attempt push anyway
+      hasCommitsToPush = true
+    }
+
+    if (!hasCommitsToPush) {
       return null
     }
 
-    await git.add('.')
-    await git.commit(
-      sanitizeCommitMessage(options?.commitMessage) ??
-        buildDefaultCommitMessage(task.externalId, task.title)
-    )
     await git.raw(['push', 'origin', `HEAD:${remoteBranchName}`, '--set-upstream'])
-
     return remoteBranchName
   }
 

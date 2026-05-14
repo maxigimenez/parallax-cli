@@ -1,7 +1,7 @@
 import type { App } from '@slack/bolt'
 
 export function registerPlanApprovalHandlers(app: App, apiBaseUrl: string): void {
-  app.action('plan_approve', async ({ action, ack, respond }) => {
+  app.action('plan_approve', async ({ action, ack, respond, body }) => {
     await ack()
     const taskId = (action as { value: string }).value
     try {
@@ -13,13 +13,25 @@ export function registerPlanApprovalHandlers(app: App, apiBaseUrl: string): void
         })
         return
       }
-      await respond({ text: `✅ Plan approved for task \`${taskId}\`.`, replace_original: false })
+      const originalBlocks = ((body as any).message?.blocks ?? []).filter(
+        (b: any) => b.type !== 'actions'
+      )
+      await respond({
+        replace_original: true,
+        blocks: [
+          ...originalBlocks,
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: `✅ *Plan approved*` },
+          },
+        ],
+      })
     } catch (err: any) {
       await respond({ text: `Error approving plan: ${err.message}`, replace_original: false })
     }
   })
 
-  app.action('plan_reject', async ({ action, ack, respond }) => {
+  app.action('plan_reject', async ({ action, ack, respond, body }) => {
     await ack()
     const taskId = (action as { value: string }).value
     try {
@@ -31,7 +43,19 @@ export function registerPlanApprovalHandlers(app: App, apiBaseUrl: string): void
         })
         return
       }
-      await respond({ text: `❌ Plan rejected for task \`${taskId}\`.`, replace_original: false })
+      const originalBlocks = ((body as any).message?.blocks ?? []).filter(
+        (b: any) => b.type !== 'actions'
+      )
+      await respond({
+        replace_original: true,
+        blocks: [
+          ...originalBlocks,
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: `❌ *Plan rejected*` },
+          },
+        ],
+      })
     } catch (err: any) {
       await respond({ text: `Error rejecting plan: ${err.message}`, replace_original: false })
     }
