@@ -153,7 +153,7 @@ async function persistPlanResult(
       const agentDef = config?.agents.find((a) => a.name === (project.agent.name ?? task.agentName))
       getSlackBot()
         ?.notify({ task: updatedTask, event: 'plan_ready', agentDef })
-        .catch(() => {})
+        .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
     }
     return
   }
@@ -222,7 +222,7 @@ export async function processTask(
         taskLifecycle.fail(task.id, 'No changes made by agent.')
         getSlackBot()
           ?.notify({ task, event: 'failed', agentDef, extra: 'No changes made by agent.' })
-          .catch(() => {})
+          .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
         return
       }
 
@@ -249,7 +249,7 @@ export async function processTask(
       if (completedTask) {
         getSlackBot()
           ?.notify({ task: completedTask, event: 'pr_created', agentDef, extra: prUrl })
-          .catch(() => {})
+          .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
       }
       return
     }
@@ -273,7 +273,7 @@ export async function processTask(
     taskLifecycle.fail(task.id, `Agent failed: ${result.error}`)
     getSlackBot()
       ?.notify({ task, event: 'failed', agentDef, extra: result.error })
-      .catch(() => {})
+      .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
   } catch (error: any) {
     if (error instanceof TaskCanceledError) {
       taskLifecycle.cancel(task.id, 'Task canceled before completion.')

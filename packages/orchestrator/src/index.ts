@@ -353,13 +353,18 @@ async function main() {
   )
 
   if (runtimeConfig.slack) {
-    const { SlackBot } = await import('@parallax/slack')
-    const bot = new SlackBot({
-      config: runtimeConfig.slack,
-      apiBaseUrl: `http://127.0.0.1:${runtimeConfig.server.apiPort}`,
-    })
-    await bot.start()
-    setSlackBot(bot)
+    try {
+      const { SlackBot } = await import('@parallax/slack')
+      const bot = new SlackBot({
+        config: runtimeConfig.slack,
+        apiBaseUrl: `http://127.0.0.1:${runtimeConfig.server.apiPort}`,
+      })
+      await bot.start()
+      setSlackBot(bot)
+      logger.info(`Slack bot connected (channel: ${runtimeConfig.slack.channel})`)
+    } catch (err: any) {
+      logger.error(`Slack bot failed to start: ${err?.message ?? err}`)
+    }
   }
 
   while (true) {
