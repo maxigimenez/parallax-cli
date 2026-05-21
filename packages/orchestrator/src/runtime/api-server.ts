@@ -33,6 +33,16 @@ type ApiServerDependencies = {
   activeWorktrees: Map<string, string>
 }
 
+function sanitizeConfigForApi(config: AppConfig): AppConfig {
+  if (!config.slack) {
+    return config
+  }
+  return {
+    ...config,
+    slack: { ...config.slack, botToken: '***', appToken: '***' },
+  }
+}
+
 function resolveTaskProject(config: AppConfig, projectId: string) {
   const project = config.projects.find((candidate) => candidate.id === projectId)
   if (!project) {
@@ -80,7 +90,7 @@ export async function createApiServer(
       .map((task) => serializeTaskForApi(task))
   )
 
-  fastify.get('/config', async () => getConfig())
+  fastify.get('/config', async () => sanitizeConfigForApi(getConfig()))
 
   fastify.get('/runtime/errors', async (_request, reply) => {
     try {

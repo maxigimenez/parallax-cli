@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@parallax/common": "workspace:*",
+    "@parallax/slack": "workspace:*",
     "@fastify/cors": "11.2.0",
     "chalk": "4",
     "dotenv": "16.4.7",

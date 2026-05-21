@@ -16,6 +16,7 @@ describe('GitHubService', () => {
           number: 27,
           title: 'Fix dashboard refresh',
           body: 'Description',
+          labels: [{ name: 'ai-ready' }],
         },
       ]),
     })
@@ -48,7 +49,7 @@ describe('GitHubService', () => {
         '--repo',
         'org/repo',
         '--json',
-        'number,title,body',
+        'number,title,body,labels',
         '--limit',
         '100',
         '--state',
@@ -58,6 +59,49 @@ describe('GitHubService', () => {
       ],
       { cwd: '/tmp/repo' }
     )
+  })
+
+  it('maps issue labels to the task labels array', async () => {
+    executeCommandMock.mockResolvedValue({
+      exitCode: 0,
+      output: JSON.stringify([
+        {
+          number: 42,
+          title: 'Add rate limiting',
+          body: 'Desc',
+          labels: [{ name: 'ai-ready' }, { name: 'ai-frontend' }],
+        },
+      ]),
+    })
+
+    const service = new GitHubService({ executeCommand: executeCommandMock } as any)
+    const project = {
+      id: 'p1',
+      workspaceDir: '/tmp/repo',
+      pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+    } as any
+
+    const tasks = await service.fetchNewIssues(project)
+
+    expect(tasks[0].labels).toEqual(['ai-ready', 'ai-frontend'])
+  })
+
+  it('maps tasks with no labels to an empty array', async () => {
+    executeCommandMock.mockResolvedValue({
+      exitCode: 0,
+      output: JSON.stringify([{ number: 5, title: 'No labels', body: '' }]),
+    })
+
+    const service = new GitHubService({ executeCommand: executeCommandMock } as any)
+    const project = {
+      id: 'p1',
+      workspaceDir: '/tmp/repo',
+      pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+    } as any
+
+    const tasks = await service.fetchNewIssues(project)
+
+    expect(tasks[0].labels).toEqual([])
   })
 
   it('should comment when a GitHub task starts', async () => {

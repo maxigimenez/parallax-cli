@@ -14,6 +14,8 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 - Global runtime state under `~/.parallax`.
 - CLI control plane plus dashboard UI.
 - Codex, Gemini, and Claude Code adapters (configurable per project).
+- Named agents with system prompts and per-label routing.
+- Slack bot for plan approvals and task notifications (Socket Mode, no public URL needed).
 
 ## Requirements
 
@@ -49,9 +51,28 @@ pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 pnpm parallax register ./parallax.yml --env-file ./.env
 ```
 
-`parallax.yml` is a YAML array of project entries:
+`parallax.yml` is a YAML array. Items are distinguished by key — you can define named agents, a Slack integration, and one or more project entries:
 
 ```yaml
+# Optional: named agent personalities
+- agents:
+    - name: developer
+      provider: claude-code
+      model: claude-opus-4-5
+      systemPrompt: |
+        You are a senior backend engineer. Prioritize correctness and minimal diffs.
+        Always run existing tests before submitting.
+    - name: reviewer
+      provider: codex
+      model: o3
+
+# Optional: Slack bot integration
+- slack:
+    botToken: xoxb-your-bot-token
+    appToken: xapp-your-app-level-token
+    channel: "#ai-tasks"
+
+# Project entries
 - id: example-repo
   workspaceDir: /absolute/path/to/your/repo
   pullFrom:
@@ -62,9 +83,18 @@ pnpm parallax register ./parallax.yml --env-file ./.env
       state: open
       labels: [ai-ready]
   agent:
-    provider: codex
-    model: gpt-5.4
+    name: developer
+  agentLabels:
+    ai-frontend: reviewer
 ```
+
+Projects that do not use named agents can still specify `agent.provider` directly — the old format continues to work unchanged.
+
+## Slack bot
+
+Parallax can connect to a Slack workspace using Bolt Socket Mode. When configured, it posts plan-ready notifications with Approve and Reject buttons directly in Slack, posts PR and failure events, and responds to a `/parallax` slash command for retry, cancel, status, and pr-review. Because Socket Mode uses an outbound WebSocket, no public URL is required — it works on localhost and behind NAT.
+
+See [docs/slack-bot.md](docs/slack-bot.md) for the full setup guide.
 
 ## CLI
 

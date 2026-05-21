@@ -48,6 +48,7 @@ function extractTextContent(value: unknown): string | undefined {
 
 export class ClaudeCodeEventCollector {
   private finalMessage: string | undefined
+  private sessionId: string | undefined
 
   constructor(
     private logger: Logger,
@@ -174,6 +175,7 @@ export class ClaudeCodeEventCollector {
           if (!sessionId) {
             return
           }
+          this.sessionId = sessionId
           this.emitBlock({
             title: 'Claude session',
             message: `Session started: ${sessionId}`,
@@ -235,6 +237,7 @@ export class ClaudeCodeEventCollector {
   getResult() {
     return {
       finalMessage: this.finalMessage,
+      sessionId: this.sessionId,
     }
   }
 }

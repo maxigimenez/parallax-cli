@@ -1,7 +1,9 @@
-import { PULL_PROVIDER, ProjectConfig, Task } from '@parallax/common'
+import { PULL_PROVIDER, ProjectConfig, Task, AppConfig } from '@parallax/common'
 import { HostExecutor } from '@parallax/common/executor'
-import { GitHubService } from '../github/service.js'
+import { GitHubService, TaskWithLabels } from '../github/service.js'
 import { LinearService } from '../linear/service.js'
+
+export type { TaskWithLabels }
 
 export type ExternalServices = {
   linearService?: LinearService
@@ -28,7 +30,7 @@ function getPullProvider(project: ProjectConfig) {
 export async function fetchProjectTasks(
   project: ProjectConfig,
   services: ExternalServices
-): Promise<Task[]> {
+): Promise<TaskWithLabels[]> {
   const provider = getPullProvider(project)
 
   if (provider === PULL_PROVIDER.LINEAR) {
@@ -43,6 +45,48 @@ export async function fetchProjectTasks(
   }
 
   return services.githubService.fetchNewIssues(project)
+}
+
+export function resolveAgentNameForTask(
+  taskLabels: string[],
+  project: ProjectConfig,
+  _config: AppConfig
+): string | undefined {
+  if (project.agentLabels) {
+    for (const label of taskLabels) {
+      const agentName = project.agentLabels[label]
+      if (agentName) {
+        return agentName
+      }
+    }
+  }
+  return project.agent.name
+}
+
+export function resolveAgentForTask(
+  task: Task,
+  project: ProjectConfig,
+  config: AppConfig
+): ProjectConfig {
+  const agentName = task.agentName ?? project.agent.name
+  if (!agentName) {
+    return project
+  }
+
+  const namedAgent = config.agents.find((a) => a.name === agentName)
+  if (!namedAgent) {
+    return project
+  }
+
+  return {
+    ...project,
+    agent: {
+      provider: namedAgent.provider,
+      model: project.agent.model ?? namedAgent.model,
+      name: agentName,
+      systemPrompt: namedAgent.systemPrompt,
+    },
+  }
 }
 
 export async function markTaskInProgress(

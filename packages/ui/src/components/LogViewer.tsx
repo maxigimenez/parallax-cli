@@ -25,6 +25,7 @@ import {
   FileText,
   GitBranch,
   GitPullRequest,
+  Hash,
   Info,
   LoaderCircle,
   Logs,
@@ -431,6 +432,13 @@ export function LogViewer({
                     <SummaryMetaChip label="Used AI" value={taskMetadata.usedAi} icon={Bot} />
                     {taskMetadata.model ? (
                       <SummaryMetaChip label="Model" value={taskMetadata.model} icon={Sparkles} />
+                    ) : null}
+                    {config?.slack ? (
+                      <SummaryMetaChip
+                        label="Slack channel"
+                        value={config.slack.channel}
+                        icon={Hash}
+                      />
                     ) : null}
                   </div>
                 </section>

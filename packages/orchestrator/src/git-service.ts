@@ -10,6 +10,10 @@ import {
   sanitizeCommitMessage,
 } from './ai-adapters/execution-metadata.js'
 
+function sanitizeBranchName(name: string): string {
+  return name.replace(/[#\s]/g, '-').replace(/-{2,}/g, '-').replace(/^-|-$/g, '')
+}
+
 export class GitService {
   constructor(private executor: HostExecutor) {}
 
@@ -281,20 +285,33 @@ export class GitService {
     options?: { commitMessage?: string }
   ): Promise<string | null> {
     const git: SimpleGit = simpleGit(worktreePath)
-    const remoteBranchName = task.branchName || `task/${task.externalId.toLowerCase()}`
+    const remoteBranchName =
+      task.branchName || sanitizeBranchName(`task/${task.externalId.toLowerCase()}`)
 
     const status = await git.status()
-    if (status.isClean()) {
+    if (!status.isClean()) {
+      await git.add('.')
+      await git.commit(
+        sanitizeCommitMessage(options?.commitMessage) ??
+          buildDefaultCommitMessage(task.externalId, task.title)
+      )
+    }
+
+    // Push if there are local commits ahead of origin/main (covers agent self-commits)
+    let hasCommitsToPush = false
+    try {
+      const log = await git.log(['origin/main..HEAD'])
+      hasCommitsToPush = log.total > 0
+    } catch {
+      // Can't compare (e.g. fresh repo) — attempt push anyway
+      hasCommitsToPush = true
+    }
+
+    if (!hasCommitsToPush) {
       return null
     }
 
-    await git.add('.')
-    await git.commit(
-      sanitizeCommitMessage(options?.commitMessage) ??
-        buildDefaultCommitMessage(task.externalId, task.title)
-    )
     await git.raw(['push', 'origin', `HEAD:${remoteBranchName}`, '--set-upstream'])
-
     return remoteBranchName
   }
 
@@ -311,7 +328,7 @@ export class GitService {
   async createPullRequest(
     worktreePath: string,
     task: Task,
-    options?: { prTitle?: string; prSummary?: string }
+    options?: { prTitle?: string; prSummary?: string; head?: string }
   ): Promise<string> {
     await this.ensureManagedLabelExists(worktreePath)
 
@@ -329,27 +346,29 @@ export class GitService {
       task.description || 'No task description provided.',
     ].join('\n')
 
+    const ghArgs = [
+      'gh',
+      'pr',
+      'create',
+      '--title',
+      title,
+      '--body',
+      body,
+      '--base',
+      'main',
+      '--label',
+      PARALLAX_MANAGED_LABEL,
+    ]
+    if (options?.head) {
+      ghArgs.push('--head', options.head)
+    }
+
     // NOTE: Removed literal quotes from arguments because we use shell: false
-    const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'pr',
-        'create',
-        '--title',
-        title,
-        '--body',
-        body,
-        '--base',
-        'main',
-        '--label',
-        PARALLAX_MANAGED_LABEL,
-      ],
-      {
-        cwd: worktreePath,
-        // Force gh to use its own authenticated host session for PR creation.
-        env: { GITHUB_TOKEN: undefined, GH_TOKEN: undefined },
-      }
-    )
+    const result = await this.executor.executeCommand(ghArgs, {
+      cwd: worktreePath,
+      // Force gh to use its own authenticated host session for PR creation.
+      env: { GITHUB_TOKEN: undefined, GH_TOKEN: undefined },
+    })
 
     if (result.exitCode !== 0) {
       if (result.output.includes('Resource not accessible by personal access token')) {

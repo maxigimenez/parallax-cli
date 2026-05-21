@@ -15,6 +15,10 @@ export abstract class BaseAgentAdapter {
     this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
   }
 
+  protected buildContextPrefix(project: ProjectConfig, _task: Task): string {
+    return project.agent.systemPrompt ?? ''
+  }
+
   protected async resolveProjectEnv(
     project: ProjectConfig
   ): Promise<Record<string, string> | undefined> {

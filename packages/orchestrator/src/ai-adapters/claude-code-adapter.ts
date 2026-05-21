@@ -22,11 +22,20 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
     super(executor, logger)
   }
 
-  private buildCommand(task: Task, project: ProjectConfig, prompt: string): string[] {
+  private buildCommand(
+    task: Task,
+    project: ProjectConfig,
+    prompt: string,
+    resumeSessionId?: string
+  ): string[] {
     const command = ['claude']
 
     if (project.agent.model) {
       command.push('--model', project.agent.model)
+    }
+
+    if (resumeSessionId) {
+      command.push('--resume', resumeSessionId)
     }
 
     command.push('--permission-mode', 'acceptEdits')
@@ -35,7 +44,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
     command.push('-p', prompt)
 
     this.logger.info(
-      `Claude Code command profile: model=${project.agent.model ?? 'default'}, permission=acceptEdits, sandbox=managed`,
+      `Claude Code command profile: model=${project.agent.model ?? 'default'}, permission=acceptEdits${resumeSessionId ? `, resume=${resumeSessionId}` : ''}`,
       task.id
     )
 
@@ -126,8 +135,9 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
     }
   }
 
-  private buildPlanPrompt(task: Task): string {
+  private buildPlanPrompt(task: Task, contextPrefix?: string): string {
     return [
+      ...(contextPrefix ? [contextPrefix, ''] : []),
       'You are running plan mode for a coding task.',
       'Return plain text only (no JSON, no markdown code fences).',
       `First line must be exactly: STATUS: ${PlanResultStatus.PLAN_READY}|${PlanResultStatus.NEEDS_CLARIFICATION}|${PlanResultStatus.PLAN_FAILED}`,
@@ -163,7 +173,8 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
   private buildExecutionPrompt(
     task: Task,
     approvedPlan?: string,
-    outputMode: 'pr' | 'commit' = 'pr'
+    outputMode: 'pr' | 'commit' = 'pr',
+    contextPrefix?: string
   ): string {
     const base = `Task ID: ${task.externalId}\nTitle: ${task.title}\nDescription:\n${task.description}`
     const planLine = approvedPlan ? `\n\nApproved Plan:\n${approvedPlan}` : ''
@@ -177,6 +188,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
           ].join(' ')
 
     return [
+      ...(contextPrefix ? [contextPrefix, ''] : []),
       'You are executing an implementation plan.',
       'Only perform steps described in the approved plan and keep scope bounded.',
       'If blocked, return a short explanation and stop without guessing.',
@@ -209,15 +221,10 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     try {
       await this.setupWorkspace(task, workingDir)
-      const command = this.buildCommand(task, project, this.buildPlanPrompt(task))
+      const contextPrefix = this.buildContextPrefix(project, task)
+      const command = this.buildCommand(task, project, this.buildPlanPrompt(task, contextPrefix))
       const collector = new ClaudeCodeEventCollector(this.logger, task, 'plan')
-      let result: any
-
-      try {
-        result = await this.executeClaudeCommand(workingDir, project, command, collector)
-      } catch (e: any) {
-        this.logger.error('DEBUG error running command', e)
-      }
+      const result = await this.executeClaudeCommand(workingDir, project, command, collector)
 
       if (result.exitCode === 127) {
         return {
@@ -238,8 +245,11 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
         }
       }
 
-      const { finalMessage } = collector.getResult()
-      return this.parsePlanOutput(finalMessage || result.stdout || result.output)
+      const { finalMessage, sessionId } = collector.getResult()
+      return {
+        ...this.parsePlanOutput(finalMessage || result.stdout || result.output),
+        sessionId,
+      }
     } catch (error: any) {
       return {
         success: false,
@@ -259,10 +269,12 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
   ): Promise<AgentResult> {
     try {
       await this.setupWorkspace(task, workingDir)
+      const contextPrefix = this.buildContextPrefix(project, task)
       const command = this.buildCommand(
         task,
         project,
-        this.buildExecutionPrompt(task, approvedPlan, outputMode)
+        this.buildExecutionPrompt(task, approvedPlan, outputMode, contextPrefix),
+        task.agentSessionId
       )
       const collector = new ClaudeCodeEventCollector(this.logger, task, 'task')
       const result = await this.executeClaudeCommand(workingDir, project, command, collector)
@@ -276,13 +288,14 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
         }
       }
 
-      const { finalMessage } = collector.getResult()
+      const { finalMessage, sessionId } = collector.getResult()
       const parsedOutput = finalMessage || result.stdout || result.output
 
       return {
         success: result.exitCode === 0,
         output: parsedOutput,
         ...extractExecutionMetadata(parsedOutput),
+        sessionId,
         error:
           result.exitCode !== 0 ? `Claude Code exited with code ${result.exitCode}` : undefined,
       }

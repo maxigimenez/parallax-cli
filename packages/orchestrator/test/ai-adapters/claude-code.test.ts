@@ -132,6 +132,74 @@ describe('ClaudeCodeAdapter', () => {
     expect(result.planMarkdown).toContain('Inspect auth middleware')
   })
 
+  it('returns sessionId captured from system:init event', async () => {
+    const mockExecutor = {
+      executeCommand: vi.fn().mockImplementation(async (_command: string[], options: any) => {
+        options.onData({
+          stream: 'stdout',
+          line: JSON.stringify({ type: 'system', subtype: 'init', session_id: 'ses-abc123' }),
+        })
+        options.onData({
+          stream: 'stdout',
+          line: JSON.stringify({ type: 'result', result: 'Done\nPARALLAX_COMMIT_MESSAGE: Fix it' }),
+        })
+        return { exitCode: 0, output: '', stdout: '', stderr: '' }
+      }),
+    }
+    const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
+    const task = { id: 't1', externalId: 'REV-500', title: 'Fix', description: 'Desc' } as any
+    const project = { agent: {} } as any
+
+    vi.spyOn(adapter, 'setupWorkspace').mockResolvedValue()
+
+    const result = await adapter.runTask(task, '/tmp/dir', project, undefined, 'commit')
+
+    expect(result.sessionId).toBe('ses-abc123')
+  })
+
+  it('adds --resume flag when task.agentSessionId is set', async () => {
+    const mockExecutor = {
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
+    }
+    const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
+    const task = {
+      id: 't2',
+      externalId: 'REV-501',
+      title: 'Resume',
+      description: 'Desc',
+      agentSessionId: 'ses-prev',
+    } as any
+    const project = { agent: {} } as any
+
+    vi.spyOn(adapter, 'setupWorkspace').mockResolvedValue()
+
+    await adapter.runTask(task, '/tmp/dir', project)
+
+    const command = mockExecutor.executeCommand.mock.calls[0][0]
+    expect(command).toContain('--resume')
+    expect(command).toContain('ses-prev')
+  })
+
+  it('does not add --resume flag when task has no agentSessionId', async () => {
+    const mockExecutor = {
+      executeCommand: vi
+        .fn()
+        .mockResolvedValue({ exitCode: 0, output: '', stdout: '', stderr: '' }),
+    }
+    const adapter = new ClaudeCodeAdapter(mockExecutor as any, mockLogger as any)
+    const task = { id: 't3', externalId: 'REV-502', title: 'Fresh', description: 'Desc' } as any
+    const project = { agent: {} } as any
+
+    vi.spyOn(adapter, 'setupWorkspace').mockResolvedValue()
+
+    await adapter.runTask(task, '/tmp/dir', project)
+
+    const command = mockExecutor.executeCommand.mock.calls[0][0]
+    expect(command).not.toContain('--resume')
+  })
+
   it('emits streamed assistant updates before the final result', async () => {
     const localLogger = {
       info: vi.fn(),
