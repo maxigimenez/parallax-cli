@@ -1,6 +1,6 @@
 # Getting Started
 
-Parallax runs as a local service on your machine. You start it once, register repositories with `parallax.yml`, then use the dashboard to review plans and task output.
+Parallax runs as a local service on your machine. Run the setup wizard once, then use the dashboard to review plans and task output.
 
 ## 1. Install
 
@@ -38,7 +38,7 @@ parallax preflight
 - `codex` CLI (optional)
 - `gemini` CLI (optional)
 - `claude` CLI (optional)
-- at least one agent CLI (`codex`, `gemini`, or `claude`) is available
+- at least one agent CLI is available
 
 If a required check fails, fix it before moving on.
 
@@ -51,62 +51,60 @@ gh auth login
 gh auth status
 ```
 
-Provider credentials:
+If you plan to use Linear, have your API key ready — the setup wizard will ask for it.
 
-- export required provider credentials in your shell environment before starting Parallax.
-- use `parallax register ./parallax.yml --env-file ./.env` if a project should load credentials from a repo-specific env file.
+## 4. Run the setup wizard
 
-## 4. Create your config (`parallax.yml`)
-
-Example:
-
-```yaml
-- id: web-app
-  workspaceDir: /absolute/path/to/your/repo
-  pullFrom:
-    provider: linear
-    filters:
-      team: ENG
-      state: Todo
-  agent:
-    provider: codex
-    model: gpt-5.4
+```bash
+parallax init
 ```
 
-For field details and more examples, see [Configuration Reference](./configuration.md).
+The wizard walks through:
+
+1. **Project ID** — a short identifier (e.g. `my-app`)
+2. **Workspace directory** — absolute path to your local git repository
+3. **Issue source** — GitHub Issues or Linear, with owner/repo or team filter
+4. **Label filter** — optional, to narrow which issues Parallax picks up (e.g. `ai-ready`)
+5. **AI agent** — Claude Code, OpenAI Codex, or Google Gemini
+6. **Model override** — optional, to pin a specific model version
+7. **Secrets** — Linear API key if you selected Linear and it is not already stored
+8. **Slack notifications** — optional, configures bot/app tokens and a channel
+
+Configuration is saved to `~/.parallax/config.json`. You can manage projects and integrations later from the dashboard.
 
 ## 5. Start Parallax
 
-Start the runtime first, then register the repository config:
-
 ```bash
 parallax start
-parallax register ./parallax.yml --env-file ./.env
 ```
 
 What this does:
 
-- `parallax start` launches the background API and dashboard from `~/.parallax`
-- `parallax register` adds this repository to the active project registry
+- launches the background orchestrator and dashboard
+- reads projects and secrets from `~/.parallax/config.json`
 
-## 6. Open dashboard
+## 6. Open the dashboard
 
-Default URL:
+```bash
+parallax open
+```
 
-- API: `http://localhost:3000`
-- UI: `http://localhost:8080`
+Or open `http://localhost:8080` in your browser.
 
-Parallax stores runtime state in `~/.parallax`.
+The dashboard has four sections (left navigation):
+
+- **Tasks** — live task list, plan approval, log streaming
+- **Projects** — add, edit, and remove project configurations
+- **Integrations** — configure GitHub, Linear, and Slack
+- **Secrets** — manage API keys and environment variables
 
 ## 7. Check runtime status
-
-Use:
 
 ```bash
 parallax status
 ```
 
-This reports whether the local runtime is healthy and surfaces orchestrator issues when present.
+Reports whether the local runtime is healthy and lists your configured projects.
 
 ## 8. Stop Parallax
 

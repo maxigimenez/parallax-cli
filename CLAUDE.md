@@ -18,9 +18,10 @@ pnpm --filter parallax-cli test
 
 # local development — use this entrypoint for all manual testing
 pnpm parallax preflight
+pnpm parallax init
 pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
-pnpm parallax register ./parallax.example.yml --env-file ./.env
-pnpm parallax pending
+pnpm parallax status
+pnpm parallax open
 pnpm parallax stop
 ```
 
@@ -32,9 +33,10 @@ Parallax is a plan-first AI orchestration runtime. It pulls work from Linear or 
 
 ### Package layout
 
-- **`packages/common`** — shared models, enums (`TASK_STATUS`, `TaskPlanState`, `AGENT_PROVIDER`, etc.), interfaces (`Task`, `ProjectConfig`, `AgentResult`, `PlanResult`), and the `HostExecutor` abstraction. All cross-package types live here.
+- **`packages/common`** — shared models, enums (`TASK_STATUS`, `TaskPlanState`, `AGENT_PROVIDER`, etc.), interfaces (`Task`, `ProjectConfig`, `StoredConfig`, `AgentResult`, `PlanResult`), and the `HostExecutor` abstraction. All cross-package types live here.
 - **`packages/orchestrator`** — the runtime process: polling loop, task state machine, AI adapter dispatch, Fastify REST API, Socket.io streaming, SQLite persistence.
 - **`packages/cli`** — the published `parallax-cli` npm package. It is the sole entry point for users. Commands talk to the orchestrator over HTTP. The `start` command forks the orchestrator as a child process and writes `~/.parallax/running.json`.
+- **`packages/slack`** — optional Slack bot (`SlackBot`) that posts task lifecycle notifications and handles interactive commands (approve, reject, cancel). Integrated at runtime via `setSlackBot()` / `getSlackBot()` in `slack-integration.ts`.
 - **`packages/ui`** — React/Vite dashboard served by the orchestrator's UI server in production.
 - **`packages/marketing`** — standalone marketing site, not part of the runtime.
 
@@ -42,12 +44,16 @@ Parallax is a plan-first AI orchestration runtime. It pulls work from Linear or 
 
 | File/Dir | Purpose |
 |---|---|
-| `registry.json` | Registered `parallax.yml` configs and optional env file paths |
+| `config.json` | All project, agent, Slack, and secrets config (managed by `parallax init` and dashboard) |
 | `running.json` | PID, ports, concurrency of the active orchestrator process |
 | `parallax.db` | SQLite — tasks and task logs tables |
 | `worktrees/` | Ephemeral git worktrees created per task, cleaned up after execution |
 
 Override via `PARALLAX_DATA_DIR` env var.
+
+### Configuration flow
+
+`~/.parallax/config.json` is the single source of truth. `loadConfig()` in `packages/orchestrator/src/config-loader.ts` reads it via `config-store.ts`, injects `secrets` into `process.env`, validates the structure via `config-validation.ts`, and returns `AppConfig`. Agent processes inherit secrets through `process.env`. No YAML files.
 
 ### Task state machine
 
@@ -71,11 +77,19 @@ Cancellation is tracked via an in-memory `canceledTasks: Set<string>` checked at
 
 ### AI adapters (`packages/orchestrator/src/ai-adapters/`)
 
-`BaseAgentAdapter` defines two abstract methods: `runPlan(task, workingDir, project)` and `runTask(task, workingDir, project, approvedPlan?, outputMode?)`. Concrete implementations: `CodexAdapter`, `GeminiAdapter`, `ClaudeCodeAdapter`. The adapter is selected from `project.agent.provider` in `parallax.yml` and cached per project in an `adapterCache` map.
+`BaseAgentAdapter` defines two abstract methods: `runPlan(task, workingDir, project)` and `runTask(task, workingDir, project, approvedPlan?, outputMode?)`. Concrete implementations: `CodexAdapter`, `GeminiAdapter`, `ClaudeCodeAdapter`. The adapter is selected from `project.agent.provider` and cached per project in an `adapterCache` map. Secrets are available in `process.env` (injected by `loadConfig()`).
 
-### Configuration flow
+### Dashboard layout
 
-`parallax register ./parallax.yml` writes the config path to `~/.parallax/registry.json`. At runtime, `loadConfig()` reads and merges all registered YAML files. Required fields per project entry: `id`, `workspaceDir`, `pullFrom.provider`, `pullFrom.filters`, `agent.provider`.
+Three-column layout: icon nav (left, 52px) | list panel (280px) | main content (fills remainder).
+
+- **NavBar** (`NavBar.tsx`) — icon-only vertical navigation for Tasks / Projects / Integrations / Secrets
+- **ListPanel** (`ListPanel.tsx`) — scrollable list for the active section
+- **Main content** — `LogViewer`, `ProjectEditor`, `IntegrationDetail`, `SecretsEditor`, or `EmptyState`
+
+### API server (`packages/orchestrator/src/runtime/api-server.ts`)
+
+The `mutateConfig(updater)` helper reads `config.json`, applies an updater, writes back atomically, reloads the runtime, and emits `config_updated` over Socket.io. All CRUD endpoints for projects, agents, Slack, and secrets use it.
 
 ## Key conventions
 

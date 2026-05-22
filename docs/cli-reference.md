@@ -9,6 +9,18 @@ parallax --version
 parallax --help
 ```
 
+## parallax init
+
+Run the interactive setup wizard to configure Parallax for the first time or add another project.
+
+```bash
+parallax init
+```
+
+The wizard covers: project ID, workspace directory, issue source (GitHub or Linear), agent selection, optional secrets, and optional Slack configuration. All settings are saved to `~/.parallax/config.json`.
+
+If a config already exists, the wizard offers to add another project, open the dashboard, or exit.
+
 ## parallax preflight
 
 Validate local prerequisites before first run.
@@ -35,8 +47,8 @@ Notes:
 
 - no flags accepted
 - prints a clear message when Parallax is not running
-- shows orchestrator PID and dashboard URL when healthy
-- prints orchestrator stderr diagnostics when the runtime has issues
+- shows orchestrator PID, dashboard URL, and configured projects when healthy
+- prints orchestrator diagnostics when the runtime has issues
 
 ## parallax start
 
@@ -46,42 +58,15 @@ Start orchestrator and dashboard in background.
 parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
 ```
 
-`parallax start` initializes the global Parallax runtime from `~/.parallax` using the provided runtime flags.
-Repository configs are added separately with `parallax register <config-file>`.
+`parallax start` reads project and secret configuration from `~/.parallax/config.json`.
+If no projects are configured, it exits with an error: run `parallax init` first.
 
 Examples:
 
 ```bash
+parallax start
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
-parallax register ./parallax.yml --env-file ./.env
 ```
-
-## parallax register
-
-Register a repository config in the global Parallax registry.
-
-```bash
-parallax register <config-file> [--env-file <path>]
-```
-
-Notes:
-
-- stores the config in `~/.parallax/registry.json`
-- optional `--env-file` is attached to that registered project config
-- if Parallax is already running, the runtime reloads immediately
-
-## parallax unregister
-
-Remove a repository config from the global Parallax registry.
-
-```bash
-parallax unregister <config-file>
-```
-
-Notes:
-
-- fails if the config is not registered
-- if Parallax is already running, the runtime reloads immediately
 
 ## parallax stop
 
@@ -91,20 +76,15 @@ Stop background processes recorded in the running manifest.
 parallax stop
 ```
 
-## parallax pending
+## parallax open
 
-List pending plans and optionally approve or reject one from the CLI.
-
-```bash
-parallax pending [--approve <id>] [--reject <id>]
-```
-
-Examples:
+Open the dashboard in your default browser.
 
 ```bash
-parallax pending --approve 3ed59f6e7cea
-parallax pending --reject 3ed59f6e7cea
+parallax open
 ```
+
+Reads the UI port from `~/.parallax/running.json`. Prints the URL if the orchestrator is not running.
 
 ## parallax retry
 
@@ -159,6 +139,6 @@ Parallax stores runtime state in `~/.parallax`.
 
 Common files:
 
+- `config.json`: project and integration configuration (managed by `parallax init` and the dashboard)
 - `running.json`: process manifest (`orchestratorPid`, `uiPid`, ports, start timestamp)
 - `parallax.db`: SQLite state database
-- `registry.json`: registered repository configs
