@@ -11,7 +11,7 @@ import {
   type Task,
   sleep,
 } from '@parallax/common'
-import { loadConfig } from './config-loader.js'
+import { loadConfig, resolveDataDir } from './config-loader.js'
 import { logger, setIo, setLogLevels } from './logger.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitHubReviewService } from './github/review-service.js'
@@ -59,6 +59,7 @@ async function startRuntimeServers(
     activeTasks,
     canceledTasks,
     activeWorktrees,
+    dataDir: resolveDataDir(),
   })
 
   const config = getConfig()

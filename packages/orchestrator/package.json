@@ -15,9 +15,7 @@
     "@parallax/slack": "workspace:*",
     "@fastify/cors": "11.2.0",
     "chalk": "4",
-    "dotenv": "16.4.7",
     "fastify": "5.7.4",
-    "js-yaml": "4.1.0",
     "log-update": "7.1.0",
     "p-limit": "6.1.0",
     "simple-git": "3.32.3",
@@ -27,7 +25,6 @@
     "uuid": "11.0.0"
   },
   "devDependencies": {
-    "@types/js-yaml": "4.0.9",
     "@types/uuid": "10.0.0"
   },
   "files": [

@@ -159,10 +159,18 @@ export interface SlackConfig {
   channel: string
 }
 
+export interface StoredConfig {
+  version: number
+  projects: ProjectConfig[]
+  agents: AgentDefinition[]
+  slack: SlackConfig | null
+  secrets: Record<string, string>
+  updatedAt: number
+}
+
 export interface ProjectConfig {
   id: string
   workspaceDir: string // Absolute path to existing local repo
-  envFilePath?: string
   pullFrom: {
     provider: PullProvider
     filters: {

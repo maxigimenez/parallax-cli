@@ -204,15 +204,12 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
     command: string[],
     collector: ClaudeCodeEventCollector
   ) {
-    const env = await this.resolveProjectEnv(project)
-
     const result = await this.executor.executeCommand(command, {
       cwd: workingDir,
       onData: (chunk) =>
         chunk.stream === 'stdout'
           ? collector.handleStdoutLine(chunk.line)
           : collector.handleStderrLine(chunk.line),
-      env,
     })
 
     return result
