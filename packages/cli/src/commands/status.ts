@@ -18,12 +18,6 @@ async function fetchRuntimeErrors(apiBase: string): Promise<RuntimeErrorsRespons
   return (await response.json()) as RuntimeErrorsResponse
 }
 
-function printErrors(errors: string[]) {
-  for (const error of errors) {
-    console.log(error)
-  }
-}
-
 export async function runStatus(args: string[], context: CliContext) {
   parseStatusOptions(args)
   const GREEN = '\x1b[32m'
@@ -79,10 +73,29 @@ export async function runStatus(args: string[], context: CliContext) {
       return
     }
 
+    let projects: Array<{ id: string; agent: { provider: string } }> = []
+    try {
+      const configRes = await fetch(`${apiBase}/config`)
+      if (configRes.ok) {
+        const cfg = (await configRes.json()) as { projects?: typeof projects }
+        projects = cfg.projects ?? []
+      }
+    } catch {
+      // ignore
+    }
+
     output.push('')
     output.push(`${GREEN}✓ Parallax status: healthy.${RESET}`)
     output.push(`${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid}`)
     output.push(`${DIM}Dashboard:${RESET} http://localhost:${state.uiPort}`)
+
+    if (projects.length > 0) {
+      output.push('')
+      output.push(`${DIM}Projects (${projects.length}):${RESET}`)
+      for (const project of projects) {
+        output.push(`  ${project.id.padEnd(20)} ${project.agent.provider}`)
+      }
+    }
   } finally {
     const remaining = 400 - (Date.now() - startTime)
     if (remaining > 0) {

@@ -61,7 +61,11 @@ export async function runStart(args: string[], context: CliContext) {
   console.log(`${BLUE}📁 Data Dir:${RESET} ${DIM}${dataDir}${RESET}`)
   console.log('')
 
-  const registry = await context.loadRegistry()
+  const storedConfig = await context.loadStoredConfig()
+  if (storedConfig.projects.length === 0) {
+    console.error(`${YELLOW}No projects configured. Run 'parallax init' to get started.${RESET}`)
+    process.exit(1)
+  }
   const env = context.buildEnvConfig(dataDir, {
     apiPort: options.apiPort,
     uiPort: options.uiPort,
@@ -85,7 +89,7 @@ export async function runStart(args: string[], context: CliContext) {
         existingState?.uiPid !== undefined ? isProcessAlive(existingState.uiPid) : false
       if (existingState && (isProcessAlive(existingState.orchestratorPid) || existingUiAlive)) {
         throw new Error(
-          `Parallax is already running. Stop it first with "parallax stop". Manifest: ${existingManifestPath}`
+          `Parallax is already running on http://localhost:${existingState.uiPort}. Run 'parallax open' to view the dashboard, or 'parallax stop' to stop it.`
         )
       }
 
@@ -176,12 +180,10 @@ export async function runStart(args: string[], context: CliContext) {
     console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
     console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
     console.log(`${DIM}Dashboard:${RESET} http://localhost:${options.uiPort}`)
-    console.log(`${DIM}Registered Configs:${RESET} ${registry.configs.length}`)
+    console.log(`${DIM}Projects:${RESET} ${storedConfig.projects.length}`)
     console.log('')
     console.log('')
-    console.log(
-      `${YELLOW}💡 Register a repository config with:${RESET} ${DIM}parallax register <config-file>${RESET}`
-    )
+    console.log(`${YELLOW}💡 Run 'parallax open' to view the dashboard.${RESET}`)
   } catch (error) {
     const processAlive = orchestratorPid > 0 ? isProcessAlive(orchestratorPid) : false
     await stopProcessBestEffort(orchestratorPid, 'orchestrator', true)

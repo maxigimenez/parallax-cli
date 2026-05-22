@@ -8,10 +8,8 @@ import {
   hasFlag,
   parseCancelOptions,
   parseLogsOptions,
-  parsePendingOptions,
   parsePreflightOptions,
   parsePrReviewOptions,
-  parseRegisterOptions,
   parseRetryOptions,
   parseStartOptions,
   parseStatusOptions,
@@ -20,26 +18,18 @@ import {
 } from './args.js'
 import {
   ensureFileExists,
-  loadRegistry as loadRegistryFromDisk,
   loadRunningState as loadRunningStateFromDisk,
-  parseConfigProjectIds,
-  parseRegistryState,
+  loadStoredConfig as loadStoredConfigFromDisk,
   parseRunningState,
   resolveCliRoot,
-  saveRegistry as saveRegistryToDisk,
-  validateConfigFile,
+  saveStoredConfig as saveStoredConfigToDisk,
 } from './config.js'
 import { runCancel } from './commands/cancel.js'
+import { runInit } from './commands/init.js'
 import { runLogs } from './commands/logs.js'
-import {
-  resolveApproveTargets,
-  resolveRejectTarget,
-  runPending,
-  scopePendingTasks,
-} from './commands/pending.js'
+import { runOpen } from './commands/open.js'
 import { runPreflight } from './commands/preflight.js'
 import { runPrReview } from './commands/pr-review.js'
-import { runRegister } from './commands/register.js'
 import { runRetry } from './commands/retry.js'
 import { runStart } from './commands/start.js'
 import { runStatus } from './commands/status.js'
@@ -53,7 +43,6 @@ const __dirname = path.dirname(__filename)
 const DEFAULT_DATA_DIR = path.join(os.homedir(), '.parallax')
 const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
 const MANIFEST_FILE = 'running.json'
-const REGISTRY_FILE = 'registry.json'
 const ROOT_DIR = resolveCliRoot(__dirname)
 
 function resolvePackageVersion(rootDir: string): string {
@@ -115,17 +104,15 @@ const cliContext: CliContext = {
   defaultApiBase: DEFAULT_API_BASE,
   defaultDataDir: DEFAULT_DATA_DIR,
   manifestFile: MANIFEST_FILE,
-  registryFile: REGISTRY_FILE,
   rootDir: ROOT_DIR,
   cliVersion: CLI_VERSION,
   packageVersion: CLI_VERSION,
   resolvePath,
   ensureFileExists,
   loadRunningState: () => loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE),
-  loadRegistry: () => loadRegistryFromDisk(DEFAULT_DATA_DIR, REGISTRY_FILE),
-  saveRegistry: (registry) => saveRegistryToDisk(DEFAULT_DATA_DIR, REGISTRY_FILE, registry),
+  loadStoredConfig: () => loadStoredConfigFromDisk(DEFAULT_DATA_DIR),
+  saveStoredConfig: (config) => saveStoredConfigToDisk(DEFAULT_DATA_DIR, config),
   resolveDefaultApiBase,
-  validateConfigFile,
   buildEnvConfig,
 }
 
@@ -147,23 +134,20 @@ async function cli() {
 
   try {
     switch (command) {
+      case 'init':
+        await runInit(commandArgs, cliContext)
+        return
       case 'start':
         await runStart(commandArgs, cliContext)
         return
-      case 'register':
-        await runRegister(commandArgs, cliContext, 'register')
+      case 'status':
+        await runStatus(commandArgs, cliContext)
         return
-      case 'unregister':
-        await runRegister(commandArgs, cliContext, 'unregister')
-        return
-      case 'pending':
-        await runPending(commandArgs, cliContext)
+      case 'open':
+        await runOpen(commandArgs, cliContext)
         return
       case 'preflight':
         await runPreflight(commandArgs)
-        return
-      case 'status':
-        await runStatus(commandArgs, cliContext)
         return
       case 'pr-review':
         await runPrReview(commandArgs, cliContext)
@@ -181,7 +165,9 @@ async function cli() {
         await runLogs(commandArgs, cliContext)
         return
       default:
+        console.error(`Unknown command: ${command}\n`)
         printUsage()
+        process.exit(1)
     }
   } catch (error: any) {
     console.error(`Error: ${error.message}`)
@@ -191,22 +177,15 @@ async function cli() {
 
 export {
   parseCancelOptions,
-  parseConfigProjectIds,
   parseLogsOptions,
-  parsePendingOptions,
   parsePreflightOptions,
   parsePrReviewOptions,
-  parseRegisterOptions,
-  parseRegistryState,
   parseRetryOptions,
   parseStartOptions,
   parseStatusOptions,
   parseRunningState,
-  resolveApproveTargets,
-  resolveRejectTarget,
   resolveDefaultApiBase,
   resolvePath,
-  scopePendingTasks,
 }
 
 export function parseStopOptions(args: string[]) {

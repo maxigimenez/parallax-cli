@@ -23,7 +23,6 @@ function createContext(overrides: Partial<CliContext> = {}): CliContext {
     defaultApiBase: 'http://localhost:3000',
     defaultDataDir: '/tmp/.parallax',
     manifestFile: 'running.json',
-    registryFile: 'registry.json',
     rootDir: '/tmp/parallax',
     cliVersion: '0.0.5',
     packageVersion: '0.0.5',
@@ -32,10 +31,16 @@ function createContext(overrides: Partial<CliContext> = {}): CliContext {
     loadRunningState: async () => {
       throw new Error('offline')
     },
-    loadRegistry: async () => ({ configs: [] }),
-    saveRegistry: async () => {},
+    loadStoredConfig: async () => ({
+      version: 1,
+      projects: [],
+      agents: [],
+      slack: null,
+      secrets: {},
+      updatedAt: 0,
+    }),
+    saveStoredConfig: async () => {},
     resolveDefaultApiBase: async () => 'http://localhost:3000',
-    validateConfigFile: async () => {},
     buildEnvConfig: () => ({}),
     ...overrides,
   }

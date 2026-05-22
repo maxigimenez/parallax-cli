@@ -2,28 +2,26 @@ export function printUsage(): void {
   console.log(`Usage:
   parallax --version
   parallax --help
+  parallax init
   parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
-  parallax register <config-file> [--env-file <path>]
-  parallax unregister <config-file>
-  parallax pending [--approve <id>] [--reject <id>]
-  parallax preflight
+  parallax stop
   parallax status
+  parallax open
+  parallax preflight
   parallax pr-review <task-id>
   parallax retry <task-id>
   parallax cancel <task-id>
-  parallax stop
   parallax logs [--task <id>]
 
 Commands:
-  start      Start orchestrator + UI in background using the provided runtime flags.
-  register   Register a repository config in ~/.parallax, with optional project env file.
-  unregister Remove a repository config from ~/.parallax.
-  pending    List pending plans and optionally approve/reject them.
+  init       Set up Parallax for the first time (interactive wizard).
+  start      Start orchestrator + UI in background.
+  stop       Force-stop the running Parallax processes.
+  status     Show orchestrator state and configured projects.
+  open       Open the dashboard in your browser.
   preflight  Validate local prerequisites and auth.
-  status     Show overall orchestrator status and runtime diagnostics.
   pr-review  [experimental] Apply open human PR review comments to the task's existing open PR.
   retry      Queue a task for manual retry.
   cancel     Cancel a pending or running task.
-  stop       Force-stop the running Parallax processes.
   logs       Tail new task logs from the running Parallax API.`)
 }
