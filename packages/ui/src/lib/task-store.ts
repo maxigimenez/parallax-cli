@@ -127,21 +127,6 @@ export function replaceTasksFromApi(
   return next
 }
 
-export function upsertTaskState(
-  previous: Record<string, TaskInfo>,
-  taskId: string,
-  patch: Partial<TaskInfo>
-): Record<string, TaskInfo> {
-  const current = requireTask(previous, taskId)
-  return {
-    ...previous,
-    [taskId]: {
-      ...current,
-      ...patch,
-    },
-  }
-}
-
 export function applyTaskLogEvent(
   previous: Record<string, TaskInfo>,
   event: LogEvent

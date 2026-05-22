@@ -1,33 +1,35 @@
+import { useState, useMemo } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '@/components/EmptyState'
 import { LogViewer } from '@/components/LogViewer'
 import { OrchestratorErrorOverlay } from '@/components/OrchestratorErrorOverlay'
-import { SettingsViewer } from '@/components/SettingsViewer'
-import { TaskSidebar } from '@/components/TaskSidebar'
+import { NavBar } from '@/components/NavBar'
+import { ListPanel, type ActiveView } from '@/components/ListPanel'
+import { ProjectEditor } from '@/components/ProjectEditor'
+import { AddProjectWizard } from '@/components/AddProjectWizard'
+import { IntegrationDetail } from '@/components/IntegrationDetail'
+import { SecretsEditor } from '@/components/SecretsEditor'
 import { useParallax } from '@/hooks/useParallax'
 import { TASK_STATUS } from '@/lib/task-constants'
-import { useMemo } from 'react'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
 
-const TASK_VIEW = 'tasks'
-const SETTINGS_VIEW = 'settings'
-const DASHBOARD_VIEW = 'dashboard'
-const LOGS_VIEW = 'logs'
-
-type ActiveView = typeof TASK_VIEW | typeof SETTINGS_VIEW
-type TaskDetailView = typeof DASHBOARD_VIEW | typeof LOGS_VIEW
+type TaskDetailView = 'dashboard' | 'logs'
 
 function resolveActiveView(pathname: string): ActiveView {
-  return pathname.startsWith('/settings') ? SETTINGS_VIEW : TASK_VIEW
+  if (pathname.startsWith('/projects')) return 'projects'
+  if (pathname.startsWith('/integrations')) return 'integrations'
+  if (pathname.startsWith('/secrets')) return 'secrets'
+  return 'tasks'
 }
 
 function resolveTaskDetailView(pathname: string): TaskDetailView {
-  return pathname.endsWith('/logs') ? LOGS_VIEW : DASHBOARD_VIEW
+  return pathname.endsWith('/logs') ? 'logs' : 'dashboard'
 }
 
 const Index = () => {
   const {
     tasks,
     config,
+    secrets,
     isConnected,
     error,
     orchestratorErrors,
@@ -35,14 +37,24 @@ const Index = () => {
     cancelTask,
     approvePlan,
     rejectPlan,
-  } =
-    useParallax()
+    createProject,
+    updateProject,
+    deleteProject,
+    saveSlack,
+    removeSlack,
+    setSecret,
+    deleteSecret,
+  } = useParallax()
+
   const navigate = useNavigate()
   const location = useLocation()
-  const { taskId, projectIndex } = useParams<{
+  const { taskId, projectId, integrationName } = useParams<{
     taskId?: string
-    projectIndex?: string
+    projectId?: string
+    integrationName?: string
   }>()
+
+  const [showAddProject, setShowAddProject] = useState(false)
 
   if (error) {
     throw error
@@ -51,32 +63,50 @@ const Index = () => {
   const activeView = resolveActiveView(location.pathname)
   const taskDetailView = resolveTaskDetailView(location.pathname)
   const selectedTask = taskId ? tasks[taskId] ?? null : null
-  const selectedTaskId = taskId ?? null
-  const selectedSettingsId = projectIndex ? `project-${projectIndex}` : null
-  const selectedSidebarId = activeView === TASK_VIEW ? selectedTaskId : selectedSettingsId
+
+  const selectedSidebarId = useMemo(() => {
+    if (activeView === 'tasks') return taskId ?? null
+    if (activeView === 'projects' && projectId) return `project-${projectId}`
+    if (activeView === 'integrations' && integrationName) return `integration-${integrationName}`
+    return null
+  }, [activeView, taskId, projectId, integrationName])
 
   const waitingTasks = useMemo(
     () => Object.values(tasks).filter((task) => task.status === TASK_STATUS.QUEUED).length,
     [tasks]
   )
 
-  const handleSelectTask = (id: string) => {
+  const handleSelectItem = (id: string) => {
     if (id.startsWith('project-')) {
-      navigate(`/settings/${id.replace('project-', '')}`)
+      navigate(`/projects/${id.replace('project-', '')}`)
       return
     }
-
+    if (id.startsWith('integration-')) {
+      navigate(`/integrations/${id.replace('integration-', '')}`)
+      return
+    }
     navigate(`/tasks/${id}`)
   }
 
   const handleViewChange = (view: ActiveView) => {
-    navigate(view === SETTINGS_VIEW ? '/settings' : '/')
+    const routes: Record<ActiveView, string> = {
+      tasks: '/',
+      projects: '/projects',
+      integrations: '/integrations',
+      secrets: '/secrets',
+    }
+    navigate(routes[view])
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-[#060606]">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {activeView === TASK_VIEW && selectedTask ? (
+  const selectedProject = useMemo(() => {
+    if (!projectId || !config) return null
+    return config.projects.find((p) => p.id === projectId) ?? null
+  }, [projectId, config])
+
+  const mainContent = () => {
+    if (activeView === 'tasks') {
+      if (selectedTask) {
+        return (
           <LogViewer
             taskId={selectedTask.id}
             title={selectedTask.title}
@@ -101,28 +131,104 @@ const Index = () => {
             onOpenLogs={() => navigate(`/tasks/${selectedTask.id}/logs`)}
             onOpenDashboard={() => navigate(`/tasks/${selectedTask.id}`)}
           />
-        ) : activeView === SETTINGS_VIEW && projectIndex !== undefined ? (
-          <SettingsViewer projectIndex={Number.parseInt(projectIndex, 10)} config={config} />
-        ) : (
-          <EmptyState
-            view={activeView}
-            isConnected={isConnected}
-            hasTasks={Object.keys(tasks).length > 0}
-            waitingTasks={waitingTasks}
-          />
-        )}
-      </div>
+        )
+      }
+      return (
+        <EmptyState
+          view="tasks"
+          isConnected={isConnected}
+          hasTasks={Object.keys(tasks).length > 0}
+          waitingTasks={waitingTasks}
+        />
+      )
+    }
 
-      <TaskSidebar
-        selectedTaskId={selectedSidebarId}
-        onSelectTask={handleSelectTask}
+    if (activeView === 'projects') {
+      if (selectedProject) {
+        return (
+          <ProjectEditor
+            project={selectedProject}
+            onUpdate={updateProject}
+            onDelete={deleteProject}
+          />
+        )
+      }
+      return (
+        <EmptyState view="projects" isConnected={isConnected} hasTasks={false} waitingTasks={0} />
+      )
+    }
+
+    if (activeView === 'integrations') {
+      if (
+        integrationName &&
+        (integrationName === 'github' ||
+          integrationName === 'linear' ||
+          integrationName === 'slack')
+      ) {
+        return (
+          <IntegrationDetail
+            name={integrationName}
+            config={config}
+            secrets={secrets}
+            onSetSecret={setSecret}
+            onSaveSlack={saveSlack}
+            onRemoveSlack={removeSlack}
+          />
+        )
+      }
+      return (
+        <EmptyState
+          view="integrations"
+          isConnected={isConnected}
+          hasTasks={false}
+          waitingTasks={0}
+        />
+      )
+    }
+
+    if (activeView === 'secrets') {
+      return (
+        <SecretsEditor secrets={secrets} onSetSecret={setSecret} onDeleteSecret={deleteSecret} />
+      )
+    }
+
+    return null
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[#060606]">
+      {/* Left icon nav */}
+      <NavBar
         activeView={activeView}
         onViewChange={handleViewChange}
-        tasks={Object.values(tasks)}
-        config={config}
         isConnected={isConnected}
       />
+
+      {/* List panel */}
+      <ListPanel
+        selectedId={selectedSidebarId}
+        onSelectItem={handleSelectItem}
+        activeView={activeView}
+        onAddProject={() => setShowAddProject(true)}
+        tasks={Object.values(tasks)}
+        config={config}
+        secrets={secrets}
+      />
+
+      {/* Main content */}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {mainContent()}
+      </main>
+
       <OrchestratorErrorOverlay errors={orchestratorErrors} />
+
+      {showAddProject && (
+        <AddProjectWizard
+          existingIds={config?.projects.map((p) => p.id) ?? []}
+          onAdd={createProject}
+          onClose={() => setShowAddProject(false)}
+        />
+      )}
     </div>
   )
 }

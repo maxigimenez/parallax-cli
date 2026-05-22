@@ -3,6 +3,8 @@ import axios from 'axios'
 import { io } from 'socket.io-client'
 import type {
   AppConfig,
+  ProjectConfig,
+  SlackConfig,
   TaskLogEntry,
   TaskPlanState,
   TaskReviewState,
@@ -15,7 +17,6 @@ import {
   hasTaskState,
   removeTaskState,
   replaceTasksFromApi,
-  upsertTaskState,
 } from '@/lib/task-store'
 
 export interface TaskInfo {
@@ -47,9 +48,15 @@ export function useParallax() {
   const apiBase = getRequiredApiBase()
   const [tasks, setTasks] = useState<Record<string, TaskInfo>>({})
   const [config, setConfig] = useState<AppConfig | null>(null)
+  const [secrets, setSecrets] = useState<Record<string, string>>({})
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [orchestratorErrors, setOrchestratorErrors] = useState<string[]>([])
+
+  const refreshSecrets = async () => {
+    const res = await axios.get(`${apiBase}/secrets`)
+    setSecrets((res.data as { secrets: Record<string, string> }).secrets)
+  }
 
   const refreshState = async () => {
     const [tasksRes, configRes] = await Promise.all([
@@ -67,6 +74,7 @@ export function useParallax() {
     setConfig(configRes.data as AppConfig)
     setTasks((prev) => replaceTasksFromApi(prev, incoming))
     setError(null)
+    await refreshSecrets()
   }
 
   const refreshOrchestratorErrors = async () => {
@@ -106,6 +114,41 @@ export function useParallax() {
   const rejectPlan = async (taskId: string) => {
     await axios.post(`${apiBase}/tasks/${encodeURIComponent(taskId)}/reject`)
     await refreshState()
+  }
+
+  const createProject = async (project: ProjectConfig) => {
+    await axios.post(`${apiBase}/projects`, project)
+    await refreshState()
+  }
+
+  const updateProject = async (id: string, patch: Partial<ProjectConfig>) => {
+    await axios.put(`${apiBase}/projects/${encodeURIComponent(id)}`, patch)
+    await refreshState()
+  }
+
+  const deleteProject = async (id: string) => {
+    await axios.delete(`${apiBase}/projects/${encodeURIComponent(id)}`)
+    await refreshState()
+  }
+
+  const saveSlack = async (slackConfig: SlackConfig) => {
+    await axios.put(`${apiBase}/integrations/slack`, slackConfig)
+    await refreshState()
+  }
+
+  const removeSlack = async () => {
+    await axios.delete(`${apiBase}/integrations/slack`)
+    await refreshState()
+  }
+
+  const setSecret = async (key: string, value: string) => {
+    await axios.patch(`${apiBase}/secrets/${encodeURIComponent(key)}`, { value })
+    await refreshSecrets()
+  }
+
+  const deleteSecret = async (key: string) => {
+    await axios.delete(`${apiBase}/secrets/${encodeURIComponent(key)}`)
+    await refreshSecrets()
   }
 
   useEffect(() => {
@@ -168,6 +211,7 @@ export function useParallax() {
   return {
     tasks,
     config,
+    secrets,
     isConnected,
     error,
     orchestratorErrors,
@@ -175,5 +219,12 @@ export function useParallax() {
     cancelTask,
     approvePlan,
     rejectPlan,
+    createProject,
+    updateProject,
+    deleteProject,
+    saveSlack,
+    removeSlack,
+    setSecret,
+    deleteSecret,
   }
 }

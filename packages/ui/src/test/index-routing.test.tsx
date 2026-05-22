@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { AGENT_PROVIDER, LOG_LEVEL, PULL_PROVIDER, TaskPlanState, TASK_REVIEW_STATE } from '@parallax/common'
 import Index from '@/pages/Index'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 vi.mock('@/hooks/useParallax', () => ({
   useParallax: () => ({
@@ -48,6 +49,7 @@ vi.mock('@/hooks/useParallax', () => ({
         },
       ],
     },
+    secrets: {},
     isConnected: true,
     error: null,
     orchestratorErrors: [],
@@ -55,6 +57,13 @@ vi.mock('@/hooks/useParallax', () => ({
     cancelTask: vi.fn(),
     approvePlan: vi.fn(),
     rejectPlan: vi.fn(),
+    createProject: vi.fn(),
+    updateProject: vi.fn(),
+    deleteProject: vi.fn(),
+    saveSlack: vi.fn(),
+    removeSlack: vi.fn(),
+    setSecret: vi.fn(),
+    deleteSecret: vi.fn(),
   }),
 }))
 
@@ -69,8 +78,9 @@ function LocationProbe() {
 
 function renderIndex(initialEntries: string[]) {
   return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <Routes>
+    <TooltipProvider>
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
         <Route
           path="/"
           element={
@@ -98,8 +108,9 @@ function renderIndex(initialEntries: string[]) {
             </>
           }
         />
-      </Routes>
-    </MemoryRouter>
+        </Routes>
+      </MemoryRouter>
+    </TooltipProvider>
   )
 }
 

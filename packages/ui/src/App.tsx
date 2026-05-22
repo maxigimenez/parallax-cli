@@ -18,8 +18,11 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/tasks/:taskId" element={<Index />} />
           <Route path="/tasks/:taskId/logs" element={<Index />} />
-          <Route path="/settings" element={<Index />} />
-          <Route path="/settings/:projectIndex" element={<Index />} />
+          <Route path="/projects" element={<Index />} />
+          <Route path="/projects/:projectId" element={<Index />} />
+          <Route path="/integrations" element={<Index />} />
+          <Route path="/integrations/:integrationName" element={<Index />} />
+          <Route path="/secrets" element={<Index />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
