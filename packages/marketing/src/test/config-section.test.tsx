@@ -1,48 +1,23 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
 
 import ConfigSection from "../components/ConfigSection";
 
 describe("ConfigSection", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-    Object.assign(navigator, {
-      clipboard: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-    });
-  });
-
-  it("renders the shared yaml code block and copies the register command inline", async () => {
+  it("tells the wizard + dashboard story without referencing YAML", () => {
     render(<ConfigSection />);
 
-    expect(screen.getAllByText("parallax.yml").length).toBeGreaterThan(0);
-    expect(screen.getByText("workspaceDir")).toBeTruthy();
-    expect(screen.getByText("/absolute/path/to/your/repo")).toBeTruthy();
-
-    const buttons = screen.getAllByRole("button");
-    const inlineCopyButton = buttons.find((button) =>
-      button.getAttribute("aria-label") === "Copy inline code"
-    );
-
-    expect(inlineCopyButton).toBeTruthy();
-
-    fireEvent.click(inlineCopyButton!);
-
-    await waitFor(() => {
-      expect(navigator.clipboard.writeText).toHaveBeenCalledWith("parallax register ./parallax.yml");
-    });
+    expect(screen.getByText("From wizard to dashboard.")).toBeTruthy();
+    expect(screen.getAllByText(/parallax init/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Guided setup")).toBeTruthy();
+    expect(screen.getByText("Dashboard-managed")).toBeTruthy();
   });
 
-  it("renders yaml syntax-highlighted content while keeping raw code copyable", () => {
+  it("does not surface the old YAML / register flow", () => {
     render(<ConfigSection />);
 
-    expect(screen.getByText("workspaceDir")).toBeTruthy();
-    expect(screen.getByText("/absolute/path/to/your/repo")).toBeTruthy();
-    expect(screen.getByText("[ai-ready]")).toBeTruthy();
-    expect(screen.getAllByText("provider").length).toBeGreaterThan(0);
-    expect(screen.getByText("codex")).toBeTruthy();
-    expect(screen.getByText("model")).toBeTruthy();
-    expect(screen.getByText("gpt-5.4")).toBeTruthy();
+    expect(screen.queryByText(/parallax\.yml/)).toBeNull();
+    expect(screen.queryByText(/workspaceDir/)).toBeNull();
+    expect(screen.queryByText(/parallax register/)).toBeNull();
   });
 });

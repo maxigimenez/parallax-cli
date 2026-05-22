@@ -1,4 +1,4 @@
-import { Download, ListPlus, MessageSquareMore } from "lucide-react";
+import { Download, Sparkles, MessageSquareMore } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "./ui/badge";
 import CodeBlock from "./CodeBlock";
@@ -26,9 +26,8 @@ const HeroSection = () => {
         <CodeBlock
           title="First run"
           code={`npm i -g parallax-cli
-parallax preflight
-parallax start
-parallax register ./parallax.yml`}
+parallax init
+parallax start`}
           className="mb-6"
         />
 
@@ -38,14 +37,14 @@ parallax register ./parallax.yml`}
               <Download className="h-4 w-4" />
             </div>
             <p className="mb-1 text-xs uppercase tracking-[0.22em] text-primary">Install</p>
-            <p>Set up the CLI, run preflight, and start the local runtime.</p>
+            <p>Set up the CLI and run preflight to verify your toolchain.</p>
           </div>
           <div className="rounded-xl border border-border/70 bg-card/40 p-4">
             <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
-              <ListPlus className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
             </div>
-            <p className="mb-1 text-xs uppercase tracking-[0.22em] text-primary">Register</p>
-            <p>Add each repository with its own <code className="text-primary">parallax.yml</code>.</p>
+            <p className="mb-1 text-xs uppercase tracking-[0.22em] text-primary">Configure</p>
+            <p>Run <code className="text-primary">parallax init</code> for an interactive wizard. No config files to hand-edit.</p>
           </div>
           <div className="rounded-xl border border-border/70 bg-card/40 p-4">
             <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">

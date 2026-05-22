@@ -14,10 +14,11 @@ describe("HeroSection", () => {
 
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Copy code" })).toBeTruthy();
-    expect(screen.getByText(/parallax preflight/)).toBeTruthy();
+    expect(screen.getAllByText(/parallax init/).length).toBeGreaterThan(0);
     expect(screen.getByText("Install")).toBeTruthy();
-    expect(screen.getByText("Register")).toBeTruthy();
+    expect(screen.getByText("Configure")).toBeTruthy();
     expect(screen.getByText("Review")).toBeTruthy();
-    expect(screen.queryByText(/--env-file/)).toBeNull();
+    expect(screen.queryByText(/parallax register/)).toBeNull();
+    expect(screen.queryByText(/parallax\.yml/)).toBeNull();
   });
 });
