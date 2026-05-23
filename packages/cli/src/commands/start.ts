@@ -121,7 +121,6 @@ export async function runStart(args: string[], context: CliContext) {
           '--filter',
           '@parallax/ui',
           'start',
-          '--',
           '--host',
           '0.0.0.0',
           '--port',

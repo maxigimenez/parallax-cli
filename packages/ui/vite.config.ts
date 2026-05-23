@@ -14,6 +14,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@parallax/common": path.resolve(__dirname, "../common/src/index.ts"),
     },
   },
 }));
