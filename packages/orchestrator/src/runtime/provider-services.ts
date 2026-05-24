@@ -84,12 +84,16 @@ export async function updateProviderComment(
   const provider = getPullProvider(project)
 
   if (provider === PULL_PROVIDER.LINEAR) {
-    if (!services.linearService) return
+    if (!services.linearService) {
+      return
+    }
     await services.linearService.updateComment(task.trackerCommentId, message).catch(() => {})
     return
   }
 
-  if (!services.githubService) return
+  if (!services.githubService) {
+    return
+  }
   const { owner, repo } = requireGitHubRepoDetails(project)
   await services.githubService
     .updateComment(owner, repo, task.trackerCommentId, message, project)

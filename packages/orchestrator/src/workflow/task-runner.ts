@@ -90,10 +90,7 @@ function buildExecutingMessage(planMarkdown: string | null | undefined): string 
   return `🤖 Parallax is executing the approved plan.${planSection}`
 }
 
-function buildErrorMessage(
-  error: string,
-  planMarkdown: string | null | undefined
-): string {
+function buildErrorMessage(error: string, planMarkdown: string | null | undefined): string {
   const planSection = planMarkdown
     ? `\n\n## Plan\n\n${planMarkdown}`
     : '\n\n_No plan was generated._'

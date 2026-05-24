@@ -121,8 +121,7 @@ export class LinearService {
       return
     }
 
-    const commentBody =
-      body ?? '🤖 Parallax has picked up this task and is generating a plan.'
+    const commentBody = body ?? '🤖 Parallax has picked up this task and is generating a plan.'
 
     if (existingCommentId) {
       await this.updateComment(existingCommentId, commentBody)
