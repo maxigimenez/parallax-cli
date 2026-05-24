@@ -50,6 +50,30 @@ Notes:
 - shows orchestrator PID, dashboard URL, and configured projects when healthy
 - prints orchestrator diagnostics when the runtime has issues
 
+## parallax tasks
+
+List the 20 most recent tasks with their current status, AI adapter, and model.
+
+```bash
+parallax tasks
+```
+
+Outputs a table with the following columns:
+
+| Column | Description |
+|--------|-------------|
+| TASK ID | External issue ID (e.g. `PROJ-42`) or internal task ID if no external ID is set |
+| NAME | Task title, truncated to 50 characters |
+| ADAPTER | Agent provider (`claude-code`, `codex`, `gemini`) |
+| MODEL | Model configured for the project (`—` if unset) |
+| STATUS | Color-coded: green=done, cyan=running, yellow=queued, red=failed, dim=canceled |
+
+Notes:
+
+- no flags accepted
+- requires Parallax to be running (`parallax start`)
+- shows tasks sorted by most recently created, newest first
+
 ## parallax start
 
 Start orchestrator and dashboard in background.
