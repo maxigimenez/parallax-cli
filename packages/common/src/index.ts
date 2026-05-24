@@ -142,6 +142,7 @@ export interface Task {
   reviewState?: TaskReviewState
   agentName?: string
   agentSessionId?: string
+  trackerCommentId?: string
   createdAt: number
   updatedAt: number
 }

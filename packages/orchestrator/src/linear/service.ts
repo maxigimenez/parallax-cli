@@ -110,11 +110,22 @@ export class LinearService {
     }))
   }
 
-  async markAsInProgress(externalId: string) {
+  async markAsInProgress(
+    externalId: string,
+    existingCommentId?: string | null,
+    body?: string
+  ): Promise<string | undefined> {
     const [teamKey, issueNumber] = externalId.split('-')
     const issueNumberParsed = Number.parseInt(issueNumber, 10)
     if (!teamKey || !Number.isFinite(issueNumberParsed)) {
       return
+    }
+
+    const commentBody = body ?? '🤖 Parallax has picked up this task and is generating a plan.'
+
+    if (existingCommentId) {
+      await this.updateComment(existingCommentId, commentBody)
+      return existingCommentId
     }
 
     const issueData = await this.request<{ issues: { nodes: IssueNode[] } }>(
@@ -189,18 +200,35 @@ export class LinearService {
       { id: issue.id, assigneeId: viewerData.viewer.id, stateId: inProgressState.id }
     )
 
-    await this.request(
+    const commentData = await this.request<{
+      commentCreate: { success: boolean; comment?: { id: string } }
+    }>(
       `
         mutation CreateComment($issueId: String!, $body: String!) {
           commentCreate(input: { issueId: $issueId, body: $body }) {
             success
+            comment {
+              id
+            }
           }
         }
       `,
-      {
-        issueId: issue.id,
-        body: '🤖 Parallax has started working on this task. Using local host environment.',
-      }
+      { issueId: issue.id, body: commentBody }
+    )
+
+    return commentData.commentCreate.comment?.id
+  }
+
+  async updateComment(commentId: string, body: string): Promise<void> {
+    await this.request(
+      `
+        mutation UpdateComment($id: String!, $body: String!) {
+          commentUpdate(id: $id, input: { body: $body }) {
+            success
+          }
+        }
+      `,
+      { id: commentId, body }
     )
   }
 }

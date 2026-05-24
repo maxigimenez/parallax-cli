@@ -29,7 +29,11 @@ import {
 import { logger } from '../logger.js'
 import { dbService } from '../database.js'
 import { taskLifecycle } from '../task-lifecycle.js'
-import { ExternalServices, markTaskInProgress } from '../runtime/provider-services.js'
+import {
+  ExternalServices,
+  markTaskInProgress,
+  updateProviderComment,
+} from '../runtime/provider-services.js'
 import { getSlackBot } from '../slack-integration.js'
 import {
   assertPlanPrompt,
@@ -74,6 +78,25 @@ export function createAgentAdapter(
   throw new Error(`Agent provider "${provider}" is not supported.`)
 }
 
+function buildPlanReadyMessage(planMarkdown: string | null | undefined): string {
+  const planSection = planMarkdown
+    ? `\n\n## Plan\n\n${planMarkdown}\n\nAwaiting approval before execution.`
+    : '\n\nAwaiting approval before execution.'
+  return `🤖 Parallax has generated a plan.${planSection}`
+}
+
+function buildExecutingMessage(planMarkdown: string | null | undefined): string {
+  const planSection = planMarkdown ? `\n\n## Plan\n\n${planMarkdown}` : ''
+  return `🤖 Parallax is executing the approved plan.${planSection}`
+}
+
+function buildErrorMessage(error: string, planMarkdown: string | null | undefined): string {
+  const planSection = planMarkdown
+    ? `\n\n## Plan\n\n${planMarkdown}`
+    : '\n\n_No plan was generated._'
+  return `🤖 Parallax encountered an error.\n\n**Error:** ${error}${planSection}`
+}
+
 export async function processTaskPlan(
   task: Task,
   project: ProjectConfig,
@@ -88,7 +111,13 @@ export async function processTaskPlan(
 
   try {
     throwIfCancellationRequested(task.id, canceledTasks)
-    await markTaskInProgress(task, project, services)
+
+    const commentId = await markTaskInProgress(task, project, services)
+    if (commentId && !task.trackerCommentId) {
+      dbService.updateTaskTrackerCommentId(task.id, commentId)
+      task = { ...task, trackerCommentId: commentId }
+    }
+
     throwIfCancellationRequested(task.id, canceledTasks)
 
     const tempBaseDir = resolveWorktreeBaseDir()
@@ -102,19 +131,23 @@ export async function processTaskPlan(
       dbService.updateAgentSessionId(task.id, planResult.sessionId)
     }
 
-    await persistPlanResult(task, project, planResult)
+    await persistPlanResult(task, project, planResult, services)
   } catch (error: any) {
     if (error instanceof TaskCanceledError) {
       taskLifecycle.cancel(task.id, 'Plan generation canceled')
       return
     }
 
+    const errorMsg = `Critical error while generating plan: ${error.message}`
     logger.error(`Plan generation critical error: ${error.message}`, task.id)
-    taskLifecycle.fail(
-      task.id,
-      `Critical error while generating plan: ${error.message}`,
-      TaskPlanState.PLAN_FAILED
-    )
+    taskLifecycle.fail(task.id, errorMsg, TaskPlanState.PLAN_FAILED)
+
+    await updateProviderComment(
+      task,
+      project,
+      services,
+      buildErrorMessage(error.message, task.planMarkdown)
+    ).catch(() => {})
   } finally {
     if (task.externalId) {
       try {
@@ -129,7 +162,12 @@ export async function processTaskPlan(
   }
 }
 
-async function persistPlanResult(task: Task, project: ProjectConfig, planResult: PlanResult) {
+async function persistPlanResult(
+  task: Task,
+  project: ProjectConfig,
+  planResult: PlanResult,
+  services: ExternalServices
+) {
   const nextState = getNextPlanState(planResult.status as PlanResultStatus)
   dbService.updateTaskPlanOutput(task.id, {
     planState: nextState,
@@ -141,6 +179,14 @@ async function persistPlanResult(task: Task, project: ProjectConfig, planResult:
 
   if (nextState === TaskPlanState.PLAN_READY) {
     taskLifecycle.queue(task.id, 'Plan ready. Awaiting approval.')
+
+    await updateProviderComment(
+      task,
+      project,
+      services,
+      buildPlanReadyMessage(planResult.planMarkdown)
+    ).catch(() => {})
+
     const updatedTask = dbService.getTaskById(task.id)
     if (updatedTask) {
       getSlackBot()
@@ -156,6 +202,14 @@ async function persistPlanResult(task: Task, project: ProjectConfig, planResult:
 
   const failMessage = planResult.error ?? 'Plan generation failed'
   taskLifecycle.fail(task.id, failMessage)
+
+  await updateProviderComment(
+    task,
+    project,
+    services,
+    buildErrorMessage(failMessage, planResult.planMarkdown)
+  ).catch(() => {})
+
   const failedTask = dbService.getTaskById(task.id)
   if (failedTask) {
     getSlackBot()
@@ -196,7 +250,14 @@ export async function processTask(
 
   try {
     throwIfCancellationRequested(task.id, canceledTasks)
-    await markTaskInProgress(task, project, services)
+
+    await updateProviderComment(
+      task,
+      project,
+      services,
+      buildExecutingMessage(task.planMarkdown)
+    ).catch(() => {})
+
     throwIfCancellationRequested(task.id, canceledTasks)
 
     const tempBaseDir = resolveWorktreeBaseDir()
@@ -219,10 +280,17 @@ export async function processTask(
       await emitWorktreeDiffLogs(task, gitService, worktreePath)
       const branchName = await gitService.commitAndPush(worktreePath, task)
       if (!branchName) {
-        logger.error('No changes made by agent.', task.id)
-        taskLifecycle.fail(task.id, 'No changes made by agent.')
+        const noChangesMsg = 'No changes made by agent.'
+        logger.error(noChangesMsg, task.id)
+        taskLifecycle.fail(task.id, noChangesMsg)
+        await updateProviderComment(
+          task,
+          project,
+          services,
+          buildErrorMessage(noChangesMsg, task.planMarkdown)
+        ).catch(() => {})
         getSlackBot()
-          ?.notify({ task, event: 'failed', extra: 'No changes made by agent.' })
+          ?.notify({ task, event: 'failed', extra: noChangesMsg })
           .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
         return
       }
@@ -271,8 +339,15 @@ export async function processTask(
       return
     }
 
-    logger.error(`Agent failed: ${result.error}`, task.id)
-    taskLifecycle.fail(task.id, `Agent failed: ${result.error}`)
+    const agentError = result.error ?? 'Agent failed'
+    logger.error(`Agent failed: ${agentError}`, task.id)
+    taskLifecycle.fail(task.id, `Agent failed: ${agentError}`)
+    await updateProviderComment(
+      task,
+      project,
+      services,
+      buildErrorMessage(agentError, task.planMarkdown)
+    ).catch(() => {})
     getSlackBot()
       ?.notify({ task, event: 'failed', extra: result.error })
       .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
@@ -286,6 +361,12 @@ export async function processTask(
     const criticalMsg = `Critical error: ${error.message}`
     logger.error(criticalMsg, task.id)
     taskLifecycle.fail(task.id, criticalMsg)
+    await updateProviderComment(
+      task,
+      project,
+      services,
+      buildErrorMessage(error.message, task.planMarkdown)
+    ).catch(() => {})
     const failedTask = dbService.getTaskById(task.id)
     if (failedTask) {
       getSlackBot()
