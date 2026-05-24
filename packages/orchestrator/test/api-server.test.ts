@@ -355,9 +355,7 @@ describe('DELETE /projects/:projectId', () => {
     vi.mocked(dbService.listTasks).mockReturnValue([{ id: 'task-1', projectId: 'proj-1' }])
     const localServer = await createApiServer(
       buildDependencies({
-        getConfig: vi
-          .fn()
-          .mockReturnValue({ projects: [{ id: 'proj-1' }], slack: null }),
+        getConfig: vi.fn().mockReturnValue({ projects: [{ id: 'proj-1' }], slack: null }),
         activeTasks: new Set(['task-1']),
       })
     )

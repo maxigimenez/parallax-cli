@@ -7,11 +7,7 @@ import {
   StoredConfig,
 } from '@parallax/common'
 
-const ALLOWED_AGENT_PROVIDERS = [
-  'codex',
-  'gemini',
-  'claude-code',
-] as const
+const ALLOWED_AGENT_PROVIDERS = ['codex', 'gemini', 'claude-code'] as const
 
 const ALLOWED_PULL_PROVIDERS = [PULL_PROVIDER.LINEAR, PULL_PROVIDER.GITHUB] as const
 
@@ -80,7 +76,9 @@ export function validateProject(raw: unknown): ProjectConfig {
     agentRaw.provider,
     `project.agent.provider for "${id}"`
   )
-  if (!ALLOWED_AGENT_PROVIDERS.includes(agentProviderRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number])) {
+  if (
+    !ALLOWED_AGENT_PROVIDERS.includes(agentProviderRaw as (typeof ALLOWED_AGENT_PROVIDERS)[number])
+  ) {
     throw new Error(
       `Unsupported agent provider "${agentProviderRaw}" for project "${id}". Supported: ${ALLOWED_AGENT_PROVIDERS.join(', ')}.`
     )
@@ -100,9 +98,7 @@ export function validateProject(raw: unknown): ProjectConfig {
   }
 }
 
-export function validateStoredConfig(
-  stored: StoredConfig
-): Pick<AppConfig, 'projects' | 'slack'> {
+export function validateStoredConfig(stored: StoredConfig): Pick<AppConfig, 'projects' | 'slack'> {
   const projectIds = new Set<string>()
   const projects: ProjectConfig[] = []
   for (const raw of stored.projects) {

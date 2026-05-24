@@ -16,10 +16,7 @@ import { logger, setIo, setLogLevels } from './logger.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitHubReviewService } from './github/review-service.js'
 import { createTaskId } from './task-id.js'
-import {
-  buildExternalServices,
-  fetchProjectTasks,
-} from './runtime/provider-services.js'
+import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
 import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'

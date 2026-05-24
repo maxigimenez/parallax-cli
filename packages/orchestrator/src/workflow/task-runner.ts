@@ -129,11 +129,7 @@ export async function processTaskPlan(
   }
 }
 
-async function persistPlanResult(
-  task: Task,
-  project: ProjectConfig,
-  planResult: PlanResult
-) {
+async function persistPlanResult(task: Task, project: ProjectConfig, planResult: PlanResult) {
   const nextState = getNextPlanState(planResult.status as PlanResultStatus)
   dbService.updateTaskPlanOutput(task.id, {
     planState: nextState,
