@@ -180,7 +180,7 @@ export class ClaudeCodeAdapter extends BaseAgentAdapter {
     const planLine = approvedPlan ? `\n\nApproved Plan:\n${approvedPlan}` : ''
     const outputInstruction =
       outputMode === 'commit'
-        ? 'At the end include a single-line commit message in PARALLAX_COMMIT_MESSAGE format.'
+        ? 'At the end include a single-line commit message in PARALLAX_COMMIT_MESSAGE format. Use conventional commits (feat:, fix:, chore:, etc.) and end with [parallax]. Example: PARALLAX_COMMIT_MESSAGE: feat: add user authentication [parallax]'
         : [
             'At the end include PR title and summary in PARALLAX_PR_TITLE and PARALLAX_PR_SUMMARY format.',
             'PARALLAX_PR_SUMMARY must be a concise human summary with maximum 10 lines.',

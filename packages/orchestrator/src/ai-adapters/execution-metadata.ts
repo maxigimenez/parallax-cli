@@ -60,7 +60,11 @@ export function extractExecutionMetadata(
 }
 
 export function sanitizeCommitMessage(commitMessage: string | undefined) {
-  return sanitizeSingleLine(commitMessage)
+  const msg = sanitizeSingleLine(commitMessage)
+  if (!msg) {
+    return undefined
+  }
+  return msg.endsWith('[parallax]') ? msg : `${msg} [parallax]`
 }
 
 export function normalizePrSummary(summary: string | undefined) {
@@ -68,5 +72,5 @@ export function normalizePrSummary(summary: string | undefined) {
 }
 
 export function buildDefaultCommitMessage(taskExternalId: string, taskTitle: string) {
-  return sanitizeSingleLine(`Parallax: ${taskExternalId} - ${taskTitle}`)!
+  return sanitizeSingleLine(`feat: ${taskTitle} [parallax]`)!
 }

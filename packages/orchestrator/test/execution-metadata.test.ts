@@ -24,13 +24,19 @@ describe('execution metadata', () => {
     expect(metadata.commitMessage).toBe('Tighten dashboard loading')
   })
 
-  it('normalizes commit messages to a single line', () => {
-    expect(sanitizeCommitMessage('  Fix   dashboard \n loading  ')).toBe('Fix dashboard loading')
+  it('normalizes commit messages to a single line and appends [parallax]', () => {
+    expect(sanitizeCommitMessage('  Fix   dashboard \n loading  ')).toBe(
+      'Fix dashboard loading [parallax]'
+    )
   })
 
-  it('builds a stable default commit message when AI output omits one', () => {
+  it('does not double-append [parallax] if already present', () => {
+    expect(sanitizeCommitMessage('feat: add thing [parallax]')).toBe('feat: add thing [parallax]')
+  })
+
+  it('builds a default conventional commit message when AI output omits one', () => {
     expect(buildDefaultCommitMessage('e340140c8be1', 'Improve loading state')).toBe(
-      'Parallax: e340140c8be1 - Improve loading state'
+      'feat: Improve loading state [parallax]'
     )
   })
 

@@ -207,7 +207,7 @@ export class GeminiAdapter extends BaseAgentAdapter {
       ...(outputMode === 'commit'
         ? [
             'At the end of your response, include:',
-            'PARALLAX_COMMIT_MESSAGE: <single-line git commit message>',
+            'PARALLAX_COMMIT_MESSAGE: <conventional commit message ending with [parallax], e.g. feat: add user authentication [parallax]>',
           ]
         : [
             'At the end of your response, include:',
