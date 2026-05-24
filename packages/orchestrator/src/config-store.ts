@@ -8,7 +8,6 @@ export function emptyStoredConfig(): StoredConfig {
   return {
     version: 1,
     projects: [],
-    agents: [],
     slack: null,
     secrets: {},
     updatedAt: 0,
@@ -46,7 +45,6 @@ export async function readConfigStore(dataDir: string): Promise<StoredConfig> {
   return {
     version: typeof obj.version === 'number' ? obj.version : 1,
     projects: Array.isArray(obj.projects) ? (obj.projects as StoredConfig['projects']) : [],
-    agents: Array.isArray(obj.agents) ? (obj.agents as StoredConfig['agents']) : [],
     slack:
       obj.slack && typeof obj.slack === 'object' && !Array.isArray(obj.slack)
         ? (obj.slack as StoredConfig['slack'])

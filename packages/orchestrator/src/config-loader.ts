@@ -60,14 +60,13 @@ export async function loadConfig(): Promise<AppConfig> {
     }
   }
 
-  const { projects, agents, slack } = validateStoredConfig(stored)
+  const { projects, slack } = validateStoredConfig(stored)
 
   return {
     concurrency: parseRuntimeConcurrency(),
     logs: ['info', 'success', 'warn', 'error'],
     server: parseRuntimeServerConfig(),
     projects,
-    agents,
     slack,
   }
 }

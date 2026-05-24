@@ -21,8 +21,8 @@ describe('task helpers', () => {
         concurrency: 1,
         logs: [LOG_LEVEL.INFO],
         server: {
-          apiPort: 3000,
-          uiPort: 8080,
+          apiPort: 9371,
+          uiPort: 9372,
         },
         projects: [
           {
@@ -47,8 +47,8 @@ describe('task helpers', () => {
         concurrency: 1,
         logs: [LOG_LEVEL.INFO],
         server: {
-          apiPort: 3000,
-          uiPort: 8080,
+          apiPort: 9371,
+          uiPort: 9372,
         },
         projects: [
           {
@@ -77,8 +77,8 @@ describe('task helpers', () => {
         concurrency: 1,
         logs: [LOG_LEVEL.INFO],
         server: {
-          apiPort: 3000,
-          uiPort: 8080,
+          apiPort: 9371,
+          uiPort: 9372,
         },
         projects: [
           {

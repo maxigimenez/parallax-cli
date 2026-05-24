@@ -8,7 +8,6 @@ Parallax stores all configuration in `~/.parallax/config.json`. You do not edit 
 {
   "version": 1,
   "projects": [...],
-  "agents": [...],
   "slack": null,
   "secrets": { "LINEAR_API_KEY": "..." },
   "updatedAt": 1716300000000
@@ -56,36 +55,6 @@ Array of project entries. Each project maps to one repository and one issue sour
 
 **agent.model** (optional) — pin a specific model version. Omit to use the provider default.
 
-**agent.name** (optional) — reference a named agent from the `agents` array instead of specifying a provider directly.
-
-**agent.systemPrompt** (optional) — custom instructions prepended to every prompt for this project.
-
-**agentLabels** (optional) — map from issue label to named agent, for per-label agent routing:
-
-```json
-{
-  "agentLabels": {
-    "ai-frontend": "reviewer",
-    "ai-security": "reviewer"
-  }
-}
-```
-
-### agents
-
-Array of reusable named agent definitions. Projects reference them by `agent.name`.
-
-```json
-{
-  "name": "developer",
-  "provider": "claude-code",
-  "model": "claude-opus-4-5",
-  "systemPrompt": "You are a senior backend engineer..."
-}
-```
-
-Agent names must be unique. `provider` is required; `model` and `systemPrompt` are optional.
-
 ### slack
 
 Slack bot configuration, or `null` if not configured.
@@ -113,7 +82,7 @@ Key-value map of environment variables injected into the orchestrator process at
 }
 ```
 
-Managed from the **Secrets** tab in the dashboard. Values are masked in the UI (`•••••••`) and never returned by the API.
+Managed from the **Integrations** tab in the dashboard. Values are masked in the UI (`•••••••`) and never returned by the API.
 
 Common secrets:
 
@@ -125,7 +94,6 @@ Common secrets:
 |---|---|
 | `parallax init` | First-time setup wizard; add a project |
 | Dashboard → Projects | Add, edit, delete projects |
-| Dashboard → Integrations | Configure GitHub, Linear, Slack |
-| Dashboard → Secrets | Add, update, delete secrets |
+| Dashboard → Integrations | Configure GitHub, Linear, Slack, and API keys |
 
 Changes made in the dashboard take effect immediately without restarting Parallax.

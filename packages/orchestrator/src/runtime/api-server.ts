@@ -18,7 +18,7 @@ import {
 } from './api/request-parsers.js'
 import { serializeTaskForApi } from './api/task-response.js'
 import { readConfigStore, writeConfigStore } from '../config-store.js'
-import { validateProject, validateAgent, validateSlack } from '../config-validation.js'
+import { validateProject, validateSlack } from '../config-validation.js'
 
 type TaskDiffFile = {
   path: string
@@ -89,6 +89,7 @@ export async function createApiServer(
 
   await fastify.register(cors, {
     origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })
 
   fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
@@ -379,7 +380,7 @@ export async function createApiServer(
     try {
       const body = request.body as Record<string, unknown>
       const existing = getConfig()
-      const project = validateProject(body, existing.agents)
+      const project = validateProject(body)
       if (existing.projects.some((p) => p.id === project.id)) {
         return reply.status(409).send({ error: `Project "${project.id}" already exists.` })
       }
@@ -400,7 +401,7 @@ export async function createApiServer(
       if (!existing.projects.some((p) => p.id === projectId)) {
         return reply.status(404).send({ error: `Project "${projectId}" not found.` })
       }
-      const project = validateProject({ ...body, id: projectId }, existing.agents)
+      const project = validateProject({ ...body, id: projectId })
       await mutateConfig((cfg) => ({
         ...cfg,
         projects: cfg.projects.map((p) => (p.id === projectId ? project : p)),
@@ -431,63 +432,6 @@ export async function createApiServer(
     await mutateConfig((cfg) => ({
       ...cfg,
       projects: cfg.projects.filter((p) => p.id !== projectId),
-    }))
-    return { ok: true }
-  })
-
-  // --- Agents CRUD ---
-
-  fastify.get('/agents', async () => ({ agents: getConfig().agents }))
-
-  fastify.post('/agents', async (request, reply) => {
-    try {
-      const body = request.body as Record<string, unknown>
-      const existing = getConfig()
-      const knownNames = new Set(existing.agents.map((a) => a.name))
-      const agent = validateAgent(body, 0, knownNames)
-      if (existing.agents.some((a) => a.name === agent.name)) {
-        return reply.status(409).send({ error: `Agent "${agent.name}" already exists.` })
-      }
-      await mutateConfig((cfg) => ({ ...cfg, agents: [...cfg.agents, agent] }))
-      return { ok: true, agent }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-  })
-
-  fastify.put('/agents/:agentName', async (request, reply) => {
-    try {
-      const { agentName } = request.params as { agentName: string }
-      const body = request.body as Record<string, unknown>
-      const existing = getConfig()
-      if (!existing.agents.some((a) => a.name === agentName)) {
-        return reply.status(404).send({ error: `Agent "${agentName}" not found.` })
-      }
-      const knownNames = new Set(existing.agents.map((a) => a.name))
-      knownNames.delete(agentName)
-      const agent = validateAgent({ ...body, name: agentName }, 0, knownNames)
-      await mutateConfig((cfg) => ({
-        ...cfg,
-        agents: cfg.agents.map((a) => (a.name === agentName ? agent : a)),
-      }))
-      return { ok: true, agent }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-  })
-
-  fastify.delete('/agents/:agentName', async (request, reply) => {
-    const { agentName } = request.params as { agentName: string }
-    if (!getConfig().agents.some((a) => a.name === agentName)) {
-      return reply.status(404).send({ error: `Agent "${agentName}" not found.` })
-    }
-    await mutateConfig((cfg) => ({
-      ...cfg,
-      agents: cfg.agents.filter((a) => a.name !== agentName),
     }))
     return { ok: true }
   })

@@ -68,7 +68,7 @@ The wizard walks through:
 5. **AI agent** — Claude Code, OpenAI Codex, or Google Gemini
 6. **Model override** — optional, to pin a specific model version
 7. **Secrets** — Linear API key if you selected Linear and it is not already stored
-8. **Slack notifications** — optional, configures bot/app tokens and a channel
+8. **Slack notifications** — optional, configures bot/app tokens and a notification channel
 
 Configuration is saved to `~/.parallax/config.json`. You can manage projects and integrations later from the dashboard.
 
@@ -89,14 +89,13 @@ What this does:
 parallax open
 ```
 
-Or open `http://localhost:8080` in your browser.
+Or open `http://localhost:9372` in your browser.
 
-The dashboard has four sections (left navigation):
+The dashboard has three sections (left navigation):
 
 - **Tasks** — live task list, plan approval, log streaming
 - **Projects** — add, edit, and remove project configurations
-- **Integrations** — configure GitHub, Linear, and Slack
-- **Secrets** — manage API keys and environment variables
+- **Integrations** — configure GitHub, Linear, and Slack (including API keys)
 
 ## 7. Check runtime status
 

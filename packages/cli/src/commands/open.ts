@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process'
 import type { CliContext } from '../types.js'
 
 export async function runOpen(_args: string[], context: CliContext) {
-  let url = `http://localhost:8080`
+  let url = `http://localhost:9372`
 
   try {
     const state = await context.loadRunningState()

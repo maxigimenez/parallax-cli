@@ -65,7 +65,7 @@ Examples:
 
 ```bash
 parallax start
-parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax start --server-api-port 9371 --server-ui-port 9372 --concurrency 2
 ```
 
 ## parallax stop

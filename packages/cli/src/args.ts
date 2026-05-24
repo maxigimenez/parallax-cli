@@ -84,8 +84,8 @@ export function parseStartOptions(args: string[]): StartCommandOptions {
     throw new Error('parallax start accepts flags only.')
   }
 
-  const apiPort = parseStrictPort(args, 'server-api-port', 3000)
-  const uiPort = parseStrictPort(args, 'server-ui-port', 8080)
+  const apiPort = parseStrictPort(args, 'server-api-port', 9371)
+  const uiPort = parseStrictPort(args, 'server-ui-port', 9372)
   const rawConcurrency = parseOptionalArg(args, 'concurrency')
   const concurrency = rawConcurrency === undefined ? 2 : Number.parseInt(rawConcurrency, 10)
 

@@ -33,7 +33,6 @@ vi.mock('../src/config-store.js', () => ({
   readConfigStore: vi.fn().mockResolvedValue({
     version: 1,
     projects: [],
-    agents: [],
     slack: null,
     secrets: {},
     updatedAt: 0,
@@ -45,8 +44,8 @@ vi.mock('../src/config-store.js', () => ({
 
 function buildDependencies(overrides: Record<string, unknown> = {}) {
   return {
-    getConfig: vi.fn().mockReturnValue({ projects: [], agents: [], slack: null }),
-    reloadRuntime: vi.fn().mockResolvedValue({ projects: [], agents: [], slack: null }),
+    getConfig: vi.fn().mockReturnValue({ projects: [], slack: null }),
+    reloadRuntime: vi.fn().mockResolvedValue({ projects: [], slack: null }),
     triggerPullRequestReview: vi.fn(),
     gitService: { getWorktreeChangedFiles: vi.fn(), getTaskUnifiedDiff: vi.fn() } as any,
     activeTasks: new Set<string>(),
@@ -89,9 +88,9 @@ describe('createApiServer – CORS', () => {
     const res = await server.inject({
       method: 'GET',
       url: '/tasks',
-      headers: { origin: 'http://localhost:3000' },
+      headers: { origin: 'http://localhost:9371' },
     })
-    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000')
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:9371')
   })
 
   it('allows requests from 127.0.0.1 origin', async () => {
@@ -118,6 +117,20 @@ describe('createApiServer – CORS', () => {
   it('does not use wildcard CORS', async () => {
     const res = await server.inject({ method: 'GET', url: '/tasks' })
     expect(res.headers['access-control-allow-origin']).not.toBe('*')
+  })
+
+  it('allows PUT and DELETE in preflight response', async () => {
+    const res = await server.inject({
+      method: 'OPTIONS',
+      url: '/integrations/slack',
+      headers: {
+        origin: 'http://localhost:9372',
+        'access-control-request-method': 'PUT',
+      },
+    })
+    const allowed = res.headers['access-control-allow-methods'] ?? ''
+    expect(allowed).toContain('PUT')
+    expect(allowed).toContain('DELETE')
   })
 })
 
@@ -322,7 +335,6 @@ describe('DELETE /projects/:projectId', () => {
       buildDependencies({
         getConfig: vi.fn().mockReturnValue({
           projects: [{ id: 'proj-1' }],
-          agents: [],
           slack: null,
         }),
       })
@@ -345,7 +357,7 @@ describe('DELETE /projects/:projectId', () => {
       buildDependencies({
         getConfig: vi
           .fn()
-          .mockReturnValue({ projects: [{ id: 'proj-1' }], agents: [], slack: null }),
+          .mockReturnValue({ projects: [{ id: 'proj-1' }], slack: null }),
         activeTasks: new Set(['task-1']),
       })
     )
@@ -474,7 +486,6 @@ describe('PUT /integrations/slack', () => {
       buildDependencies({
         getConfig: vi.fn().mockReturnValue({
           projects: [],
-          agents: [],
           slack: { botToken: 'xoxb-real', appToken: 'xapp-real', channel: '#old' },
         }),
       })
@@ -493,7 +504,6 @@ describe('PUT /integrations/slack', () => {
       buildDependencies({
         getConfig: vi.fn().mockReturnValue({
           projects: [],
-          agents: [],
           slack: { botToken: 'xoxb-real', appToken: 'xapp-real', channel: '#old' },
         }),
       })

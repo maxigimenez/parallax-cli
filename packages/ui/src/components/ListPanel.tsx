@@ -6,7 +6,6 @@ import {
   FolderOpen,
   Github,
   Hash,
-  KeyRound,
   Layers,
   List,
   Plug,
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react'
 import { TASK_STATUS, TASK_STATUS_LABEL, type TaskStatus } from '@/lib/task-constants'
 
-export type ActiveView = 'tasks' | 'projects' | 'integrations' | 'secrets'
+export type ActiveView = 'tasks' | 'projects' | 'integrations'
 
 interface ListPanelProps {
   selectedId: string | null
@@ -23,7 +22,6 @@ interface ListPanelProps {
   onAddProject: () => void
   tasks: TaskInfo[]
   config: AppConfig | null
-  secrets: Record<string, string>
 }
 
 const STATUS_ORDER: TaskStatus[] = [
@@ -67,7 +65,6 @@ const VIEW_META: Record<ActiveView, { label: string; icon: React.ReactNode }> = 
   tasks: { label: 'Tasks', icon: <List className="h-3.5 w-3.5" /> },
   projects: { label: 'Projects', icon: <FolderOpen className="h-3.5 w-3.5" /> },
   integrations: { label: 'Integrations', icon: <Plug className="h-3.5 w-3.5" /> },
-  secrets: { label: 'Secrets', icon: <KeyRound className="h-3.5 w-3.5" /> },
 }
 
 export function ListPanel({
@@ -77,7 +74,6 @@ export function ListPanel({
   onAddProject,
   tasks,
   config,
-  secrets,
 }: ListPanelProps) {
   const counts = useMemo(() => {
     const initial: Record<TaskStatus, number> = {
@@ -229,20 +225,6 @@ export function ListPanel({
           </div>
         )}
 
-        {activeView === 'secrets' && (
-          <div>
-            {Object.keys(secrets).length === 0 ? (
-              <p className="p-3 text-xs text-zinc-600">No secrets configured.</p>
-            ) : (
-              Object.keys(secrets).sort().map((key) => (
-                <div key={key} className="border-b border-zinc-900 px-3 py-3">
-                  <p className="text-xs font-medium text-zinc-200">{key}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-zinc-600">•••••••</p>
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
     </aside>
   )

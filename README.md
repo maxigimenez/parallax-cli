@@ -14,7 +14,6 @@ It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent i
 - Global runtime state under `~/.parallax`.
 - CLI onboarding wizard plus dashboard UI.
 - Codex, Gemini, and Claude Code adapters (configurable per project).
-- Named agents with system prompts and per-label routing.
 - Slack bot for plan approvals and task notifications (Socket Mode, no public URL needed).
 
 ## Requirements
@@ -93,12 +92,11 @@ See [docs/slack-bot.md](docs/slack-bot.md) for the full setup guide.
 
 ## Dashboard
 
-The dashboard is a four-section UI accessible at `http://localhost:8080` (default):
+The dashboard is accessible at `http://localhost:9372` (default):
 
 - **Tasks** — live task list with plan approval and log streaming
 - **Projects** — add, edit, and delete project configurations
-- **Integrations** — configure GitHub, Linear, and Slack
-- **Secrets** — manage runtime environment variables (API keys, tokens)
+- **Integrations** — configure GitHub, Linear, Slack, and API keys
 
 ## Runtime behavior
 
@@ -127,8 +125,8 @@ Before triggering the release, update the version in `packages/cli/package.json`
 Default runtime locations and ports:
 
 - runtime state: `~/.parallax`
-- API: `http://localhost:3000`
-- dashboard: `http://localhost:8080`
+- API: `http://localhost:9371`
+- dashboard: `http://localhost:9372`
 
 ## Development
 

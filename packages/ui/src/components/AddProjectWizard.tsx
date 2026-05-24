@@ -37,7 +37,6 @@ export function AddProjectWizard({ existingIds, onAdd, onClose }: AddProjectWiza
   // Agent
   const [agentProvider, setAgentProvider] = useState<ProjectConfig['agent']['provider']>('claude-code')
   const [agentModel, setAgentModel] = useState('')
-  const [systemPrompt, setSystemPrompt] = useState('')
 
   const stepIndex = STEPS.indexOf(step)
 
@@ -98,7 +97,6 @@ export function AddProjectWizard({ existingIds, onAdd, onClose }: AddProjectWiza
         agent: {
           provider: agentProvider,
           model: agentModel.trim() || undefined,
-          systemPrompt: systemPrompt.trim() || undefined,
         },
       }
       await onAdd(project)
@@ -241,14 +239,6 @@ export function AddProjectWizard({ existingIds, onAdd, onClose }: AddProjectWiza
                   onChange={(e) => setAgentModel(e.target.value)}
                   placeholder="provider default"
                   className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-orange-600 focus:outline-none"
-                />
-              </Field>
-              <Field label="System prompt (optional)">
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={5}
-                  className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600 focus:border-orange-600 focus:outline-none resize-y min-h-[100px]"
                 />
               </Field>
             </>

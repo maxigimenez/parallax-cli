@@ -8,12 +8,12 @@ export async function sendNotification(
   payload: SlackNotificationPayload,
   threadRegistry: Map<string, string>
 ): Promise<void> {
-  const { task, event, agentDef, extra } = payload
+  const { task, event, extra } = payload
 
   if (event === 'plan_ready') {
     const result = await client.chat.postMessage({
       channel,
-      blocks: buildPlanApprovalMessage(task, agentDef),
+      blocks: buildPlanApprovalMessage(task),
       text: `Plan ready for ${task.externalId}: ${task.title}`,
     })
     if (result.ts) {
@@ -24,7 +24,7 @@ export async function sendNotification(
 
   await client.chat.postMessage({
     channel,
-    blocks: buildEventMessage(task, event, agentDef, extra),
+    blocks: buildEventMessage(task, event, extra),
     text: `[${event}] ${task.externalId}: ${task.title}`,
   })
 }

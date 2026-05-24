@@ -1,4 +1,4 @@
-import type { Task, AgentDefinition } from '@parallax/common'
+import type { Task } from '@parallax/common'
 
 export type SlackNotificationEvent =
   | 'plan_ready'
@@ -10,7 +10,6 @@ export type SlackNotificationEvent =
 export interface SlackNotificationPayload {
   task: Task
   event: SlackNotificationEvent
-  agentDef?: AgentDefinition
   extra?: string
 }
 

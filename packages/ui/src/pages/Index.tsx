@@ -8,7 +8,6 @@ import { ListPanel, type ActiveView } from '@/components/ListPanel'
 import { ProjectEditor } from '@/components/ProjectEditor'
 import { AddProjectWizard } from '@/components/AddProjectWizard'
 import { IntegrationDetail } from '@/components/IntegrationDetail'
-import { SecretsEditor } from '@/components/SecretsEditor'
 import { useParallax } from '@/hooks/useParallax'
 import { TASK_STATUS } from '@/lib/task-constants'
 
@@ -17,7 +16,6 @@ type TaskDetailView = 'dashboard' | 'logs'
 function resolveActiveView(pathname: string): ActiveView {
   if (pathname.startsWith('/projects')) return 'projects'
   if (pathname.startsWith('/integrations')) return 'integrations'
-  if (pathname.startsWith('/secrets')) return 'secrets'
   return 'tasks'
 }
 
@@ -43,7 +41,6 @@ const Index = () => {
     saveSlack,
     removeSlack,
     setSecret,
-    deleteSecret,
   } = useParallax()
 
   const navigate = useNavigate()
@@ -93,7 +90,6 @@ const Index = () => {
       tasks: '/',
       projects: '/projects',
       integrations: '/integrations',
-      secrets: '/secrets',
     }
     navigate(routes[view])
   }
@@ -186,12 +182,6 @@ const Index = () => {
       )
     }
 
-    if (activeView === 'secrets') {
-      return (
-        <SecretsEditor secrets={secrets} onSetSecret={setSecret} onDeleteSecret={deleteSecret} />
-      )
-    }
-
     return null
   }
 
@@ -212,7 +202,6 @@ const Index = () => {
         onAddProject={() => setShowAddProject(true)}
         tasks={Object.values(tasks)}
         config={config}
-        secrets={secrets}
       />
 
       {/* Main content */}

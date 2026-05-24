@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { Github, List, FolderOpen, Plug, KeyRound } from 'lucide-react'
+import { Github, List, FolderOpen, Plug } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { ActiveView } from './ListPanel'
 
@@ -13,7 +13,6 @@ const NAV_ITEMS: { id: ActiveView; icon: React.ReactNode; label: string }[] = [
   { id: 'tasks', icon: <List className="h-4 w-4" />, label: 'Tasks' },
   { id: 'projects', icon: <FolderOpen className="h-4 w-4" />, label: 'Projects' },
   { id: 'integrations', icon: <Plug className="h-4 w-4" />, label: 'Integrations' },
-  { id: 'secrets', icon: <KeyRound className="h-4 w-4" />, label: 'Secrets' },
 ]
 
 export function NavBar({ activeView, onViewChange, isConnected }: NavBarProps) {

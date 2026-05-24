@@ -22,7 +22,6 @@ const App = () => (
           <Route path="/projects/:projectId" element={<Index />} />
           <Route path="/integrations" element={<Index />} />
           <Route path="/integrations/:integrationName" element={<Index />} />
-          <Route path="/secrets" element={<Index />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

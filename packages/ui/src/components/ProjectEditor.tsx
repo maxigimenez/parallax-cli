@@ -20,8 +20,6 @@ export function ProjectEditor({ project, onUpdate, onDelete }: ProjectEditorProp
   const [workspaceDir, setWorkspaceDir] = useState(project.workspaceDir)
   const [agentProvider, setAgentProvider] = useState(project.agent.provider)
   const [agentModel, setAgentModel] = useState(project.agent.model ?? '')
-  const [agentName, setAgentName] = useState(project.agent.name ?? '')
-  const [systemPrompt, setSystemPrompt] = useState(project.agent.systemPrompt ?? '')
   const [labelFilter, setLabelFilter] = useState(
     project.pullFrom.filters.labels?.[0] ?? ''
   )
@@ -30,8 +28,6 @@ export function ProjectEditor({ project, onUpdate, onDelete }: ProjectEditorProp
     setWorkspaceDir(project.workspaceDir)
     setAgentProvider(project.agent.provider)
     setAgentModel(project.agent.model ?? '')
-    setAgentName(project.agent.name ?? '')
-    setSystemPrompt(project.agent.systemPrompt ?? '')
     setLabelFilter(project.pullFrom.filters.labels?.[0] ?? '')
     setError(null)
   }
@@ -40,8 +36,6 @@ export function ProjectEditor({ project, onUpdate, onDelete }: ProjectEditorProp
     setWorkspaceDir(project.workspaceDir)
     setAgentProvider(project.agent.provider)
     setAgentModel(project.agent.model ?? '')
-    setAgentName(project.agent.name ?? '')
-    setSystemPrompt(project.agent.systemPrompt ?? '')
     setLabelFilter(project.pullFrom.filters.labels?.[0] ?? '')
     setError(null)
     setEditing(false)
@@ -65,8 +59,6 @@ export function ProjectEditor({ project, onUpdate, onDelete }: ProjectEditorProp
         agent: {
           provider: agentProvider,
           model: agentModel.trim() || undefined,
-          name: agentName.trim() || undefined,
-          systemPrompt: systemPrompt.trim() || undefined,
         },
       }
       await onUpdate(project.id, patch)
@@ -225,29 +217,9 @@ export function ProjectEditor({ project, onUpdate, onDelete }: ProjectEditorProp
             ) : (
               <Row label="Model" value={project.agent.model || '—'} />
             )}
-            {editing ? (
-              <EditRow label="Named agent" value={agentName} onChange={setAgentName} placeholder="optional" />
-            ) : (
-              <Row label="Named agent" value={project.agent.name || '—'} />
-            )}
-            {editing ? (
-              <TextareaRow label="System prompt" value={systemPrompt} onChange={setSystemPrompt} placeholder="optional" />
-            ) : (
-              <Row label="System prompt" value={project.agent.systemPrompt || '—'} />
-            )}
           </div>
         </section>
 
-        {project.agentLabels && Object.keys(project.agentLabels).length > 0 && (
-          <section>
-            <p className="mb-3 text-[10px] font-bold tracking-widest text-zinc-500 uppercase">Agent Labels</p>
-            <div className="space-y-2">
-              {Object.entries(project.agentLabels).map(([label, agentRef]) => (
-                <Row key={label} label={label} value={agentRef} />
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     </div>
   )
@@ -313,27 +285,3 @@ function SelectRow({
   )
 }
 
-function TextareaRow({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-}) {
-  return (
-    <div className="flex gap-3">
-      <span className="w-28 shrink-0 pt-1 text-[11px] text-zinc-500">{label}</span>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={5}
-        className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-[12px] text-zinc-100 placeholder:text-zinc-600 focus:border-orange-600 focus:outline-none resize-y min-h-[80px]"
-      />
-    </div>
-  )
-}

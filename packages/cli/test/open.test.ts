@@ -13,7 +13,7 @@ import { runOpen } from '../src/commands/open.js'
 
 function createContext(overrides: Partial<CliContext> = {}): CliContext {
   return {
-    defaultApiBase: 'http://localhost:3000',
+    defaultApiBase: 'http://localhost:9371',
     defaultDataDir: '/tmp/.parallax',
     manifestFile: 'running.json',
     rootDir: '/tmp/parallax',
@@ -24,13 +24,12 @@ function createContext(overrides: Partial<CliContext> = {}): CliContext {
     loadRunningState: async () => ({
       startedAt: Date.now(),
       orchestratorPid: 1,
-      apiPort: 3000,
-      uiPort: 8080,
+      apiPort: 9371,
+      uiPort: 9372,
     }),
     loadStoredConfig: async () => ({
       version: 1,
       projects: [],
-      agents: [],
       slack: null,
       secrets: {},
       updatedAt: 0,
@@ -68,8 +67,8 @@ describe('runOpen', () => {
 
     expect(execSyncMock).toHaveBeenCalledOnce()
     const cmd = execSyncMock.mock.calls[0][0] as string
-    expect(cmd).toContain('"http://localhost:8080"')
-    expect(logSpy).toHaveBeenCalledWith('Opened http://localhost:8080')
+    expect(cmd).toContain('"http://localhost:9372"')
+    expect(logSpy).toHaveBeenCalledWith('Opened http://localhost:9372')
   })
 
   it('uses uiPort from running state', async () => {
@@ -100,6 +99,6 @@ describe('runOpen', () => {
 
     await runOpen([], createContext())
 
-    expect(logSpy).toHaveBeenCalledWith('Dashboard: http://localhost:8080')
+    expect(logSpy).toHaveBeenCalledWith('Dashboard: http://localhost:9372')
   })
 })

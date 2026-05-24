@@ -98,7 +98,7 @@ export async function runInit(_args: string[], context: CliContext) {
     )
 
     if (action === 'open') {
-      let url = `http://localhost:8080`
+      let url = `http://localhost:9372`
       try {
         const state = await context.loadRunningState()
         url = `http://localhost:${state.uiPort}`
@@ -228,10 +228,6 @@ export async function runInit(_args: string[], context: CliContext) {
 
   const modelOverride = await promptModel(agentProvider)
 
-  const systemPrompt = assertNotCancel(
-    await p.text({ message: 'Custom system prompt (optional)', placeholder: '' })
-  )
-
   // --- Secrets ---
 
   let linearApiKey: string | undefined
@@ -305,7 +301,6 @@ export async function runInit(_args: string[], context: CliContext) {
     agent: {
       provider: agentProvider,
       model: modelOverride,
-      systemPrompt: systemPrompt.trim() || undefined,
     },
   }
 

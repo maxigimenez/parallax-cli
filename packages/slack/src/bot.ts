@@ -12,7 +12,7 @@ export class SlackBot {
   private apiBaseUrl: string
   private threadRegistry = new Map<string, string>()
 
-  constructor({ config, apiBaseUrl }: SlackBotOptions) {
+  constructor({ config, apiBaseUrl, onError }: SlackBotOptions) {
     this.channel = config.channel
     this.apiBaseUrl = apiBaseUrl
     this.app = new App({
@@ -21,6 +21,10 @@ export class SlackBot {
       socketMode: true,
     })
     this.client = new WebClient(config.botToken)
+
+    this.app.error(async (err) => {
+      onError?.(err)
+    })
 
     registerPlanApprovalHandlers(this.app, apiBaseUrl)
     registerSlashCommands(this.app, apiBaseUrl)

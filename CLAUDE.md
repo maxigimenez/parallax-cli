@@ -19,7 +19,7 @@ pnpm --filter parallax-cli test
 # local development — use this entrypoint for all manual testing
 pnpm parallax preflight
 pnpm parallax init
-pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+pnpm parallax start --server-api-port 9371 --server-ui-port 9372 --concurrency 2
 pnpm parallax status
 pnpm parallax open
 pnpm parallax stop
@@ -83,9 +83,9 @@ Cancellation is tracked via an in-memory `canceledTasks: Set<string>` checked at
 
 Three-column layout: icon nav (left, 52px) | list panel (280px) | main content (fills remainder).
 
-- **NavBar** (`NavBar.tsx`) — icon-only vertical navigation for Tasks / Projects / Integrations / Secrets
+- **NavBar** (`NavBar.tsx`) — icon-only vertical navigation for Tasks / Projects / Integrations
 - **ListPanel** (`ListPanel.tsx`) — scrollable list for the active section
-- **Main content** — `LogViewer`, `ProjectEditor`, `IntegrationDetail`, `SecretsEditor`, or `EmptyState`
+- **Main content** — `LogViewer`, `ProjectEditor`, `IntegrationDetail`, or `EmptyState`
 
 ### API server (`packages/orchestrator/src/runtime/api-server.ts`)
 

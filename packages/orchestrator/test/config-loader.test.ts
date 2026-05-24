@@ -39,7 +39,6 @@ function makeStoredConfig(overrides: object = {}) {
     {
       version: 1,
       projects: [],
-      agents: [],
       slack: null,
       secrets: {},
       updatedAt: Date.now(),
@@ -64,8 +63,8 @@ describe('config-loader', () => {
 
     const config = await loadConfig()
     expect(config.projects).toHaveLength(0)
-    expect(config.server.apiPort).toBe(3000)
-    expect(config.server.uiPort).toBe(8080)
+    expect(config.server.apiPort).toBe(9371)
+    expect(config.server.uiPort).toBe(9372)
     expect(config.concurrency).toBe(2)
   })
 
@@ -148,102 +147,6 @@ describe('config-loader', () => {
     await expect(loadConfig()).rejects.toThrow('Unsupported agent provider "unknown-agent"')
   })
 
-  it('loads named agents from agents array', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        agents: [
-          {
-            name: 'developer',
-            provider: 'claude-code',
-            model: 'claude-opus-4-5',
-            systemPrompt: 'You are a senior engineer.',
-          },
-        ],
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { name: 'developer' },
-          },
-        ],
-      })
-    )
-
-    const config = await loadConfig()
-    expect(config.agents).toHaveLength(1)
-    expect(config.agents[0].name).toBe('developer')
-    expect(config.agents[0].provider).toBe('claude-code')
-    expect(config.agents[0].model).toBe('claude-opus-4-5')
-    expect(config.agents[0].systemPrompt).toBe('You are a senior engineer.')
-    expect(config.projects[0].agent.provider).toBe('claude-code')
-    expect(config.projects[0].agent.name).toBe('developer')
-    expect(config.projects[0].agent.systemPrompt).toBe('You are a senior engineer.')
-  })
-
-  it('loads agentLabels mapping on a project', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        agents: [
-          { name: 'developer', provider: 'codex' },
-          { name: 'reviewer', provider: 'gemini' },
-        ],
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { name: 'developer' },
-            agentLabels: { 'ai-frontend': 'reviewer', 'ai-security': 'reviewer' },
-          },
-        ],
-      })
-    )
-
-    const config = await loadConfig()
-    expect(config.projects[0].agentLabels).toEqual({
-      'ai-frontend': 'reviewer',
-      'ai-security': 'reviewer',
-    })
-  })
-
-  it('rejects agentLabels value referencing an unknown agent', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        agents: [{ name: 'developer', provider: 'codex' }],
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { name: 'developer' },
-            agentLabels: { 'ai-frontend': 'does-not-exist' },
-          },
-        ],
-      })
-    )
-
-    await expect(loadConfig()).rejects.toThrow('unknown agent "does-not-exist"')
-  })
-
   it('loads slack config', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
     const workspace = path.join(root, 'workspace')
@@ -318,32 +221,6 @@ describe('config-loader', () => {
     await expect(loadConfig()).rejects.toThrow('Duplicate project id "test"')
   })
 
-  it('rejects duplicate agent names', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    const agent = { name: 'developer', provider: 'codex' }
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        agents: [agent, agent],
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'codex' },
-          },
-        ],
-      })
-    )
-
-    await expect(loadConfig()).rejects.toThrow('Duplicate agent name "developer"')
-  })
-
   it('injects secrets into process.env without overwriting existing values', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
     const workspace = path.join(root, 'workspace')
@@ -384,7 +261,6 @@ describe('config-loader', () => {
 
     const config = await loadConfig()
     expect(config.projects).toHaveLength(0)
-    expect(config.agents).toHaveLength(0)
     expect(config.slack).toBeUndefined()
   })
 })

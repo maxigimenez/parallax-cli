@@ -11,8 +11,8 @@ export abstract class BaseAgentAdapter {
     this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
   }
 
-  protected buildContextPrefix(project: ProjectConfig, _task: Task): string {
-    return project.agent.systemPrompt ?? ''
+  protected buildContextPrefix(_project: ProjectConfig, _task: Task): string {
+    return ''
   }
 
   abstract runTask(
