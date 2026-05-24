@@ -60,6 +60,6 @@ describe('GitService branch reuse', () => {
       { commitMessage: '  Address   review \n comments ' }
     )
 
-    expect(gitMock.commit).toHaveBeenCalledWith('Address review comments')
+    expect(gitMock.commit).toHaveBeenCalledWith('Address review comments [parallax]')
   })
 })
