@@ -6,11 +6,12 @@ export function registerSlashCommands(app: App, apiBaseUrl: string): void {
     const [subcommand, taskId] = command.text.trim().split(/\s+/)
 
     if (!subcommand) {
-      await respond('Usage: `/parallax <retry|cancel|status|pr-review> <taskId>`')
+      await respond('Usage: `/parallax <retry|cancel|status|pr-review> [taskId]`')
       return
     }
 
-    if (!taskId) {
+    const requiresTaskId = subcommand !== 'status'
+    if (requiresTaskId && !taskId) {
       await respond(`Usage: \`/parallax ${subcommand} <taskId>\``)
       return
     }
@@ -36,14 +37,15 @@ export function registerSlashCommands(app: App, apiBaseUrl: string): void {
           break
         }
         case 'status': {
-          const res = await fetch(`${apiBaseUrl}/tasks/${taskId}`)
+          const res = await fetch(`${apiBaseUrl}/runtime/health`)
           if (!res.ok) {
-            await respond(`Task \`${taskId}\` not found.`)
+            await respond('⚠️ Could not reach Parallax orchestrator.')
             return
           }
-          const data = (await res.json()) as { status: string; planState?: string; title?: string }
+          const data = (await res.json()) as { activeTasks: number }
+          const taskLabel = data.activeTasks === 1 ? '1 task' : `${data.activeTasks} tasks`
           await respond(
-            `*Task \`${taskId}\`:* ${data.title ?? ''}\nStatus: \`${data.status}\`  Plan: \`${data.planState ?? 'n/a'}\``
+            `✅ Parallax is running.\nActive tasks: ${data.activeTasks === 0 ? 'none' : taskLabel} processing.`
           )
           break
         }
