@@ -61,7 +61,9 @@ export function extractExecutionMetadata(
 
 export function sanitizeCommitMessage(commitMessage: string | undefined) {
   const msg = sanitizeSingleLine(commitMessage)
-  if (!msg) return undefined
+  if (!msg) {
+    return undefined
+  }
   return msg.endsWith('[parallax]') ? msg : `${msg} [parallax]`
 }
 
