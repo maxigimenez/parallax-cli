@@ -17,10 +17,9 @@ import { formatLogLine, runLogs } from '../src/commands/logs.js'
 
 function createContext(overrides: Partial<CliContext> = {}): CliContext {
   return {
-    defaultApiBase: 'http://localhost:3000',
+    defaultApiBase: 'http://localhost:9371',
     defaultDataDir: '/tmp/.parallax',
     manifestFile: 'running.json',
-    registryFile: 'registry.json',
     rootDir: '/tmp/parallax',
     cliVersion: '0.0.8',
     packageVersion: '0.0.8',
@@ -29,13 +28,18 @@ function createContext(overrides: Partial<CliContext> = {}): CliContext {
     loadRunningState: async () => ({
       startedAt: Date.now(),
       orchestratorPid: 1,
-      apiPort: 3000,
-      uiPort: 8080,
+      apiPort: 9371,
+      uiPort: 9372,
     }),
-    loadRegistry: async () => ({ configs: [] }),
-    saveRegistry: async () => {},
-    resolveDefaultApiBase: async () => 'http://localhost:3000',
-    validateConfigFile: async () => {},
+    loadStoredConfig: async () => ({
+      version: 1,
+      projects: [],
+      slack: null,
+      secrets: {},
+      updatedAt: 0,
+    }),
+    saveStoredConfig: async () => {},
+    resolveDefaultApiBase: async () => 'http://localhost:9371',
     buildEnvConfig: () => ({}),
     ...overrides,
   }
@@ -58,7 +62,7 @@ describe('runLogs', () => {
 
     await expect(runLogs([], createContext())).rejects.toBe(stopLoop)
 
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/logs?since=5000&limit=500')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:9371/logs?since=5000&limit=500')
   })
 
   it('prints only new entries once while preserving the existing output shape', async () => {
@@ -120,7 +124,7 @@ describe('runLogs', () => {
     expect(stripAnsi(String(logSpy.mock.calls[1]?.[0]))).toBe(
       '1970-01-01T00:00:05.001Z [task-2] ERROR ✖ second fresh log'
     )
-    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:3000/logs?since=5000&limit=500')
+    expect(fetch).toHaveBeenNthCalledWith(2, 'http://localhost:9371/logs?since=5000&limit=500')
   })
 
   it('applies severity-based ANSI styling without changing the readable text', () => {

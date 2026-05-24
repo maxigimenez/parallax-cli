@@ -1,14 +1,10 @@
-import type { AgentDefinition, Task } from '@parallax/common'
+import type { Task } from '@parallax/common'
 import type { Block, KnownBlock } from '@slack/web-api'
 
 const MAX_PLAN_LENGTH = 2500
 
-function agentIdentityLine(agentDef?: AgentDefinition): string {
-  if (!agentDef) {
-    return 'Unknown agent'
-  }
-  const model = agentDef.model ? ` / ${agentDef.model}` : ''
-  return `${agentDef.name} (${agentDef.provider}${model})`
+function agentIdentityLine(task: Task): string {
+  return task.lastAgent ?? 'Agent'
 }
 
 function truncate(text: string, max: number): string {
@@ -30,10 +26,7 @@ function markdownToMrkdwn(text: string): string {
   )
 }
 
-export function buildPlanApprovalMessage(
-  task: Task,
-  agentDef?: AgentDefinition
-): (Block | KnownBlock)[] {
+export function buildPlanApprovalMessage(task: Task): (Block | KnownBlock)[] {
   const planText = task.planMarkdown
     ? truncate(task.planMarkdown, MAX_PLAN_LENGTH)
     : 'No plan content available.'
@@ -43,7 +36,7 @@ export function buildPlanApprovalMessage(
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `Plan Ready — ${agentIdentityLine(agentDef)}`,
+        text: `Plan Ready — ${agentIdentityLine(task)}`,
         emoji: true,
       },
     },
@@ -88,7 +81,6 @@ export function buildPlanApprovalMessage(
 export function buildEventMessage(
   task: Task,
   event: string,
-  agentDef?: AgentDefinition,
   extra?: string
 ): (Block | KnownBlock)[] {
   const eventLabels: Record<string, string> = {
@@ -99,7 +91,7 @@ export function buildEventMessage(
   }
 
   const label = eventLabels[event] ?? event
-  const agentLine = agentIdentityLine(agentDef)
+  const agentLine = agentIdentityLine(task)
 
   const blocks: (Block | KnownBlock)[] = [
     {

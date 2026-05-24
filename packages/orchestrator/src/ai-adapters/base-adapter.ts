@@ -1,11 +1,7 @@
-import fs from 'node:fs/promises'
-import dotenv from 'dotenv'
 import { Task, Logger, ProjectConfig, AgentResult, PlanResult } from '@parallax/common'
 import { LocalExecutor } from '@parallax/common/executor'
 
 export abstract class BaseAgentAdapter {
-  private envFileCache = new Map<string, Record<string, string>>()
-
   constructor(
     protected executor: LocalExecutor,
     protected logger: Logger
@@ -15,26 +11,8 @@ export abstract class BaseAgentAdapter {
     this.logger.info(`Workspace already prepared via git worktree: ${workingDir}`, task.id)
   }
 
-  protected buildContextPrefix(project: ProjectConfig, _task: Task): string {
-    return project.agent.systemPrompt ?? ''
-  }
-
-  protected async resolveProjectEnv(
-    project: ProjectConfig
-  ): Promise<Record<string, string> | undefined> {
-    if (!project.envFilePath) {
-      return undefined
-    }
-
-    const cached = this.envFileCache.get(project.envFilePath)
-    if (cached) {
-      return cached
-    }
-
-    const content = await fs.readFile(project.envFilePath, 'utf8')
-    const parsed = dotenv.parse(content)
-    this.envFileCache.set(project.envFilePath, parsed)
-    return parsed
+  protected buildContextPrefix(_project: ProjectConfig, _task: Task): string {
+    return ''
   }
 
   abstract runTask(

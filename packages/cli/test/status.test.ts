@@ -20,10 +20,9 @@ import { runStatus } from '../src/commands/status.js'
 
 function createContext(overrides: Partial<CliContext> = {}): CliContext {
   return {
-    defaultApiBase: 'http://localhost:3000',
+    defaultApiBase: 'http://localhost:9371',
     defaultDataDir: '/tmp/.parallax',
     manifestFile: 'running.json',
-    registryFile: 'registry.json',
     rootDir: '/tmp/parallax',
     cliVersion: '0.0.5',
     packageVersion: '0.0.5',
@@ -32,10 +31,15 @@ function createContext(overrides: Partial<CliContext> = {}): CliContext {
     loadRunningState: async () => {
       throw new Error('offline')
     },
-    loadRegistry: async () => ({ configs: [] }),
-    saveRegistry: async () => {},
-    resolveDefaultApiBase: async () => 'http://localhost:3000',
-    validateConfigFile: async () => {},
+    loadStoredConfig: async () => ({
+      version: 1,
+      projects: [],
+      slack: null,
+      secrets: {},
+      updatedAt: 0,
+    }),
+    saveStoredConfig: async () => {},
+    resolveDefaultApiBase: async () => 'http://localhost:9371',
     buildEnvConfig: () => ({}),
     ...overrides,
   }
@@ -46,8 +50,8 @@ function createRunningState(overrides: Partial<RunningState> = {}): RunningState
     startedAt: Date.now(),
     orchestratorPid: 1234,
     uiPid: 5678,
-    apiPort: 3000,
-    uiPort: 8080,
+    apiPort: 9371,
+    uiPort: 9372,
     ...overrides,
   }
 }
@@ -104,7 +108,7 @@ describe('runStatus', () => {
     expect(startSpinnerMock).toHaveBeenCalledWith('Checking Parallax status...')
     expect(isProcessAliveMock).toHaveBeenCalledWith(1234)
     expect(isProcessAliveMock).toHaveBeenCalledWith(5678)
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3000/runtime/errors')
+    expect(fetch).toHaveBeenCalledWith('http://localhost:9371/runtime/errors')
     expect(stop).toHaveBeenCalledOnce()
     expect(logSpy.mock.calls.map((call) => String(call[0]))).toEqual([
       '',

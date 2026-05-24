@@ -11,17 +11,12 @@ import {
   type Task,
   sleep,
 } from '@parallax/common'
-import { loadConfig } from './config-loader.js'
+import { loadConfig, resolveDataDir } from './config-loader.js'
 import { logger, setIo, setLogLevels } from './logger.js'
 import { HostExecutor } from '@parallax/common/executor'
 import { GitHubReviewService } from './github/review-service.js'
 import { createTaskId } from './task-id.js'
-import {
-  buildExternalServices,
-  fetchProjectTasks,
-  resolveAgentNameForTask,
-  resolveAgentForTask,
-} from './runtime/provider-services.js'
+import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
 import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'
@@ -59,6 +54,7 @@ async function startRuntimeServers(
     activeTasks,
     canceledTasks,
     activeWorktrees,
+    dataDir: resolveDataDir(),
   })
 
   const config = getConfig()
@@ -100,9 +96,8 @@ async function pollProjects(
       }
 
       for (const taskWithLabels of newIssues) {
-        const agentName = resolveAgentNameForTask(taskWithLabels.labels, project, config)
         const { labels: _labels, ...task } = taskWithLabels
-        dbService.saveTask({ ...task, agentName })
+        dbService.saveTask(task)
         const savedTask = dbService.getTaskByExternalId(task.externalId)!
         dbService.updateTaskPlanState(savedTask.id, TaskPlanState.PLAN_GENERATING)
         taskLifecycle.queue(savedTask.id, 'Queued for execution plan')
@@ -139,7 +134,7 @@ async function pollProjects(
           continue
         }
 
-        const resolvedProject = resolveAgentForTask(task, project, config)
+        const resolvedProject = project
         const adapter = getAdapterForTask(task, resolvedProject)
 
         if (requiresPlan(task)) {
@@ -155,8 +150,7 @@ async function pollProjects(
                 adapter,
                 gitService,
                 canceledTasks,
-                services,
-                config
+                services
               )
             } finally {
               canceledTasks.delete(task.id)
@@ -183,8 +177,7 @@ async function pollProjects(
               gitService,
               canceledTasks,
               services,
-              activeWorktrees,
-              config
+              activeWorktrees
             )
           } finally {
             canceledTasks.delete(task.id)
@@ -256,8 +249,7 @@ async function main() {
   const adapterCache = new Map<string, BaseAgentAdapter>()
 
   const getAdapterForTask = (task: Task, resolvedProject: ProjectConfig) => {
-    const agentKey = resolvedProject.agent.name ?? resolvedProject.agent.provider
-    const key = `${resolvedProject.id}:${agentKey}`
+    const key = `${resolvedProject.id}:${resolvedProject.agent.provider}`
     const existing = adapterCache.get(key)
     if (existing) {
       return existing
@@ -312,8 +304,7 @@ async function main() {
     })
     dbService.updateTaskReviewState(reviewTask.id, TASK_REVIEW_STATE.REVIEW_PENDING)
 
-    const resolvedReviewProject = resolveAgentForTask(reviewTask, project, getConfig())
-    const adapter = getAdapterForTask(reviewTask, resolvedReviewProject)
+    const adapter = getAdapterForTask(reviewTask, project)
     activeTasks.add(reviewTask.id)
     taskLifecycle.queue(reviewTask.id, `Queued PR review run for #${reviewTask.prNumber}`)
     void limit(async () => {
@@ -358,6 +349,7 @@ async function main() {
       const bot = new SlackBot({
         config: runtimeConfig.slack,
         apiBaseUrl: `http://127.0.0.1:${runtimeConfig.server.apiPort}`,
+        onError: (err) => logger.error(`Slack bot error: ${err.message}`),
       })
       await bot.start()
       setSlackBot(bot)

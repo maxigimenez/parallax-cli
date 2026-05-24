@@ -29,18 +29,29 @@ vi.mock('../src/task-lifecycle.js', () => ({
 vi.mock('../src/runtime/diagnostics.js', () => ({
   readOrchestratorErrors: vi.fn().mockResolvedValue([]),
 }))
+vi.mock('../src/config-store.js', () => ({
+  readConfigStore: vi.fn().mockResolvedValue({
+    version: 1,
+    projects: [],
+    slack: null,
+    secrets: {},
+    updatedAt: 0,
+  }),
+  writeConfigStore: vi.fn().mockResolvedValue(undefined),
+}))
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function buildDependencies(overrides: Record<string, unknown> = {}) {
   return {
-    getConfig: vi.fn().mockReturnValue({ projects: [] }),
-    reloadRuntime: vi.fn().mockResolvedValue({ projects: [] }),
+    getConfig: vi.fn().mockReturnValue({ projects: [], slack: null }),
+    reloadRuntime: vi.fn().mockResolvedValue({ projects: [], slack: null }),
     triggerPullRequestReview: vi.fn(),
     gitService: { getWorktreeChangedFiles: vi.fn(), getTaskUnifiedDiff: vi.fn() } as any,
     activeTasks: new Set<string>(),
     canceledTasks: new Set<string>(),
     activeWorktrees: new Map<string, string>(),
+    dataDir: '/tmp/test-parallax',
     ...overrides,
   }
 }
@@ -77,9 +88,9 @@ describe('createApiServer – CORS', () => {
     const res = await server.inject({
       method: 'GET',
       url: '/tasks',
-      headers: { origin: 'http://localhost:3000' },
+      headers: { origin: 'http://localhost:9371' },
     })
-    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:3000')
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost:9371')
   })
 
   it('allows requests from 127.0.0.1 origin', async () => {
@@ -106,6 +117,20 @@ describe('createApiServer – CORS', () => {
   it('does not use wildcard CORS', async () => {
     const res = await server.inject({ method: 'GET', url: '/tasks' })
     expect(res.headers['access-control-allow-origin']).not.toBe('*')
+  })
+
+  it('allows PUT and DELETE in preflight response', async () => {
+    const res = await server.inject({
+      method: 'OPTIONS',
+      url: '/integrations/slack',
+      headers: {
+        origin: 'http://localhost:9372',
+        'access-control-request-method': 'PUT',
+      },
+    })
+    const allowed = res.headers['access-control-allow-methods'] ?? ''
+    expect(allowed).toContain('PUT')
+    expect(allowed).toContain('DELETE')
   })
 })
 
@@ -296,5 +321,197 @@ describe('POST /tasks/:taskId/cancel', () => {
     )
     const res = await server.inject({ method: 'POST', url: '/tasks/task-1/cancel' })
     expect(res.statusCode).toBe(409)
+  })
+})
+
+describe('DELETE /projects/:projectId', () => {
+  let server: FastifyInstance
+  let dbService: any
+
+  beforeEach(async () => {
+    const mod = await import('../src/database.js')
+    dbService = mod.dbService
+    server = await createApiServer(
+      buildDependencies({
+        getConfig: vi.fn().mockReturnValue({
+          projects: [{ id: 'proj-1' }],
+          slack: null,
+        }),
+      })
+    )
+  })
+
+  afterEach(async () => {
+    await server.close()
+  })
+
+  it('returns 404 when project not found', async () => {
+    const res = await server.inject({ method: 'DELETE', url: '/projects/unknown' })
+    expect(res.statusCode).toBe(404)
+    expect(JSON.parse(res.body).error).toContain('"unknown" not found')
+  })
+
+  it('returns 409 when project has active tasks', async () => {
+    vi.mocked(dbService.listTasks).mockReturnValue([{ id: 'task-1', projectId: 'proj-1' }])
+    const localServer = await createApiServer(
+      buildDependencies({
+        getConfig: vi.fn().mockReturnValue({ projects: [{ id: 'proj-1' }], slack: null }),
+        activeTasks: new Set(['task-1']),
+      })
+    )
+    const res = await localServer.inject({ method: 'DELETE', url: '/projects/proj-1' })
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).error).toContain('active task')
+    await localServer.close()
+  })
+
+  it('returns 200 when project has no active tasks', async () => {
+    vi.mocked(dbService.listTasks).mockReturnValue([])
+    const res = await server.inject({ method: 'DELETE', url: '/projects/proj-1' })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({ ok: true })
+  })
+
+  it('returns 200 when task belongs to project but is not active', async () => {
+    vi.mocked(dbService.listTasks).mockReturnValue([{ id: 'task-1', projectId: 'proj-1' }])
+    // task-1 is not in activeTasks
+    const res = await server.inject({ method: 'DELETE', url: '/projects/proj-1' })
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('PATCH /secrets/:key', () => {
+  let server: FastifyInstance
+
+  beforeEach(async () => {
+    server = await createApiServer(buildDependencies())
+  })
+
+  afterEach(async () => {
+    await server.close()
+  })
+
+  it('returns 400 for key starting with a digit', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/1INVALID',
+      payload: { value: 'secret' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('environment variable name')
+  })
+
+  it('returns 400 for key containing spaces', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/MY%20KEY',
+      payload: { value: 'secret' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('environment variable name')
+  })
+
+  it('returns 400 for key containing hyphens', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/MY-KEY',
+      payload: { value: 'secret' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('environment variable name')
+  })
+
+  it('returns 400 when value is missing', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/VALID_KEY',
+      payload: {},
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('value must be a string')
+  })
+
+  it('returns 400 when value is empty', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/VALID_KEY',
+      payload: { value: '' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('must not be empty')
+  })
+
+  it('returns 200 for valid snake_case key', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/LINEAR_API_KEY',
+      payload: { value: 'lin_abc123' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({ ok: true })
+  })
+
+  it('returns 200 for lowercase key', async () => {
+    const res = await server.inject({
+      method: 'PATCH',
+      url: '/secrets/my_token',
+      payload: { value: 'somevalue' },
+    })
+    expect(res.statusCode).toBe(200)
+  })
+})
+
+describe('PUT /integrations/slack', () => {
+  let server: FastifyInstance
+
+  afterEach(async () => {
+    await server.close()
+  })
+
+  it('returns 400 when bot token is missing on new connection', async () => {
+    server = await createApiServer(buildDependencies())
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/integrations/slack',
+      payload: { appToken: 'xapp-1', channel: '#eng' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('botToken')
+  })
+
+  it('returns 200 when tokens are omitted on update with existing config', async () => {
+    server = await createApiServer(
+      buildDependencies({
+        getConfig: vi.fn().mockReturnValue({
+          projects: [],
+          slack: { botToken: 'xoxb-real', appToken: 'xapp-real', channel: '#old' },
+        }),
+      })
+    )
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/integrations/slack',
+      payload: { channel: '#new-channel' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(JSON.parse(res.body)).toEqual({ ok: true })
+  })
+
+  it('returns 400 when new token has invalid prefix even on update', async () => {
+    server = await createApiServer(
+      buildDependencies({
+        getConfig: vi.fn().mockReturnValue({
+          projects: [],
+          slack: { botToken: 'xoxb-real', appToken: 'xapp-real', channel: '#old' },
+        }),
+      })
+    )
+    const res = await server.inject({
+      method: 'PUT',
+      url: '/integrations/slack',
+      payload: { botToken: 'invalid-token', channel: '#eng' },
+    })
+    expect(res.statusCode).toBe(400)
+    expect(JSON.parse(res.body).error).toContain('xoxb-')
   })
 })

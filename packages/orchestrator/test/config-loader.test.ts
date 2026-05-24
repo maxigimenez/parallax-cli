@@ -34,124 +34,91 @@ afterEach(async () => {
   }
 })
 
+function makeStoredConfig(overrides: object = {}) {
+  return JSON.stringify(
+    {
+      version: 1,
+      projects: [],
+      slack: null,
+      secrets: {},
+      updatedAt: Date.now(),
+      ...overrides,
+    },
+    null,
+    2
+  )
+}
+
+async function setupDataDir(root: string) {
+  const dataDir = path.join(root, '.parallax')
+  await fs.mkdir(dataDir, { recursive: true })
+  process.env.PARALLAX_DATA_DIR = dataDir
+  return dataDir
+}
+
 describe('config-loader', () => {
-  it('returns empty config when registry is missing', async () => {
+  it('returns empty config when config.json is missing', async () => {
     const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
     process.env.PARALLAX_DATA_DIR = dataDir
 
     const config = await loadConfig()
     expect(config.projects).toHaveLength(0)
-    expect(config.server.apiPort).toBe(3000)
-    expect(config.server.uiPort).toBe(8080)
+    expect(config.server.apiPort).toBe(9371)
+    expect(config.server.uiPort).toBe(9372)
     expect(config.concurrency).toBe(2)
   })
 
-  it('loads a strict valid config', async () => {
+  it('loads a valid config from config.json', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
+    const dataDir = await setupDataDir(root)
+
     await fs.writeFile(
-      configPath,
-      [
-        '- id: test',
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: codex',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'codex' },
+          },
+        ],
+      })
     )
 
-    process.env.PARALLAX_DATA_DIR = dataDir
     process.env.PARALLAX_CONCURRENCY = '4'
     process.env.PARALLAX_SERVER_API_PORT = '4100'
     process.env.PARALLAX_SERVER_UI_PORT = '4101'
-    process.chdir(root)
 
     const config = await loadConfig()
     expect(config.projects).toHaveLength(1)
+    expect(config.projects[0].id).toBe('test')
     expect(config.concurrency).toBe(4)
     expect(config.server.apiPort).toBe(4100)
     expect(config.server.uiPort).toBe(4101)
-    expect(config.projects[0].id).toBe('test')
-  })
-
-  it('attaches registered env file path to the project config', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
-    const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const envFilePath = path.join(root, '.env')
-    const registryPath = path.join(dataDir, 'registry.json')
-    await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(envFilePath, 'TEST_VALUE=1\n')
-    await fs.writeFile(
-      configPath,
-      [
-        '- id: test',
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: codex',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, envFilePath, addedAt: Date.now() }] }, null, 2)
-    )
-
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
-
-    const config = await loadConfig()
-    expect(config.projects[0].envFilePath).toBe(envFilePath)
   })
 
   it('accepts claude-code as a supported agent provider', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(
-      configPath,
-      [
-        '- id: test',
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: claude-code',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
+    const dataDir = await setupDataDir(root)
 
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
+    await fs.writeFile(
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'claude-code' },
+          },
+        ],
+      })
+    )
 
     const config = await loadConfig()
     expect(config.projects[0].agent.provider).toBe('claude-code')
@@ -159,200 +126,49 @@ describe('config-loader', () => {
 
   it('rejects unsupported agent provider', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(
-      configPath,
-      [
-        '- id: test',
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: unknown-agent',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
+    const dataDir = await setupDataDir(root)
 
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
+    await fs.writeFile(
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'unknown-agent' },
+          },
+        ],
+      })
+    )
 
     await expect(loadConfig()).rejects.toThrow('Unsupported agent provider "unknown-agent"')
   })
 
-  it('loads named agents defined in agents: item', async () => {
+  it('loads slack config', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
+    const dataDir = await setupDataDir(root)
+
     await fs.writeFile(
-      configPath,
-      [
-        '- agents:',
-        '    - name: developer',
-        '      provider: claude-code',
-        '      model: claude-opus-4-5',
-        '      systemPrompt: "You are a senior engineer."',
-        `- id: test`,
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    name: developer',
-      ].join('\n')
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        slack: { botToken: 'xoxb-test-token', appToken: 'xapp-test-token', channel: '#ai-tasks' },
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'codex' },
+          },
+        ],
+      })
     )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
 
     const config = await loadConfig()
-
-    expect(config.agents).toHaveLength(1)
-    expect(config.agents[0].name).toBe('developer')
-    expect(config.agents[0].provider).toBe('claude-code')
-    expect(config.agents[0].model).toBe('claude-opus-4-5')
-    expect(config.agents[0].systemPrompt).toBe('You are a senior engineer.')
-    expect(config.projects[0].agent.provider).toBe('claude-code')
-    expect(config.projects[0].agent.name).toBe('developer')
-    expect(config.projects[0].agent.systemPrompt).toBe('You are a senior engineer.')
-  })
-
-  it('loads agentLabels mapping on a project entry', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
-    const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
-    await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(
-      configPath,
-      [
-        '- agents:',
-        '    - name: developer',
-        '      provider: codex',
-        '    - name: reviewer',
-        '      provider: gemini',
-        `- id: test`,
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    name: developer',
-        '  agentLabels:',
-        '    ai-frontend: reviewer',
-        '    ai-security: reviewer',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
-
-    const config = await loadConfig()
-
-    expect(config.projects[0].agentLabels).toEqual({
-      'ai-frontend': 'reviewer',
-      'ai-security': 'reviewer',
-    })
-  })
-
-  it('rejects an agentLabels value that references an unknown agent', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
-    const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
-    await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(
-      configPath,
-      [
-        '- agents:',
-        '    - name: developer',
-        '      provider: codex',
-        `- id: test`,
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    name: developer',
-        '  agentLabels:',
-        '    ai-frontend: does-not-exist',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
-
-    await expect(loadConfig()).rejects.toThrow('unknown agent "does-not-exist"')
-  })
-
-  it('loads slack config from slack: item', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
-    const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
-    await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    await fs.writeFile(
-      configPath,
-      [
-        '- slack:',
-        '    botToken: xoxb-test-token',
-        '    appToken: xapp-test-token',
-        '    channel: "#ai-tasks"',
-        `- id: test`,
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: codex',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
-
-    const config = await loadConfig()
-
     expect(config.slack).toEqual({
       botToken: 'xoxb-test-token',
       appToken: 'xapp-test-token',
@@ -360,115 +176,91 @@ describe('config-loader', () => {
     })
   })
 
-  it('rejects slack botToken that does not start with xoxb-', async () => {
+  it('rejects slack botToken not starting with xoxb-', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
+    const dataDir = await setupDataDir(root)
+
     await fs.writeFile(
-      configPath,
-      [
-        '- slack:',
-        '    botToken: bad-token',
-        '    appToken: xapp-test-token',
-        '    channel: "#ai-tasks"',
-        `- id: test`,
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: codex',
-      ].join('\n')
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        slack: { botToken: 'bad-token', appToken: 'xapp-test-token', channel: '#ai-tasks' },
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'codex' },
+          },
+        ],
+      })
     )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
 
     await expect(loadConfig()).rejects.toThrow('xoxb-')
   })
 
-  it('rejects duplicate agent names across registered configs', async () => {
+  it('rejects duplicate project ids', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath1 = path.join(root, 'parallax1.yml')
-    const configPath2 = path.join(root, 'parallax2.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
-    const agentBlock = ['- agents:', '    - name: developer', '      provider: codex'].join('\n')
-    const projectBlock = [
-      `- id: test-X`,
-      `  workspaceDir: ${workspace}`,
-      '  pullFrom:',
-      '    provider: github',
-      '    filters:',
-      '      owner: org',
-      '      repo: repo',
-      '  agent:',
-      '    provider: codex',
-    ].join('\n')
-    await fs.writeFile(configPath1, `${agentBlock}\n${projectBlock.replace('test-X', 'test-1')}`)
-    await fs.writeFile(configPath2, `${agentBlock}\n${projectBlock.replace('test-X', 'test-2')}`)
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify(
-        {
-          configs: [
-            { configPath: configPath1, addedAt: Date.now() },
-            { configPath: configPath2, addedAt: Date.now() },
-          ],
-        },
-        null,
-        2
-      )
-    )
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
+    const dataDir = await setupDataDir(root)
 
-    await expect(loadConfig()).rejects.toThrow('Duplicate agent name "developer"')
+    const project = {
+      id: 'test',
+      workspaceDir: workspace,
+      pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+      agent: { provider: 'codex' },
+    }
+
+    await fs.writeFile(
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({ projects: [project, project] })
+    )
+
+    await expect(loadConfig()).rejects.toThrow('Duplicate project id "test"')
   })
 
-  it('rejects unknown agent fields', async () => {
+  it('injects secrets into process.env without overwriting existing values', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = path.join(root, '.parallax')
     const workspace = path.join(root, 'workspace')
-    const configPath = path.join(root, 'parallax.yml')
-    const registryPath = path.join(dataDir, 'registry.json')
     await fs.mkdir(workspace, { recursive: true })
-    await fs.mkdir(dataDir, { recursive: true })
+    const dataDir = await setupDataDir(root)
+
+    process.env.EXISTING_KEY = 'existing'
+    delete process.env.NEW_KEY
+
     await fs.writeFile(
-      configPath,
-      [
-        '- id: test',
-        `  workspaceDir: ${workspace}`,
-        '  pullFrom:',
-        '    provider: github',
-        '    filters:',
-        '      owner: org',
-        '      repo: repo',
-        '  agent:',
-        '    provider: codex',
-        '    sandbox: true',
-      ].join('\n')
-    )
-    await fs.writeFile(
-      registryPath,
-      JSON.stringify({ configs: [{ configPath, addedAt: Date.now() }] }, null, 2)
+      path.join(dataDir, 'config.json'),
+      makeStoredConfig({
+        secrets: { EXISTING_KEY: 'should-not-overwrite', NEW_KEY: 'injected' },
+        projects: [
+          {
+            id: 'test',
+            workspaceDir: workspace,
+            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
+            agent: { provider: 'codex' },
+          },
+        ],
+      })
     )
 
-    process.env.PARALLAX_DATA_DIR = dataDir
-    process.chdir(root)
+    await loadConfig()
+    expect(process.env.EXISTING_KEY).toBe('existing')
+    expect(process.env.NEW_KEY).toBe('injected')
 
-    await expect(loadConfig()).rejects.toThrow('project.agent for "test" in')
+    delete process.env.EXISTING_KEY
+    delete process.env.NEW_KEY
+  })
+
+  it('returns empty config when config.json is empty object', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
+    const dataDir = await setupDataDir(root)
+
+    await fs.writeFile(path.join(dataDir, 'config.json'), '{}')
+
+    const config = await loadConfig()
+    expect(config.projects).toHaveLength(0)
+    expect(config.slack).toBeUndefined()
   })
 })

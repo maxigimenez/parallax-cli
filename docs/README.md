@@ -4,8 +4,8 @@ This documentation is for people trying Parallax for the first time and running 
 
 ## Documentation map
 
-- [Getting Started](./getting-started.md): install Parallax, start it, register your repo, and open the dashboard.
-- [Configuration Reference](./configuration.md): what goes in `parallax.yml` and how to register it.
+- [Getting Started](./getting-started.md): install Parallax, run the setup wizard, and open the dashboard.
+- [Configuration Reference](./configuration.md): how Parallax stores config and what each field means.
 - [CLI Reference](./cli-reference.md): the day-to-day commands you will actually run.
 - [Task Lifecycle](./task-lifecycle.md): how Parallax processes tasks from pull to PR.
 - [Slack Bot](./slack-bot.md): connect Parallax to Slack for plan approvals and task notifications.
@@ -23,8 +23,7 @@ This documentation is for people trying Parallax for the first time and running 
 
 1. Install: `npm i -g parallax-cli`
 2. Validate dependencies: `parallax preflight`
-3. Create `parallax.yml`
+3. Run the setup wizard: `parallax init`
 4. Start Parallax: `parallax start`
-5. Check runtime status: `parallax status`
-6. Register config: `parallax register ./parallax.yml`
-7. Open dashboard: `http://localhost:8080`
+5. Open the dashboard: `parallax open`
+6. Check runtime status: `parallax status`

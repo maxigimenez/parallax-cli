@@ -2,10 +2,8 @@ import path from 'node:path'
 import type {
   CancelCommandOptions,
   LogsCommandOptions,
-  PendingCommandOptions,
   PreflightCommandOptions,
   PrReviewCommandOptions,
-  RegisterCommandOptions,
   RetryCommandOptions,
   StartCommandOptions,
   StopCommandOptions,
@@ -86,8 +84,8 @@ export function parseStartOptions(args: string[]): StartCommandOptions {
     throw new Error('parallax start accepts flags only.')
   }
 
-  const apiPort = parseStrictPort(args, 'server-api-port', 3000)
-  const uiPort = parseStrictPort(args, 'server-ui-port', 8080)
+  const apiPort = parseStrictPort(args, 'server-api-port', 9371)
+  const uiPort = parseStrictPort(args, 'server-ui-port', 9372)
   const rawConcurrency = parseOptionalArg(args, 'concurrency')
   const concurrency = rawConcurrency === undefined ? 2 : Number.parseInt(rawConcurrency, 10)
 
@@ -108,36 +106,6 @@ export function parseStopOptions(args: string[]): StopCommandOptions {
   }
 
   return {}
-}
-
-export function parsePendingOptions(args: string[]): PendingCommandOptions {
-  const allowedFlags = new Set(['--approve', '--reject'])
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index]
-    if (arg.startsWith('--')) {
-      const flag = arg.includes('=') ? arg.split('=')[0] : arg
-      if (!allowedFlags.has(flag)) {
-        throw new Error(`Unsupported flag for parallax pending: ${arg}`)
-      }
-      if (!arg.includes('=')) {
-        index += 1
-      }
-      continue
-    }
-
-    throw new Error('parallax pending accepts flags only.')
-  }
-
-  const approve = parseOptionalArg(args, 'approve')
-  const reject = parseOptionalArg(args, 'reject')
-
-  if (approve && reject) {
-    throw new Error('Use either --approve or --reject, not both.')
-  }
-  return {
-    approve,
-    reject,
-  }
 }
 
 export function parseRetryOptions(args: string[]): RetryCommandOptions {
@@ -227,53 +195,6 @@ export function parseStatusOptions(args: string[]): StatusCommandOptions {
   }
 
   return {}
-}
-
-export function parseRegisterOptions(
-  args: string[],
-  command: 'register' | 'unregister'
-): RegisterCommandOptions {
-  const configPath = args[0]
-  if (!configPath || configPath.startsWith('--')) {
-    throw new Error(`parallax ${command} requires <config-file>.`)
-  }
-
-  const envFilePath = parseOptionalArg(args.slice(1), 'env-file')
-  const allowedFlags = command === 'register' ? new Set(['--env-file']) : new Set<string>()
-  for (let index = 1; index < args.length; index += 1) {
-    const arg = args[index]
-    if (!arg.startsWith('--')) {
-      throw new Error(`parallax ${command} accepts exactly one <config-file>.`)
-    }
-
-    const flag = arg.includes('=') ? arg.split('=')[0] : arg
-    if (!allowedFlags.has(flag)) {
-      throw new Error(`Unsupported flag for parallax ${command}: ${arg}`)
-    }
-    if (!arg.includes('=')) {
-      index += 1
-    }
-  }
-
-  if (command === 'unregister' && envFilePath !== undefined) {
-    throw new Error('parallax unregister does not accept flags.')
-  }
-
-  const positionalArgs = args.slice(1).filter((entry, index, entries) => {
-    const previous = entries[index - 1]
-    if (previous === '--env-file') {
-      return false
-    }
-    return !entry.startsWith('--')
-  })
-  if (positionalArgs.length > 0) {
-    throw new Error(`parallax ${command} accepts exactly one <config-file>.`)
-  }
-
-  return {
-    configPath,
-    envFilePath,
-  }
 }
 
 export function resolvePath(raw: string): string {

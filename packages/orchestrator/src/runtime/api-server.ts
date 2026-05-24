@@ -1,6 +1,6 @@
 import cors from '@fastify/cors'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { AppConfig, TASK_STATUS, TaskPlanState } from '@parallax/common'
+import { AppConfig, StoredConfig, TASK_STATUS, TaskPlanState } from '@parallax/common'
 import { dbService } from '../database.js'
 import { resetTaskRuntimeState } from '../logger.js'
 import { GitService } from '../git-service.js'
@@ -17,6 +17,8 @@ import {
   type RetryMode,
 } from './api/request-parsers.js'
 import { serializeTaskForApi } from './api/task-response.js'
+import { readConfigStore, writeConfigStore } from '../config-store.js'
+import { validateProject, validateSlack } from '../config-validation.js'
 
 type TaskDiffFile = {
   path: string
@@ -31,6 +33,7 @@ type ApiServerDependencies = {
   activeTasks: Set<string>
   canceledTasks: Set<string>
   activeWorktrees: Map<string, string>
+  dataDir: string
 }
 
 function sanitizeConfigForApi(config: AppConfig): AppConfig {
@@ -72,10 +75,21 @@ export async function createApiServer(
     activeTasks,
     canceledTasks,
     activeWorktrees,
+    dataDir,
   } = dependencies
+
+  async function mutateConfig(updater: (cfg: StoredConfig) => StoredConfig): Promise<AppConfig> {
+    const current = await readConfigStore(dataDir)
+    const updated = updater(current)
+    await writeConfigStore(dataDir, updated)
+    const newConfig = await reloadRuntime()
+    emitConfigUpdated()
+    return newConfig
+  }
 
   await fastify.register(cors, {
     origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })
 
   fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
@@ -356,6 +370,157 @@ export async function createApiServer(
         .status(400)
         .send({ error: error instanceof Error ? error.message : String(error) })
     }
+  })
+
+  // --- Projects CRUD ---
+
+  fastify.get('/projects', async () => ({ projects: getConfig().projects }))
+
+  fastify.post('/projects', async (request, reply) => {
+    try {
+      const body = request.body as Record<string, unknown>
+      const existing = getConfig()
+      const project = validateProject(body)
+      if (existing.projects.some((p) => p.id === project.id)) {
+        return reply.status(409).send({ error: `Project "${project.id}" already exists.` })
+      }
+      await mutateConfig((cfg) => ({ ...cfg, projects: [...cfg.projects, project] }))
+      return { ok: true, project }
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  fastify.put('/projects/:projectId', async (request, reply) => {
+    try {
+      const { projectId } = request.params as { projectId: string }
+      const body = request.body as Record<string, unknown>
+      const existing = getConfig()
+      if (!existing.projects.some((p) => p.id === projectId)) {
+        return reply.status(404).send({ error: `Project "${projectId}" not found.` })
+      }
+      const project = validateProject({ ...body, id: projectId })
+      await mutateConfig((cfg) => ({
+        ...cfg,
+        projects: cfg.projects.map((p) => (p.id === projectId ? project : p)),
+      }))
+      return { ok: true, project }
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  fastify.delete('/projects/:projectId', async (request, reply) => {
+    const { projectId } = request.params as { projectId: string }
+    if (!getConfig().projects.some((p) => p.id === projectId)) {
+      return reply.status(404).send({ error: `Project "${projectId}" not found.` })
+    }
+    const inFlight = dbService
+      .listTasks()
+      .filter(
+        (t: { id: string; projectId: string }) => t.projectId === projectId && activeTasks.has(t.id)
+      )
+    if (inFlight.length > 0) {
+      return reply.status(409).send({
+        error: `Project "${projectId}" has ${inFlight.length} active task(s). Cancel them first.`,
+      })
+    }
+    await mutateConfig((cfg) => ({
+      ...cfg,
+      projects: cfg.projects.filter((p) => p.id !== projectId),
+    }))
+    return { ok: true }
+  })
+
+  // --- Slack integration ---
+
+  fastify.get('/integrations/slack', async () => {
+    const slack = getConfig().slack
+    if (!slack) {
+      return { configured: false }
+    }
+    return { configured: true, channel: slack.channel }
+  })
+
+  fastify.put('/integrations/slack', async (request, reply) => {
+    try {
+      const body = request.body as Record<string, unknown>
+      const existing = getConfig().slack
+      // Allow omitting tokens when updating an existing connection (keep current values)
+      const merged =
+        existing && (!body.botToken || !body.appToken)
+          ? {
+              botToken: body.botToken || existing.botToken,
+              appToken: body.appToken || existing.appToken,
+              channel: body.channel,
+            }
+          : body
+      const slack = validateSlack(merged)
+      await mutateConfig((cfg) => ({ ...cfg, slack }))
+      return { ok: true }
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  fastify.delete('/integrations/slack', async () => {
+    await mutateConfig((cfg) => ({ ...cfg, slack: null }))
+    return { ok: true }
+  })
+
+  // --- Secrets ---
+
+  fastify.get('/secrets', async () => {
+    const stored = await readConfigStore(dataDir)
+    const masked = Object.fromEntries(Object.keys(stored.secrets).map((k) => [k, '***']))
+    return { secrets: masked }
+  })
+
+  fastify.patch('/secrets/:key', async (request, reply) => {
+    try {
+      const { key } = request.params as { key: string }
+      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+        return reply.status(400).send({
+          error:
+            'Secret key must be a valid environment variable name (letters, digits, underscores; cannot start with a digit).',
+        })
+      }
+      const body = request.body as Record<string, unknown>
+      if (typeof body.value !== 'string') {
+        return reply.status(400).send({ error: 'value must be a string.' })
+      }
+      if (!body.value) {
+        return reply.status(400).send({ error: 'value must not be empty.' })
+      }
+      await mutateConfig((cfg) => ({
+        ...cfg,
+        secrets: { ...cfg.secrets, [key]: body.value as string },
+      }))
+      return { ok: true }
+    } catch (error) {
+      return reply
+        .status(400)
+        .send({ error: error instanceof Error ? error.message : String(error) })
+    }
+  })
+
+  fastify.delete('/secrets/:key', async (request, reply) => {
+    const { key } = request.params as { key: string }
+    const stored = await readConfigStore(dataDir)
+    if (!(key in stored.secrets)) {
+      return reply.status(404).send({ error: `Secret "${key}" not found.` })
+    }
+    await mutateConfig((cfg) => {
+      const { [key]: _removed, ...rest } = cfg.secrets
+      return { ...cfg, secrets: rest }
+    })
+    return { ok: true }
   })
 
   return fastify

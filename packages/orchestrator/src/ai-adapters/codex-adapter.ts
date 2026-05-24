@@ -296,7 +296,6 @@ export class CodexAdapter extends BaseAgentAdapter {
   async runPlan(task: Task, workingDir: string, project: ProjectConfig): Promise<PlanResult> {
     const contextPrefix = this.buildContextPrefix(project, task)
     const command = this.buildCommand(task, project, this.buildPlanPrompt(task, contextPrefix))
-    const env = await this.resolveProjectEnv(project)
     const collector = new CodexEventCollector(this.logger, task, 'plan')
 
     const result = await this.executor.executeCommand(command, {
@@ -305,7 +304,6 @@ export class CodexAdapter extends BaseAgentAdapter {
         chunk.stream === 'stdout'
           ? collector.handleStdoutLine(chunk.line)
           : collector.handleStderrLine(chunk.line),
-      env,
     })
 
     if (result.exitCode === 127) {
@@ -352,7 +350,6 @@ export class CodexAdapter extends BaseAgentAdapter {
       project,
       this.buildExecutionPrompt(task, approvedPlan, outputMode, contextPrefix)
     )
-    const env = await this.resolveProjectEnv(project)
     const collector = new CodexEventCollector(this.logger, task, 'task')
 
     const result = await this.executor.executeCommand(command, {
@@ -361,7 +358,6 @@ export class CodexAdapter extends BaseAgentAdapter {
         chunk.stream === 'stdout'
           ? collector.handleStdoutLine(chunk.line)
           : collector.handleStderrLine(chunk.line),
-      env,
     })
 
     if (result.exitCode === 127) {

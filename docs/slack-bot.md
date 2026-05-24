@@ -72,27 +72,19 @@ In Slack, open the channel you want Parallax to post in and run:
 
 Replace `Parallax` with whatever you named your app.
 
-## Step 7 — Add the `slack:` block to `parallax.yml`
+## Step 7 — Configure Slack in Parallax
 
-Add a top-level `slack:` item to your `parallax.yml` array:
+Run the setup wizard and follow the Slack prompts:
 
-```yaml
-- slack:
-    botToken: xoxb-your-bot-token
-    appToken: xapp-your-app-level-token
-    channel: "#ai-tasks"
-
-- id: my-repo
-  workspaceDir: /path/to/repo
-  pullFrom:
-    provider: github
-    filters:
-      owner: myorg
-      repo: my-repo
-      labels: [ai-ready]
-  agent:
-    name: developer
+```bash
+parallax init
 ```
+
+Or, if Parallax is already running, open the dashboard and go to **Integrations → Slack**. Fill in:
+
+- **Bot token** — starts with `xoxb-`
+- **App token** — starts with `xapp-`
+- **Channel** — the channel where you invited the bot (e.g. `#ai-tasks`)
 
 The `channel` value must match the channel where you invited the bot.
 
@@ -100,7 +92,7 @@ The `channel` value must match the channel where you invited the bot.
 
 ```bash
 parallax stop
-parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
+parallax start
 ```
 
 Parallax reads the config at startup. You must restart for Slack changes to take effect.
@@ -113,37 +105,9 @@ If no message appears, check:
 
 - The bot is invited to the correct channel.
 - Both tokens are correct (bot token starts with `xoxb-`, app token with `xapp-`).
-- The `channel` value in `parallax.yml` matches exactly (including the `#`).
+- The `channel` value matches exactly (including the `#`).
 - `parallax status` shows the orchestrator is running.
 
-## Security: keeping tokens out of source control
+## Security: keeping tokens safe
 
-The `botToken` and `appToken` values are sensitive credentials. Do not commit `parallax.yml` to a repository if it contains them.
-
-**Important**: Parallax does not support environment variable substitution in YAML values. Writing `botToken: ${SLACK_BOT_TOKEN}` will not expand to anything — it will be passed as the literal string `${SLACK_BOT_TOKEN}`.
-
-The two safe approaches are:
-
-**Option A — Keep `parallax.yml` outside the repository**
-
-Store your config in a location that is never committed, such as your home directory, and register it from there:
-
-```bash
-parallax register ~/parallax.yml
-```
-
-**Option B — Gitignore `parallax.yml`**
-
-If you want to keep the file inside the repo directory, add it to `.gitignore`:
-
-```
-parallax.yml
-```
-
-Then register it normally:
-
-```bash
-parallax register ./parallax.yml
-```
-
-In both cases, document the required fields (without values) in a `parallax.example.yml` that is safe to commit, so teammates know what to fill in.
+Bot and app tokens are sensitive credentials. Parallax stores them in `~/.parallax/config.json`, which is outside any repository by default. The tokens are never returned by the API and are masked in the dashboard UI.
