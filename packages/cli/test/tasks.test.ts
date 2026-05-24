@@ -224,7 +224,9 @@ describe('runTasks', () => {
 
     const taskRows = rawLines.filter((_, i) => {
       const plain = stripped[i]
-      return plain !== undefined && statuses.some((s) => plain.includes(s) && plain.includes('TASK-'))
+      return (
+        plain !== undefined && statuses.some((s) => plain.includes(s) && plain.includes('TASK-'))
+      )
     })
 
     for (const row of taskRows) {
