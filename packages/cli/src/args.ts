@@ -8,6 +8,7 @@ import type {
   StartCommandOptions,
   StopCommandOptions,
   StatusCommandOptions,
+  TasksCommandOptions,
 } from './types.js'
 
 export function parseArg(args: string[], key: string): string | undefined {
@@ -192,6 +193,14 @@ export function parsePreflightOptions(args: string[]): PreflightCommandOptions {
 export function parseStatusOptions(args: string[]): StatusCommandOptions {
   if (args.length > 0) {
     throw new Error('parallax status does not accept flags.')
+  }
+
+  return {}
+}
+
+export function parseTasksOptions(args: string[]): TasksCommandOptions {
+  if (args.length > 0) {
+    throw new Error('parallax tasks does not accept flags.')
   }
 
   return {}

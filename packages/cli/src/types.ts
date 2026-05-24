@@ -20,6 +20,8 @@ export type PreflightCommandOptions = Record<string, never>
 
 export type StatusCommandOptions = Record<string, never>
 
+export type TasksCommandOptions = Record<string, never>
+
 export type StartCommandOptions = {
   apiPort: number
   uiPort: number

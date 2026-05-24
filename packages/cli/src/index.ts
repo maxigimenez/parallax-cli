@@ -13,6 +13,7 @@ import {
   parseRetryOptions,
   parseStartOptions,
   parseStatusOptions,
+  parseTasksOptions,
   parseStopOptions as parseStopOptionsInternal,
   resolvePath,
 } from './args.js'
@@ -34,6 +35,7 @@ import { runRetry } from './commands/retry.js'
 import { runStart } from './commands/start.js'
 import { runStatus } from './commands/status.js'
 import { runStop } from './commands/stop.js'
+import { runTasks } from './commands/tasks.js'
 import type { CliContext } from './types.js'
 import { printUsage } from './usage.js'
 
@@ -164,6 +166,9 @@ async function cli() {
       case 'logs':
         await runLogs(commandArgs, cliContext)
         return
+      case 'tasks':
+        await runTasks(commandArgs, cliContext)
+        return
       default:
         console.error(`Unknown command: ${command}\n`)
         printUsage()
@@ -183,6 +188,7 @@ export {
   parseRetryOptions,
   parseStartOptions,
   parseStatusOptions,
+  parseTasksOptions,
   parseRunningState,
   resolveDefaultApiBase,
   resolvePath,
