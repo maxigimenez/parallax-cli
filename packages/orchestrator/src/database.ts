@@ -34,7 +34,8 @@ db.exec(`
     approvedBy TEXT,
     approvedAt INTEGER,
     executionAttempts INTEGER DEFAULT 0,
-    lastAgent TEXT
+    lastAgent TEXT,
+    trackerCommentId TEXT
   );
 `)
 
@@ -85,6 +86,7 @@ ensureColumn('executionAttempts', 'INTEGER DEFAULT 0')
 ensureColumn('lastAgent', 'TEXT')
 ensureColumn('agentName', 'TEXT')
 ensureColumn('agentSessionId', 'TEXT')
+ensureColumn('trackerCommentId', 'TEXT')
 
 const existingLogColumns = new Set(
   (db.prepare('PRAGMA table_info(task_logs)').all() as Array<{ name: string }>).map(
@@ -109,8 +111,8 @@ ensureLogColumn('title', 'TEXT')
 export const dbService = {
   saveTask(task: Task) {
     const upsert = db.prepare(`
-      INSERT INTO tasks (id, externalId, title, description, status, projectId, branchName, prUrl, prNumber, lastReviewEventAt, reviewState, planState, planMarkdown, planPrompt, planResult, approvedBy, approvedAt, executionAttempts, lastAgent, agentName, agentSessionId, createdAt, updatedAt)
-      VALUES (@id, @externalId, @title, @description, @status, @projectId, @branchName, @prUrl, @prNumber, @lastReviewEventAt, @reviewState, @planState, @planMarkdown, @planPrompt, @planResult, @approvedBy, @approvedAt, @executionAttempts, @lastAgent, @agentName, @agentSessionId, @createdAt, @updatedAt)
+      INSERT INTO tasks (id, externalId, title, description, status, projectId, branchName, prUrl, prNumber, lastReviewEventAt, reviewState, planState, planMarkdown, planPrompt, planResult, approvedBy, approvedAt, executionAttempts, lastAgent, agentName, agentSessionId, trackerCommentId, createdAt, updatedAt)
+      VALUES (@id, @externalId, @title, @description, @status, @projectId, @branchName, @prUrl, @prNumber, @lastReviewEventAt, @reviewState, @planState, @planMarkdown, @planPrompt, @planResult, @approvedBy, @approvedAt, @executionAttempts, @lastAgent, @agentName, @agentSessionId, @trackerCommentId, @createdAt, @updatedAt)
       ON CONFLICT(externalId) DO UPDATE SET
         title=excluded.title,
         description=excluded.description,
@@ -125,6 +127,7 @@ export const dbService = {
         lastAgent=COALESCE(excluded.lastAgent, lastAgent),
         agentName=COALESCE(excluded.agentName, agentName),
         agentSessionId=COALESCE(excluded.agentSessionId, agentSessionId),
+        trackerCommentId=COALESCE(excluded.trackerCommentId, trackerCommentId),
         updatedAt=excluded.updatedAt
     `)
 
@@ -144,6 +147,7 @@ export const dbService = {
       lastAgent: task.lastAgent || null,
       agentName: null,
       agentSessionId: null,
+      trackerCommentId: null,
       ...task,
     })
   },
@@ -369,6 +373,14 @@ export const dbService = {
   updateAgentSessionId(id: string, sessionId: string) {
     db.prepare('UPDATE tasks SET agentSessionId = ?, updatedAt = ? WHERE id = ?').run(
       sessionId,
+      Date.now(),
+      id
+    )
+  },
+
+  updateTaskTrackerCommentId(id: string, commentId: string | null) {
+    db.prepare('UPDATE tasks SET trackerCommentId = ?, updatedAt = ? WHERE id = ?').run(
+      commentId,
       Date.now(),
       id
     )
