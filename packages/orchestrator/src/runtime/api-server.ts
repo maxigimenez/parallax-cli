@@ -92,6 +92,11 @@ export async function createApiServer(
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   })
 
+  fastify.get('/runtime/health', async () => ({
+    status: 'ok',
+    activeTasks: activeTasks.size,
+  }))
+
   fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
 
   fastify.get('/tasks/pending-plans', async () =>

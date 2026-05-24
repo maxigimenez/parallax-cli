@@ -144,7 +144,7 @@ async function persistPlanResult(task: Task, project: ProjectConfig, planResult:
     const updatedTask = dbService.getTaskById(task.id)
     if (updatedTask) {
       getSlackBot()
-        ?.notify({ task: updatedTask, event: 'plan_ready' })
+        ?.notify({ task: updatedTask, event: 'plan_ready', agentModel: project.agent.model })
         .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
     }
     return
@@ -187,6 +187,11 @@ export async function processTask(
 
   taskLifecycle.run(task.id, `Starting execution: ${task.title}`)
   dbService.incrementExecutionAttempts(task.id)
+
+  getSlackBot()
+    ?.notify({ task, event: 'execution_started' })
+    .catch((err: any) => logger.error(`Slack notify failed: ${err?.message ?? err}`, task.id))
+
   let worktreePath: string | undefined
 
   try {

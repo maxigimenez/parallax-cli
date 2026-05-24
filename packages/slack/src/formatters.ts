@@ -26,17 +26,21 @@ function markdownToMrkdwn(text: string): string {
   )
 }
 
-export function buildPlanApprovalMessage(task: Task): (Block | KnownBlock)[] {
+export function buildPlanApprovalMessage(task: Task, agentModel?: string): (Block | KnownBlock)[] {
   const planText = task.planMarkdown
     ? truncate(task.planMarkdown, MAX_PLAN_LENGTH)
     : 'No plan content available.'
+
+  const agentLabel = agentModel
+    ? `${agentIdentityLine(task)} - ${agentModel}`
+    : agentIdentityLine(task)
 
   return [
     {
       type: 'header',
       text: {
         type: 'plain_text',
-        text: `Plan Ready — ${agentIdentityLine(task)}`,
+        text: `Plan Ready — ${agentLabel}`,
         emoji: true,
       },
     },
@@ -44,7 +48,7 @@ export function buildPlanApprovalMessage(task: Task): (Block | KnownBlock)[] {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Project:* ${task.projectId}\n*Task:* ${task.externalId} · ${task.title}`,
+        text: `*Project:* ${task.projectId}\n*ID:* ${task.id}\n*Task:* ${task.externalId} · ${task.title}`,
       },
     },
     { type: 'divider' },

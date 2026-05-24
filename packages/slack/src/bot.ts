@@ -11,6 +11,7 @@ export class SlackBot {
   private channel: string
   private apiBaseUrl: string
   private threadRegistry = new Map<string, string>()
+  private taskToThread = new Map<string, string>()
 
   constructor({ config, apiBaseUrl, onError }: SlackBotOptions) {
     this.channel = config.channel
@@ -39,6 +40,12 @@ export class SlackBot {
   }
 
   async notify(payload: SlackNotificationPayload): Promise<void> {
-    await sendNotification(this.client, this.channel, payload, this.threadRegistry)
+    await sendNotification(
+      this.client,
+      this.channel,
+      payload,
+      this.threadRegistry,
+      this.taskToThread
+    )
   }
 }

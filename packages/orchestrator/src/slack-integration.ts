@@ -11,6 +11,7 @@ export interface SlackNotificationPayload {
   task: Task
   event: SlackNotificationEvent
   extra?: string
+  agentModel?: string
 }
 
 export interface SlackBotInterface {
