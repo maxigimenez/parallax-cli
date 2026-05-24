@@ -104,11 +104,14 @@ describe('GitHubService', () => {
     expect(tasks[0].labels).toEqual([])
   })
 
-  it('should comment when a GitHub task starts', async () => {
-    executeCommandMock.mockResolvedValue({ exitCode: 0, output: '' })
+  it('should assign and comment when a GitHub task starts', async () => {
+    executeCommandMock.mockResolvedValue({
+      exitCode: 0,
+      output: JSON.stringify({ id: 9001 }),
+    })
     const service = new GitHubService({ executeCommand: executeCommandMock } as any)
 
-    await service.markAsInProgress('org/repo#42', {
+    const commentId = await service.markAsInProgress('org/repo#42', {
       id: 'p1',
       workspaceDir: '/tmp/repo',
       pullFrom: {
@@ -120,16 +123,22 @@ describe('GitHubService', () => {
       },
     } as any)
 
+    expect(commentId).toBe('9001')
+
+    expect(executeCommandMock).toHaveBeenCalledWith(
+      ['gh', 'issue', 'edit', '42', '--repo', 'org/repo', '--add-assignee', '@me'],
+      { cwd: '/tmp/repo' }
+    )
+
     expect(executeCommandMock).toHaveBeenCalledWith(
       [
         'gh',
-        'issue',
-        'comment',
-        '42',
-        '--repo',
-        'org/repo',
-        '--body',
-        'Parallax has started working on this task in the local host environment.',
+        'api',
+        'repos/org/repo/issues/42/comments',
+        '-X',
+        'POST',
+        '-F',
+        'body=🤖 Parallax has picked up this task and is generating a plan.',
       ],
       { cwd: '/tmp/repo' }
     )
