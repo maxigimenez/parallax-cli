@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import path from 'node:path'
+import { injectUiRuntimeConfig } from '../src/runtime/ui-server.js'
 
 /**
  * Tests for the path traversal prevention logic in the UI server.
@@ -70,5 +71,13 @@ describe('UI server path traversal prevention', () => {
     const result = resolveAndValidate(uiDist, 'assets/fonts/roboto.woff2')
     expect(result.ok).toBe(true)
     expect(result.resolved).toBe('/app/ui/dist/assets/fonts/roboto.woff2')
+  })
+})
+
+describe('UI runtime configuration', () => {
+  it('injects the API port without hard-coding localhost', () => {
+    const result = injectUiRuntimeConfig('<html><head></head><body></body></html>', 9371)
+    expect(result).toContain('"apiPort":9371')
+    expect(result).not.toContain('localhost')
   })
 })

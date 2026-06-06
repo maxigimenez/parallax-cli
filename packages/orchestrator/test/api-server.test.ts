@@ -114,6 +114,31 @@ describe('createApiServer – CORS', () => {
     expect(allowOrigin).not.toBe('*')
   })
 
+  it('allows a matching LAN hostname only when network access is enabled', async () => {
+    await server.close()
+    server = await createApiServer(buildDependencies({ networkAccess: true }))
+
+    const allowed = await server.inject({
+      method: 'GET',
+      url: '/tasks',
+      headers: {
+        host: 'cerebro.local:9371',
+        origin: 'http://cerebro.local:9372',
+      },
+    })
+    expect(allowed.headers['access-control-allow-origin']).toBe('http://cerebro.local:9372')
+
+    const blocked = await server.inject({
+      method: 'GET',
+      url: '/tasks',
+      headers: {
+        host: 'cerebro.local:9371',
+        origin: 'http://other.local:9372',
+      },
+    })
+    expect(blocked.headers['access-control-allow-origin']).toBeUndefined()
+  })
+
   it('does not use wildcard CORS', async () => {
     const res = await server.inject({ method: 'GET', url: '/tasks' })
     expect(res.headers['access-control-allow-origin']).not.toBe('*')

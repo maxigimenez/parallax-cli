@@ -3,7 +3,7 @@ export function printUsage(): void {
   parallax --version
   parallax --help
   parallax init
-  parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
+  parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>] [--network-access]
   parallax stop
   parallax status
   parallax tasks

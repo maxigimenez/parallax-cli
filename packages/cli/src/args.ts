@@ -68,13 +68,24 @@ function parseStrictPort(args: string[], key: string, fallback: number): number 
 }
 
 export function parseStartOptions(args: string[]): StartCommandOptions {
-  const allowedFlags = new Set(['--server-api-port', '--server-ui-port', '--concurrency'])
+  const allowedFlags = new Set([
+    '--server-api-port',
+    '--server-ui-port',
+    '--concurrency',
+    '--network-access',
+  ])
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
     if (arg.startsWith('--')) {
       const flag = arg.includes('=') ? arg.split('=')[0] : arg
       if (!allowedFlags.has(flag)) {
         throw new Error(`Unsupported flag for parallax start: ${arg}`)
+      }
+      if (flag === '--network-access') {
+        if (arg.includes('=')) {
+          throw new Error('--network-access does not accept a value.')
+        }
+        continue
       }
       if (!arg.includes('=')) {
         index += 1
@@ -98,7 +109,7 @@ export function parseStartOptions(args: string[]): StartCommandOptions {
     throw new Error('--server-api-port and --server-ui-port must be different.')
   }
 
-  return { apiPort, uiPort, concurrency }
+  return { apiPort, uiPort, concurrency, networkAccess: hasFlag(args, 'network-access') }
 }
 
 export function parseStopOptions(args: string[]): StopCommandOptions {

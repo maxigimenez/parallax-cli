@@ -84,7 +84,7 @@ async function resolveDefaultApiBase(): Promise<string> {
 
 function buildEnvConfig(
   dataDir: string,
-  runtime: { apiPort: number; uiPort: number; concurrency: number }
+  runtime: { apiPort: number; uiPort: number; concurrency: number; networkAccess: boolean }
 ) {
   const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
   const sqliteWarningSuppression = '--disable-warning=ExperimentalWarning'
@@ -99,6 +99,7 @@ function buildEnvConfig(
     PARALLAX_SERVER_API_PORT: String(runtime.apiPort),
     PARALLAX_SERVER_UI_PORT: String(runtime.uiPort),
     PARALLAX_CONCURRENCY: String(runtime.concurrency),
+    PARALLAX_NETWORK_ACCESS: String(runtime.networkAccess),
   }
 }
 

@@ -83,6 +83,24 @@ What this does:
 - launches the background orchestrator and dashboard
 - reads projects and secrets from `~/.parallax/config.json`
 
+### Optional: access a headless machine over the local network
+
+On a trusted internal network, start Parallax with:
+
+```bash
+parallax start --network-access
+```
+
+The startup output includes a network dashboard URL, for example:
+
+```text
+http://cerebro.local:9372
+```
+
+You can also use the machine's LAN IP address. This mode has no authentication: anyone who can
+reach it can approve tasks and modify Parallax configuration and secrets. Without
+`--network-access`, both the dashboard and API remain bound to localhost.
+
 ## 6. Open the dashboard
 
 ```bash
@@ -90,6 +108,8 @@ parallax open
 ```
 
 Or open `http://localhost:9372` in your browser.
+
+For a remote browser, use the network URL printed by `parallax start --network-access`.
 
 The dashboard has three sections (left navigation):
 

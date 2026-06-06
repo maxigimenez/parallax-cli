@@ -51,6 +51,50 @@ parallax stop
 parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
 ```
 
+## Dashboard cannot be reached over the local network
+
+Parallax binds to localhost unless network access is explicitly enabled:
+
+```bash
+parallax stop
+parallax start --network-access
+```
+
+Use the network URL printed at startup or by `parallax status`, for example
+`http://cerebro.local:9372`.
+
+### Vite says the host is not allowed
+
+An error such as:
+
+```text
+Blocked request. This host ("cerebro.local") is not allowed.
+```
+
+means the development dashboard was started without network mode. Restart the full Parallax runtime
+with `parallax start --network-access`; do not edit the installed `vite.config.js`.
+
+### The `.local` hostname does not resolve
+
+On macOS, check the Bonjour hostname:
+
+```bash
+scutil --get LocalHostName
+```
+
+Try `<LocalHostName>.local`, or use the Mac's LAN IP address instead. Ensure both devices are on the
+same network and that client isolation is disabled on the router or access point.
+
+### The hostname resolves but the connection is refused
+
+- Confirm `parallax status` shows a network dashboard URL.
+- Allow incoming connections for Node.js in **System Settings → Network → Firewall**.
+- Confirm ports `9371` and `9372`, or your custom API/UI ports, are not blocked by host or network
+  firewall rules.
+
+Network access has no authentication. Enable it only on a trusted internal network because remote
+dashboard users can approve tasks and modify configuration and secrets.
+
 ## Task actions fail
 
 ### Unknown task id

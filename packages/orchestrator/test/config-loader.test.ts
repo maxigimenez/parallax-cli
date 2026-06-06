@@ -9,6 +9,7 @@ const originalDataDir = process.env.PARALLAX_DATA_DIR
 const originalConcurrency = process.env.PARALLAX_CONCURRENCY
 const originalApiPort = process.env.PARALLAX_SERVER_API_PORT
 const originalUiPort = process.env.PARALLAX_SERVER_UI_PORT
+const originalNetworkAccess = process.env.PARALLAX_NETWORK_ACCESS
 
 afterEach(async () => {
   process.chdir(originalCwd)
@@ -31,6 +32,11 @@ afterEach(async () => {
     delete process.env.PARALLAX_SERVER_UI_PORT
   } else {
     process.env.PARALLAX_SERVER_UI_PORT = originalUiPort
+  }
+  if (originalNetworkAccess === undefined) {
+    delete process.env.PARALLAX_NETWORK_ACCESS
+  } else {
+    process.env.PARALLAX_NETWORK_ACCESS = originalNetworkAccess
   }
 })
 
@@ -65,6 +71,7 @@ describe('config-loader', () => {
     expect(config.projects).toHaveLength(0)
     expect(config.server.apiPort).toBe(9371)
     expect(config.server.uiPort).toBe(9372)
+    expect(config.server.networkAccess).toBe(false)
     expect(config.concurrency).toBe(2)
   })
 
@@ -91,6 +98,7 @@ describe('config-loader', () => {
     process.env.PARALLAX_CONCURRENCY = '4'
     process.env.PARALLAX_SERVER_API_PORT = '4100'
     process.env.PARALLAX_SERVER_UI_PORT = '4101'
+    process.env.PARALLAX_NETWORK_ACCESS = 'true'
 
     const config = await loadConfig()
     expect(config.projects).toHaveLength(1)
@@ -98,6 +106,7 @@ describe('config-loader', () => {
     expect(config.concurrency).toBe(4)
     expect(config.server.apiPort).toBe(4100)
     expect(config.server.uiPort).toBe(4101)
+    expect(config.server.networkAccess).toBe(true)
   })
 
   it('accepts claude-code as a supported agent provider', async () => {

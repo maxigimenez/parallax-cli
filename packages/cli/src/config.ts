@@ -58,6 +58,8 @@ export function parseRunningState(raw: string, source: string): RunningState {
     (parsed as { orchestratorPid: number }).orchestratorPid <= 0 ||
     (parsed as { apiPort: number }).apiPort <= 0 ||
     (parsed as { uiPort: number }).uiPort <= 0 ||
+    ('networkAccess' in parsed &&
+      typeof (parsed as { networkAccess?: unknown }).networkAccess !== 'boolean') ||
     ('uiPid' in parsed && typeof (parsed as { uiPid?: unknown }).uiPid !== 'number') ||
     (typeof (parsed as { uiPid?: unknown }).uiPid === 'number' &&
       (parsed as { uiPid: number }).uiPid <= 0)
@@ -65,7 +67,10 @@ export function parseRunningState(raw: string, source: string): RunningState {
     throw new Error(`Invalid running manifest at ${source}.`)
   }
 
-  return parsed as RunningState
+  return {
+    ...(parsed as RunningState),
+    networkAccess: (parsed as { networkAccess?: boolean }).networkAccess === true,
+  }
 }
 
 export async function loadRunningState(
