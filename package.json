@@ -10,6 +10,7 @@
     "lint:fix": "pnpm --filter './packages/*' -r lint:fix && pnpm exec eslint eslint.config.js --fix",
     "parallax": "NODE_ENV=dev pnpm --filter parallax-cli start",
     "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
+    "version:set": "node scripts/set-version.mjs",
     "release:pack": "pnpm --filter parallax-cli pack:tarball",
     "release:publish": "pnpm --dir packages/cli publish:package"
   },
