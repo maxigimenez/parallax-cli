@@ -21,6 +21,8 @@ Parallax can connect to a Slack workspace to post plan notifications, accept app
 
 Task IDs appear in plan-ready messages and in the dashboard.
 
+All slash-command replies are posted **in-channel** (`response_type: in_channel`), so they are visible to everyone in the channel rather than only the person who ran the command.
+
 ## How it works
 
 Parallax uses Bolt **Socket Mode**: it opens an outbound WebSocket to Slack's API servers. There is no inbound HTTP server to expose, no public URL to configure, and no need to punch through a firewall or NAT. It works on localhost and on air-gapped machines as long as they have outbound HTTPS/WSS access.
