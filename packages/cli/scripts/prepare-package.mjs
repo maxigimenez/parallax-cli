@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises'
-import { lstatSync, readlinkSync } from 'node:fs'
+import { lstatSync, readlinkSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -51,7 +51,26 @@ const bundledPackages = [
       type: 'module',
     },
   },
+  {
+    name: '@parallax/slack',
+    sourceDir: path.join(workspaceRoot, 'packages/slack'),
+    packageJson: {
+      name: '@parallax/slack',
+      version: '0.0.4',
+      type: 'module',
+    },
+  },
 ]
+
+// Pin each bundled package to its real workspace version so the published
+// package.json, the flattened bundled package.json, and the rewritten cli
+// dependency ranges all stay consistent across releases.
+for (const metadata of bundledPackages) {
+  const { version } = JSON.parse(
+    readFileSync(path.join(metadata.sourceDir, 'package.json'), 'utf8')
+  )
+  metadata.packageJson.version = version
+}
 
 function runPnpm(args) {
   execFileSync('pnpm', ['--dir', workspaceRoot, ...args], {
@@ -120,6 +139,7 @@ async function main() {
       '@parallax/common': bundledPackages[0].packageJson.version,
       '@parallax/orchestrator': bundledPackages[1].packageJson.version,
       '@parallax/ui': bundledPackages[2].packageJson.version,
+      '@parallax/slack': bundledPackages[3].packageJson.version,
     },
   }
   await fs.writeFile(cliPackageJsonPath, JSON.stringify(rewrittenCliPackageJson, null, 2) + '\n')
