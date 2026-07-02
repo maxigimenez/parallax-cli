@@ -79,7 +79,7 @@ Notes:
 Start orchestrator and dashboard in background.
 
 ```bash
-parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
+parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>] [--network-access]
 ```
 
 `parallax start` reads project and secret configuration from `~/.parallax/config.json`.
@@ -90,7 +90,12 @@ Examples:
 ```bash
 parallax start
 parallax start --server-api-port 9371 --server-ui-port 9372 --concurrency 2
+parallax start --network-access
 ```
+
+`--network-access` binds the dashboard and API to all network interfaces and prints a LAN URL such
+as `http://cerebro.local:9372`. The default remains localhost-only. Network mode is unauthenticated
+and should only be used on a trusted internal network.
 
 ## parallax stop
 
@@ -165,4 +170,5 @@ Common files:
 
 - `config.json`: project and integration configuration (managed by `parallax init` and the dashboard)
 - `running.json`: process manifest (`orchestratorPid`, `uiPid`, ports, start timestamp)
+- `running.json` also records whether the current runtime enabled network access
 - `parallax.db`: SQLite state database

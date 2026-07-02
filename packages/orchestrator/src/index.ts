@@ -20,6 +20,7 @@ import { buildExternalServices, fetchProjectTasks } from './runtime/provider-ser
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
 import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'
+import { allowSocketRequest } from './runtime/network-access.js'
 import {
   createAgentAdapter,
   processPullRequestReview,
@@ -55,12 +56,19 @@ async function startRuntimeServers(
     canceledTasks,
     activeWorktrees,
     dataDir: resolveDataDir(),
+    networkAccess: getConfig().server.networkAccess,
   })
 
   const config = getConfig()
-  await fastify.listen({ port: config.server.apiPort, host: '127.0.0.1' })
+  await fastify.listen({
+    port: config.server.apiPort,
+    host: config.server.networkAccess ? '0.0.0.0' : '127.0.0.1',
+  })
   const io = new SocketServer(fastify.server, {
-    cors: { origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/ },
+    cors: {
+      origin: config.server.networkAccess ? true : /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
+    },
+    allowRequest: allowSocketRequest(config.server.networkAccess),
   })
   setIo(io)
 
@@ -70,7 +78,12 @@ async function startRuntimeServers(
 
   const uiDistPath = resolveUiDistPath()
   if (uiDistPath) {
-    await startUiServer(uiDistPath, config.server.uiPort, config.server.apiPort)
+    await startUiServer(
+      uiDistPath,
+      config.server.uiPort,
+      config.server.apiPort,
+      config.server.networkAccess
+    )
     logger.info(`UI server ready on http://localhost:${config.server.uiPort}`)
     return
   }

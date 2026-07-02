@@ -66,12 +66,22 @@ parallax status      # check health + running projects
 parallax stop
 ```
 
+To access a headless machine's dashboard from a trusted internal network, opt in when starting:
+
+```bash
+parallax start --network-access
+```
+
+Parallax prints the network URL, such as `http://cerebro.local:9372`. Network access is
+unauthenticated and allows dashboard users to approve work and modify configuration, so enable it
+only on a trusted network. Localhost-only access remains the default.
+
 ## CLI
 
 ```bash
 parallax --version
 parallax init                                               # first-time setup wizard
-parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>]
+parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>] [--network-access]
 parallax stop
 parallax status
 parallax open
@@ -92,7 +102,8 @@ See [docs/slack-bot.md](docs/slack-bot.md) for the full setup guide.
 
 ## Dashboard
 
-The dashboard is accessible at `http://localhost:9372` (default):
+The dashboard is accessible at `http://localhost:9372` by default. With
+`parallax start --network-access`, it is also available through the host's network name or IP:
 
 - **Tasks** — live task list with plan approval and log streaming
 - **Projects** — add, edit, and delete project configurations

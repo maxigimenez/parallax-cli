@@ -19,6 +19,7 @@ import {
 import { serializeTaskForApi } from './api/task-response.js'
 import { readConfigStore, writeConfigStore } from '../config-store.js'
 import { validateProject, validateSlack } from '../config-validation.js'
+import { isAllowedBrowserOrigin } from './network-access.js'
 
 type TaskDiffFile = {
   path: string
@@ -34,6 +35,7 @@ type ApiServerDependencies = {
   canceledTasks: Set<string>
   activeWorktrees: Map<string, string>
   dataDir: string
+  networkAccess?: boolean
 }
 
 function sanitizeConfigForApi(config: AppConfig): AppConfig {
@@ -76,6 +78,7 @@ export async function createApiServer(
     canceledTasks,
     activeWorktrees,
     dataDir,
+    networkAccess = false,
   } = dependencies
 
   async function mutateConfig(updater: (cfg: StoredConfig) => StoredConfig): Promise<AppConfig> {
@@ -88,8 +91,16 @@ export async function createApiServer(
   }
 
   await fastify.register(cors, {
-    origin: /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
-    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    delegator: (request, callback) => {
+      const origin = request.headers.origin
+      const requestHost = request.headers.host
+      callback(null, {
+        origin: isAllowedBrowserOrigin(origin, requestHost, networkAccess)
+          ? origin || false
+          : false,
+        methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      })
+    },
   })
 
   fastify.get('/runtime/health', async () => ({

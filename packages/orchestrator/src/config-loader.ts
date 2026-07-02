@@ -47,7 +47,15 @@ function parseRuntimeServerConfig(): ServerConfig {
   if (apiPort === uiPort) {
     throw new Error('PARALLAX_SERVER_API_PORT and PARALLAX_SERVER_UI_PORT must be different.')
   }
-  return { apiPort, uiPort }
+  const rawNetworkAccess = process.env.PARALLAX_NETWORK_ACCESS
+  if (
+    rawNetworkAccess !== undefined &&
+    rawNetworkAccess !== 'true' &&
+    rawNetworkAccess !== 'false'
+  ) {
+    throw new Error('PARALLAX_NETWORK_ACCESS must be "true" or "false".')
+  }
+  return { apiPort, uiPort, networkAccess: rawNetworkAccess === 'true' }
 }
 
 export async function loadConfig(): Promise<AppConfig> {

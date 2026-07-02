@@ -36,6 +36,10 @@ What this flow does:
 
 The dashboard is at `http://localhost:9372` after `parallax start`.
 
+For a trusted internal network, `parallax start --network-access` also exposes the dashboard through
+the machine hostname or LAN IP. This mode is unauthenticated; localhost-only access remains the
+default.
+
 ## How it works
 
 - Parallax stores all configuration and runtime state under `~/.parallax`

@@ -3,6 +3,7 @@ import fsSync from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import { parseStartOptions } from '../args.js'
+import { buildDashboardUrl, resolveNetworkHostname } from '../network.js'
 import {
   isProcessAlive,
   readFileTail,
@@ -70,6 +71,7 @@ export async function runStart(args: string[], context: CliContext) {
     apiPort: options.apiPort,
     uiPort: options.uiPort,
     concurrency: options.concurrency,
+    networkAccess: options.networkAccess,
   })
   const workspaceDevMode = process.env.NODE_ENV === 'dev'
   const orchestratorStdoutPath = path.join(dataDir, 'orchestrator.stdout.log')
@@ -122,14 +124,20 @@ export async function runStart(args: string[], context: CliContext) {
           '@parallax/ui',
           'start',
           '--host',
-          '0.0.0.0',
+          options.networkAccess ? '0.0.0.0' : '127.0.0.1',
           '--port',
           String(options.uiPort),
         ],
         context.rootDir,
-        {
-          VITE_PARALLAX_API_BASE: `http://localhost:${options.apiPort}`,
-        },
+        options.networkAccess
+          ? {
+              VITE_PARALLAX_API_PORT: String(options.apiPort),
+              PARALLAX_NETWORK_ACCESS: 'true',
+            }
+          : {
+              VITE_PARALLAX_API_BASE: `http://localhost:${options.apiPort}`,
+              PARALLAX_NETWORK_ACCESS: 'false',
+            },
         {
           stdoutPath: uiStdoutPath,
           stderrPath: uiStderrPath,
@@ -168,6 +176,7 @@ export async function runStart(args: string[], context: CliContext) {
           uiPid: uiPid || undefined,
           apiPort: options.apiPort,
           uiPort: options.uiPort,
+          networkAccess: options.networkAccess,
         },
         null,
         2
@@ -179,6 +188,14 @@ export async function runStart(args: string[], context: CliContext) {
     console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
     console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
     console.log(`${DIM}Dashboard:${RESET} http://localhost:${options.uiPort}`)
+    if (options.networkAccess) {
+      console.log(
+        `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), options.uiPort)}`
+      )
+      console.log(
+        `${YELLOW}Warning: network access is unauthenticated. Anyone on this trusted network can control Parallax and modify its configuration.${RESET}`
+      )
+    }
     console.log(`${DIM}Projects:${RESET} ${storedConfig.projects.length}`)
     console.log('')
     console.log('')

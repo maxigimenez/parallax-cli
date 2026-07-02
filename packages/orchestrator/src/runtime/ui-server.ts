@@ -22,8 +22,8 @@ function inferMimeType(filePath: string): string {
   return STATIC_MIME[extension] || 'application/octet-stream'
 }
 
-function injectUiRuntimeConfig(html: string, apiPort: number): string {
-  const runtimeScript = `<script>window.__PARALLAX_RUNTIME_CONFIG__=${JSON.stringify({ apiBase: `http://localhost:${apiPort}` })}</script>`
+export function injectUiRuntimeConfig(html: string, apiPort: number): string {
+  const runtimeScript = `<script>window.__PARALLAX_RUNTIME_CONFIG__=${JSON.stringify({ apiPort })}</script>`
   return html.includes('</head>')
     ? html.replace('</head>', `  ${runtimeScript}\n</head>`)
     : `${runtimeScript}\n${html}`
@@ -47,7 +47,12 @@ export function resolveUiDistPath(): string | undefined {
   }
 }
 
-export async function startUiServer(uiDistPath: string, uiPort: number, apiPort: number) {
+export async function startUiServer(
+  uiDistPath: string,
+  uiPort: number,
+  apiPort: number,
+  networkAccess: boolean
+) {
   const uiFastify = Fastify({ logger: false })
 
   uiFastify.get('/*', async (request, reply) => {
@@ -79,6 +84,6 @@ export async function startUiServer(uiDistPath: string, uiPort: number, apiPort:
     }
   })
 
-  await uiFastify.listen({ port: uiPort, host: '127.0.0.1' })
+  await uiFastify.listen({ port: uiPort, host: networkAccess ? '0.0.0.0' : '127.0.0.1' })
   return uiFastify
 }

@@ -148,4 +148,26 @@ describe('runStatus', () => {
       'second error',
     ])
   })
+
+  it('prints the network dashboard URL when network access is enabled', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ hasErrors: false, errors: [] }),
+      })
+    )
+
+    await runStatus(
+      [],
+      createContext({
+        loadRunningState: async () => createRunningState({ networkAccess: true }),
+      })
+    )
+
+    expect(logSpy.mock.calls.map((call) => String(call[0]))).toContainEqual(
+      expect.stringContaining('Network dashboard:')
+    )
+  })
 })

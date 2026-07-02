@@ -184,6 +184,7 @@ export interface ProjectConfig {
 export interface ServerConfig {
   apiPort: number
   uiPort: number
+  networkAccess: boolean
 }
 
 export const DEFAULT_API_PORT = 9371

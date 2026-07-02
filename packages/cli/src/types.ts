@@ -26,6 +26,7 @@ export type StartCommandOptions = {
   apiPort: number
   uiPort: number
   concurrency: number
+  networkAccess: boolean
 }
 
 export type RunningState = {
@@ -34,6 +35,7 @@ export type RunningState = {
   uiPid?: number
   apiPort: number
   uiPort: number
+  networkAccess?: boolean
 }
 
 export type VerifyCheck = {
@@ -58,6 +60,6 @@ export type CliContext = {
   packageVersion: string
   buildEnvConfig: (
     dataDir: string,
-    runtime: { apiPort: number; uiPort: number; concurrency: number }
+    runtime: { apiPort: number; uiPort: number; concurrency: number; networkAccess: boolean }
   ) => Record<string, string>
 }

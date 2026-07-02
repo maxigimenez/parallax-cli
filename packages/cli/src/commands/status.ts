@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { sleep } from '@parallax/common'
 import { parseStatusOptions } from '../args.js'
+import { buildDashboardUrl, resolveNetworkHostname } from '../network.js'
 import { startSpinner, isProcessAlive } from '../process.js'
 import type { CliContext } from '../types.js'
 
@@ -68,6 +69,11 @@ export async function runStatus(args: string[], context: CliContext) {
       output.push(`${RED}✗ Parallax status: issues detected.${RESET}`)
       output.push(`${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid}`)
       output.push(`${DIM}Dashboard:${RESET} http://localhost:${state.uiPort}`)
+      if (state.networkAccess) {
+        output.push(
+          `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), state.uiPort)}`
+        )
+      }
       output.push('')
       output.push(...errors)
       return
@@ -88,6 +94,11 @@ export async function runStatus(args: string[], context: CliContext) {
     output.push(`${GREEN}✓ Parallax status: healthy.${RESET}`)
     output.push(`${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid}`)
     output.push(`${DIM}Dashboard:${RESET} http://localhost:${state.uiPort}`)
+    if (state.networkAccess) {
+      output.push(
+        `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), state.uiPort)}`
+      )
+    }
 
     if (projects.length > 0) {
       output.push('')
