@@ -119,6 +119,7 @@ async function main() {
   runPnpm(['--filter', '@parallax/common', 'build'])
   runPnpm(['--filter', '@parallax/orchestrator', 'build'])
   runPnpm(['--filter', '@parallax/ui', 'build'])
+  runPnpm(['--filter', '@parallax/slack', 'build'])
   runPnpm(['--filter', 'parallax-cli', 'build'])
 
   const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, 'utf8'))
