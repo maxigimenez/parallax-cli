@@ -23,6 +23,7 @@ import {
   saveStoredConfig as saveStoredConfigToDisk,
 } from './config.js'
 import { MANIFEST_FILE } from './constants.js'
+import { ensureCapableRuntime, resolveRunnerNode, SQLITE_FLAG } from './node-runtime.js'
 import { runAgents } from './commands/agents.js'
 import { runCancel } from './commands/cancel.js'
 import { runInit } from './commands/init.js'
@@ -75,6 +76,16 @@ function resolvePackageVersion(rootDir: string): string {
 
 const PACKAGE_VERSION = resolvePackageVersion(ROOT_DIR)
 
+// Before anything else: if this interpreter cannot load node:sqlite, hand off to
+// one that can. Doing it here means every command benefits, and a version switch
+// after install produces a re-exec rather than a failure deep in the database.
+try {
+  ensureCapableRuntime(DEFAULT_DATA_DIR, __filename)
+} catch (error: unknown) {
+  console.error(chalk.red(error instanceof Error ? error.message : String(error)))
+  process.exit(1)
+}
+
 const context: CliContext = {
   defaultApiBase: DEFAULT_API_BASE,
   defaultDataDir: DEFAULT_DATA_DIR,
@@ -101,8 +112,11 @@ const context: CliContext = {
   },
 
   buildEnvConfig: (dataDir, runtime) => ({
-    // node:sqlite is still flagged experimental and prints a warning per boot.
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --disable-warning=ExperimentalWarning`.trim(),
+    // node:sqlite needs the flag on Node 22 and ignores it from 23 on, so one
+    // invocation covers every supported runtime; the warning is suppressed
+    // because it fires on every boot and says nothing actionable.
+    NODE_OPTIONS:
+      `${process.env.NODE_OPTIONS ?? ''} ${SQLITE_FLAG} --disable-warning=ExperimentalWarning`.trim(),
     PARALLAX_DATA_DIR: dataDir,
     PARALLAX_DB_PATH: path.join(dataDir, 'parallax.db'),
     PARALLAX_SERVER_API_PORT: String(runtime.apiPort),

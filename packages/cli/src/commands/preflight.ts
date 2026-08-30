@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import chalk from 'chalk'
 import type { CliContext, VerifyCheck } from '../types.js'
 import { getJson } from '../api.js'
+import { findCapableNode } from '../node-runtime.js'
 
 const MIN_NODE = [23, 7, 0] as const
 
@@ -37,11 +38,16 @@ async function commandSucceeds(cmd: string, args: string[]): Promise<boolean> {
 export async function runPreflight(context: CliContext): Promise<void> {
   const checks: VerifyCheck[] = []
 
+  // Capability, not version: what matters is whether node:sqlite loads, and
+  // which interpreter the runner will actually be started with.
+  const runtime = findCapableNode(context.defaultDataDir)
   checks.push({
-    name: `Node.js >= ${MIN_NODE.join('.')}`,
-    ok: isSupportedNodeVersion(process.version),
+    name: 'A Node that can load node:sqlite',
+    ok: Boolean(runtime),
     required: true,
-    detail: process.version,
+    detail: runtime
+      ? `${runtime.version ?? '?'} at ${runtime.binary}`
+      : `none found (running ${process.version})`,
   })
 
   const config = await context.loadStoredConfig()

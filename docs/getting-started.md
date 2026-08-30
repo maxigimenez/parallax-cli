@@ -176,6 +176,24 @@ entry point, so that file must be executable. `pnpm build` sets the bit; if you 
 see `zsh: permission denied: parallax`, the build did not run or ran from an older
 checkout — rebuild, or `chmod +x $(readlink -f "$(which parallax)")`.
 
+### Node versions
+
+Parallax needs a Node that can load `node:sqlite` — 22.5 or newer (22.x needs
+`--experimental-sqlite`, which Parallax passes for you).
+
+You do not have to keep that version selected. If `parallax` is invoked under an
+interpreter that cannot load it, it finds one that can — checking the interpreter it
+last used, then nvm, fnm, volta, asdf and Homebrew — and re-executes itself there.
+The choice is remembered in `~/.parallax/node-runtime.json`.
+
+The runner is started with that absolute interpreter path rather than whatever `node`
+means at the time, so a version switch months later cannot break a daemon that is
+already installed. `parallax runner status` warns if that interpreter has since been
+removed; `parallax runner install` repins it.
+
+If no usable Node exists at all, you get a message saying so rather than a failure
+deep inside the database layer.
+
 `init` asks for your cloud URL and the **runner** key, then reads your Hermes install
 directly: it lists every profile under `~/.hermes/profiles/`, picks each one's
 `API_SERVER_KEY` out of its own `.env`, and asks you which to add. It probes each as it

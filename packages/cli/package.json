@@ -30,7 +30,7 @@
     "test": "vitest run"
   },
   "engines": {
-    "node": ">=23.7.0"
+    "node": ">=22.5.0"
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",

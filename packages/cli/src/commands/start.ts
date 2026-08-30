@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import chalk from 'chalk'
 import { spawnDetached, waitForUrlHealth } from '../process.js'
 import { RUNNER_STDERR_FILE, RUNNER_STDOUT_FILE } from '../constants.js'
+import { resolveRunnerNode, SQLITE_FLAG } from '../node-runtime.js'
 import type { CliContext, StartCommandOptions } from '../types.js'
 
 const require = createRequire(import.meta.url)
@@ -56,10 +57,14 @@ export async function runStart(context: CliContext, options: StartCommandOptions
   const env = context.buildEnvConfig(dataDir, options)
   const entry = resolveRunnerEntryPoint(context.rootDir)
 
+  // An absolute interpreter path, so the daemon keeps working after a version
+  // switch rather than inheriting whatever `node` happens to mean later.
+  const runtime = resolveRunnerNode(dataDir)
+
   if (options.foreground) {
     // Inherit stdio so logs go straight to the terminal; used by launchd too.
     const { spawn } = await import('node:child_process')
-    const child = spawn(process.execPath, [entry], {
+    const child = spawn(runtime.binary, [SQLITE_FLAG, entry], {
       cwd: context.rootDir,
       env: { ...process.env, ...env },
       stdio: 'inherit',
@@ -72,7 +77,7 @@ export async function runStart(context: CliContext, options: StartCommandOptions
   const stderr = path.join(dataDir, RUNNER_STDERR_FILE)
   await Promise.all([fs.writeFile(stdout, ''), fs.writeFile(stderr, '')])
 
-  const pid = spawnDetached(process.execPath, [entry], context.rootDir, env, {
+  const pid = spawnDetached(runtime.binary, [SQLITE_FLAG, entry], context.rootDir, env, {
     stdoutPath: stdout,
     stderrPath: stderr,
   })

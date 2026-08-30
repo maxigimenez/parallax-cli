@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import chalk from 'chalk'
 import { LAUNCH_AGENT_LABEL, RUNNER_STDERR_FILE, RUNNER_STDOUT_FILE } from '../constants.js'
 import { resolveRunnerEntryPoint } from './start.js'
+import { readRecordedNode, probeNode, resolveRunnerNode, SQLITE_FLAG } from '../node-runtime.js'
 import type { CliContext, RunnerCommandOptions } from '../types.js'
 
 function plistPath(): string {
@@ -35,7 +36,12 @@ function escapeXml(value: string): string {
  * brings it back after a reboot -- the same shape `hermes gateway install`
  * uses, so both halves of the system survive a power cut on the Mac Mini.
  */
-function buildPlist(entry: string, dataDir: string, env: Record<string, string>): string {
+function buildPlist(
+  nodeBinary: string,
+  entry: string,
+  dataDir: string,
+  env: Record<string, string>
+): string {
   const envEntries = Object.entries(env)
     .map(
       ([key, value]) =>
@@ -51,7 +57,8 @@ function buildPlist(entry: string, dataDir: string, env: Record<string, string>)
     <string>${LAUNCH_AGENT_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-      <string>${escapeXml(process.execPath)}</string>
+      <string>${escapeXml(nodeBinary)}</string>
+      <string>${escapeXml(SQLITE_FLAG)}</string>
       <string>${escapeXml(entry)}</string>
     </array>
     <key>EnvironmentVariables</key>
@@ -112,6 +119,19 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
         : chalk.yellow(`Installed but ${state ?? 'not running'}.`)
     )
     console.log(chalk.dim(`  ${target}`))
+
+    // The agent runs whatever interpreter it was installed with. If a version
+    // manager later removes it, the job fails at boot with nothing explaining
+    // why -- so say it here, while someone is looking.
+    const pinned = readRecordedNode(dataDir)
+    if (!pinned) {
+      console.log(chalk.yellow('  Could not determine which Node it was installed with.'))
+    } else if (!probeNode(pinned)) {
+      console.log(chalk.red(`  Its Node is gone or unusable: ${pinned}`))
+      console.log(chalk.dim('  Run "parallax runner install" again to repin it.'))
+    } else {
+      console.log(chalk.dim(`  node       ${pinned}`))
+    }
     return
   }
 
@@ -141,7 +161,11 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
   env.PATH = process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin'
   env.HOME = os.homedir()
 
-  await fs.writeFile(target, buildPlist(resolveRunnerEntryPoint(context.rootDir), dataDir, env))
+  const runtime = resolveRunnerNode(dataDir)
+  await fs.writeFile(
+    target,
+    buildPlist(runtime.binary, resolveRunnerEntryPoint(context.rootDir), dataDir, env)
+  )
 
   await launchctl(['bootout', `gui/${uid}/${LAUNCH_AGENT_LABEL}`])
   const { code, output } = await launchctl(['bootstrap', `gui/${uid}`, target])
