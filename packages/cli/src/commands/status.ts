@@ -1,120 +1,65 @@
-import path from 'node:path'
-import { sleep } from '@parallax/common'
-import { parseStatusOptions } from '../args.js'
-import { buildDashboardUrl, resolveNetworkHostname } from '../network.js'
-import { startSpinner, isProcessAlive } from '../process.js'
+import chalk from 'chalk'
+import { getJson, runnerUnreachable } from '../api.js'
+import { isProcessAlive } from '../process.js'
 import type { CliContext } from '../types.js'
 
-type RuntimeErrorsResponse = {
-  hasErrors?: boolean
-  errors?: string[]
+interface Health {
+  status: string
+  version: string
+  projects: number
+  agents: number
+  routes: number
+  cloud: string
+  hermes: string | null
 }
 
-async function fetchRuntimeErrors(apiBase: string): Promise<RuntimeErrorsResponse> {
-  const response = await fetch(`${apiBase}/runtime/errors`)
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`)
-  }
-
-  return (await response.json()) as RuntimeErrorsResponse
-}
-
-export async function runStatus(args: string[], context: CliContext) {
-  parseStatusOptions(args)
-  const GREEN = '\x1b[32m'
-  const RED = '\x1b[31m'
-  const YELLOW = '\x1b[33m'
-  const DIM = '\x1b[2m'
-  const RESET = '\x1b[0m'
-  const startTime = Date.now()
-  const output: string[] = []
-
-  const spinner = startSpinner('Checking Parallax status...')
-
+export async function runStatus(context: CliContext): Promise<void> {
+  let running
   try {
-    const manifestPath = path.join(context.defaultDataDir, context.manifestFile)
-    let state
-    try {
-      state = await context.loadRunningState()
-    } catch {
-      output.push('')
-      output.push(`${RED}✗ Parallax status: offline.${RESET}`)
-      output.push(`Run ${YELLOW}parallax start${RESET} to launch the orchestrator and dashboard.`)
-      return
-    }
+    running = await context.loadRunningState()
+  } catch {
+    console.log(chalk.yellow('Parallax is not running.'))
+    console.log(chalk.dim('  parallax start'))
+    process.exitCode = 1
+    return
+  }
 
-    const orchestratorAlive = isProcessAlive(state.orchestratorPid)
-    const uiAlive = state.uiPid ? isProcessAlive(state.uiPid) : true
+  if (!isProcessAlive(running.runnerPid)) {
+    console.log(chalk.yellow(`Manifest points at pid ${running.runnerPid}, which is gone.`))
+    console.log(chalk.dim('  parallax stop     clear it, then start again'))
+    process.exitCode = 1
+    return
+  }
 
-    if (!orchestratorAlive || !uiAlive) {
-      output.push('')
-      output.push(`${RED}✗ Parallax status: unhealthy.${RESET}`)
-      output.push(`${DIM}Manifest:${RESET} ${manifestPath}`)
-      output.push(
-        `${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid} ${orchestratorAlive ? '(alive)' : '(not running)'}`
-      )
-      if (state.uiPid) {
-        output.push(`${DIM}UI PID:${RESET} ${state.uiPid} ${uiAlive ? '(alive)' : '(not running)'}`)
-      }
-      output.push(`Run ${YELLOW}parallax stop${RESET} and then ${YELLOW}parallax start${RESET}.`)
-      return
-    }
+  const apiBase = `http://localhost:${running.apiPort}`
+  let health: Health
+  try {
+    health = await getJson<Health>(`${apiBase}/runtime/health`)
+  } catch {
+    throw runnerUnreachable(apiBase)
+  }
 
-    const apiBase = await context.resolveDefaultApiBase()
-    const diagnostics = await fetchRuntimeErrors(apiBase)
-    const errors = Array.isArray(diagnostics.errors) ? diagnostics.errors : []
+  const uptime = Math.round((Date.now() - running.startedAt) / 1000)
+  console.log('')
+  console.log(`  ${chalk.green('running')}  pid ${running.runnerPid}  ${apiBase}`)
+  console.log(chalk.dim(`  up ${uptime < 60 ? `${uptime}s` : `${Math.floor(uptime / 60)}m`}`))
+  console.log('')
+  console.log(`  agents    ${health.agents}`)
+  console.log(`  routes    ${health.routes}`)
+  console.log(`  projects  ${health.projects}`)
+  console.log(`  hermes    ${health.hermes ?? chalk.yellow('not configured')}`)
+  console.log(`  cloud     ${health.cloud}`)
 
-    if (diagnostics.hasErrors && errors.length > 0) {
-      output.push('')
-      output.push(`${RED}✗ Parallax status: issues detected.${RESET}`)
-      output.push(`${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid}`)
-      output.push(`${DIM}Dashboard:${RESET} http://localhost:${state.uiPort}`)
-      if (state.networkAccess) {
-        output.push(
-          `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), state.uiPort)}`
-        )
-      }
-      output.push('')
-      output.push(...errors)
-      return
-    }
+  const { errors, hasErrors } = await getJson<{ errors: string[]; hasErrors: boolean }>(
+    `${apiBase}/runtime/errors`
+  ).catch(() => ({ errors: [], hasErrors: false }))
 
-    let projects: Array<{ id: string; agent: { provider: string } }> = []
-    try {
-      const configRes = await fetch(`${apiBase}/config`)
-      if (configRes.ok) {
-        const cfg = (await configRes.json()) as { projects?: typeof projects }
-        projects = cfg.projects ?? []
-      }
-    } catch {
-      // ignore
-    }
-
-    output.push('')
-    output.push(`${GREEN}✓ Parallax status: healthy.${RESET}`)
-    output.push(`${DIM}Orchestrator PID:${RESET} ${state.orchestratorPid}`)
-    output.push(`${DIM}Dashboard:${RESET} http://localhost:${state.uiPort}`)
-    if (state.networkAccess) {
-      output.push(
-        `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), state.uiPort)}`
-      )
-    }
-
-    if (projects.length > 0) {
-      output.push('')
-      output.push(`${DIM}Projects (${projects.length}):${RESET}`)
-      for (const project of projects) {
-        output.push(`  ${project.id.padEnd(20)} ${project.agent.provider}`)
-      }
-    }
-  } finally {
-    const remaining = 400 - (Date.now() - startTime)
-    if (remaining > 0) {
-      await sleep(remaining)
-    }
-    spinner?.stop()
-    for (const line of output) {
-      console.log(line)
+  if (hasErrors) {
+    console.log('')
+    console.log(chalk.red(`  recent errors (${errors.length}):`))
+    for (const line of errors.slice(-5)) {
+      console.log(chalk.dim(`    ${line}`))
     }
   }
+  console.log('')
 }

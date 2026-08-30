@@ -10,91 +10,119 @@ pnpm build            # build all packages (tsc)
 pnpm test             # run all tests
 pnpm lint             # lint all packages
 pnpm lint:fix         # auto-fix lint issues
-pnpm clean            # remove local DB and worktrees artifacts
 
 # run a single package's tests
 pnpm --filter @parallax/orchestrator test
+pnpm --filter @parallax/cloud test
 pnpm --filter parallax-cli test
 
 # local development — use this entrypoint for all manual testing
 pnpm parallax preflight
 pnpm parallax init
-pnpm parallax start --server-api-port 9371 --server-ui-port 9372 --concurrency 2
-pnpm parallax status
-pnpm parallax open
+pnpm parallax start --api-port 9371 --concurrency 2
+pnpm parallax agents
+pnpm parallax runs
 pnpm parallax stop
+
+# cloud, against a local or Railway Postgres
+DATABASE_URL=... pnpm --filter @parallax/cloud dev
+DATABASE_URL=... pnpm --filter @parallax/cloud db:migrate
 ```
 
-Node.js >= 23.7.0 and pnpm 10.x are required. The `--filter` flag targets individual workspace packages by their `name` in `package.json`.
+Node.js >= 23.7.0 and pnpm 10.x are required.
 
 ## Architecture
 
-Parallax is a plan-first AI orchestration runtime. It pulls work from Linear or GitHub, generates a plan via an AI agent, waits for human approval, then executes the approved plan in an isolated git worktree and opens a PR.
+Parallax is a **trigger and dispatch layer over [Hermes Agent](https://hermes-agent.nousresearch.com)**.
+It watches tickets and pull requests, decides which Hermes agent should start and with
+what context, and records what happened. It does not run agents itself.
+
+### The boundary — read this first
+
+Everything else follows from this split:
+
+- **Parallax owns** deciding *when* an agent should start, *which* agent, and *with
+  what context*; recording the outcome; announcing it.
+- **Hermes owns** everything from the moment a run starts — the filesystem, git,
+  worktrees, tooling, credentials, and the agent's own GitHub identity.
+
+Parallax creates no worktrees, runs no git commands, and opens no pull requests. The
+agent does that work under its own identity and reports back. Consequently the runner
+needs **no local clone** of any repository, and `ProjectConfig` has no `workspaceDir`.
 
 ### Package layout
 
-- **`packages/common`** — shared models, enums (`TASK_STATUS`, `TaskPlanState`, `AGENT_PROVIDER`, etc.), interfaces (`Task`, `ProjectConfig`, `StoredConfig`, `AgentResult`, `PlanResult`), and the `HostExecutor` abstraction. All cross-package types live here.
-- **`packages/orchestrator`** — the runtime process: polling loop, task state machine, AI adapter dispatch, Fastify REST API, Socket.io streaming, SQLite persistence.
-- **`packages/cli`** — the published `parallax-cli` npm package. It is the sole entry point for users. Commands talk to the orchestrator over HTTP. The `start` command forks the orchestrator as a child process and writes `~/.parallax/running.json`.
-- **`packages/slack`** — optional Slack bot (`SlackBot`) that posts task lifecycle notifications and handles interactive commands (approve, reject, cancel). Integrated at runtime via `setSlackBot()` / `getSlackBot()` in `slack-integration.ts`.
-- **`packages/ui`** — React/Vite dashboard served by the orchestrator's UI server in production.
-- **`packages/marketing`** — standalone marketing site, not part of the runtime.
+- **`packages/common`** — the shared type spine. `RUN_STATUS`, `AgentDescriptor`,
+  `TriggerEvent`, `RoutingRule`, `RunRecord`, and the config shapes. All cross-package
+  types live here.
+- **`packages/orchestrator`** — the runner. Polls trigger sources, evaluates routes,
+  dispatches to Hermes, mirrors runs to the cloud. Runs on the same machine as Hermes.
+- **`packages/cli`** — the published `parallax-cli` package, the only user entry point.
+- **`packages/cloud`** — the Railway-deployed control plane. Fastify + Postgres.
+  Stores config, the agent registry, and run history; sends Slack notifications.
+- **`packages/dashboard`** — not built yet. Will consume the cloud user API.
 
 ### Runtime state (`~/.parallax/`)
 
-| File/Dir | Purpose |
+| File | Purpose |
 |---|---|
-| `config.json` | All project, agent, Slack, and secrets config (managed by `parallax init` and dashboard) |
-| `running.json` | PID, ports, concurrency of the active orchestrator process |
-| `parallax.db` | SQLite — tasks and task logs tables |
-| `worktrees/` | Ephemeral git worktrees created per task, cleaned up after execution |
+| `config.json` | Cloud credentials, Hermes profiles and keys, secrets (v2 schema) |
+| `routes.json` | Last known good routes; the offline fallback, and the whole route table when no cloud is configured |
+| `running.json` | Pid and port of the running runner |
+| `parallax.db` | SQLite — runs, run events, dispatch ledger |
+| `runner.{stdout,stderr}.log` | Runner output |
 
-Override via `PARALLAX_DATA_DIR` env var.
+Override the directory with `PARALLAX_DATA_DIR`.
 
-### Configuration flow
+### Hermes integration (`packages/orchestrator/src/hermes/`)
 
-`~/.parallax/config.json` is the single source of truth. `loadConfig()` in `packages/orchestrator/src/config-loader.ts` reads it via `config-store.ts`, injects `secrets` into `process.env`, validates the structure via `config-validation.ts`, and returns `AppConfig`. Agent processes inherit secrets through `process.env`. No YAML files.
+One `HermesClient` addresses exactly one profile: the URL prefix (`/p/<name>`, or
+nothing for `default`) and the bearer key are bound together at construction, so the
+default profile's key can never be presented to a named profile's routes — which
+Hermes rejects under `gateway.multiplex_profiles`.
 
-### Task state machine
+`HermesAdapter.run()` implements the one rule worth remembering: **the SSE stream is
+progress, the poll is truth.** Hermes expires run event buffers after five minutes, so
+a long run's stream ends while the run continues. Completion is decided exclusively by
+polling `GET /v1/runs/{id}`; stream failures are logged and swallowed.
 
-Tasks move through two parallel dimensions:
+### Routing (`packages/orchestrator/src/routing/`)
 
-**`TASK_STATUS`**: `PENDING` → `IN_PROGRESS` → `COMPLETED` / `FAILED` / `CANCELED`
+`trigger → match → target → execution → outcome`. `rule-engine.ts` is pure — no I/O,
+no clock — so the whole "which agent starts, and when" decision is exhaustively
+unit-testable.
 
-**`TaskPlanState`**: `PLAN_GENERATING` → `PLAN_READY` / `PLAN_REQUIRES_CLARIFICATION` → _(user approves)_ → `PLAN_APPROVED` → execution → `PLAN_APPROVED` (persisted on PR creation). `NOT_REQUIRED` is used for PR-review tasks that skip planning.
+Two invariants the dispatcher enforces:
 
-State transitions are coordinated through `taskLifecycle` (`packages/orchestrator/src/task-lifecycle.ts`) which writes to the DB and updates the in-memory log display.
+1. **One run per agent.** Hermes corrupts a profile's memory if two agents drive it
+   concurrently. A route targeting a busy agent *defers* without claiming its dedupe
+   key, so the trigger survives to the next cycle.
+2. **Fire once per change.** Every dispatch claims
+   `sha1(routeId, triggerRef, triggerRevision)` in the SQLite `dispatch_ledger` before
+   any work starts. `INSERT OR IGNORE` is the concurrency control. A failure before the
+   agent was reached releases the claim so a fix can run.
 
-### Orchestrator polling loop (`packages/orchestrator/src/index.ts`)
+### Cloud (`packages/cloud`)
 
-The `main()` function runs an infinite loop (15 s interval) calling `pollProjects()`. For each registered project it:
-1. Fetches new issues from the configured provider (Linear or GitHub).
-2. Creates worktrees and runs `adapter.runPlan()` for tasks needing a plan.
-3. Dispatches `adapter.runTask()` for tasks with an approved plan.
-4. Enforces a `pLimit` concurrency cap across all projects.
+Two API-key scopes, separated from day one: `prx_rnr_` for the runner
+(`/v1/runner/*`), `prx_usr_` for humans and the future dashboard (`/v1/*`). Presenting
+one where the other is required is a 401.
 
-Cancellation is tracked via an in-memory `canceledTasks: Set<string>` checked at each `throwIfCancellationRequested()` call.
+The runner **long-polls** `GET /v1/runner/commands` rather than accepting inbound
+connections, so it works behind NAT with no tunnel. That poll also paces the runner's
+main loop.
 
-### AI adapters (`packages/orchestrator/src/ai-adapters/`)
-
-`BaseAgentAdapter` defines two abstract methods: `runPlan(task, workingDir, project)` and `runTask(task, workingDir, project, approvedPlan?, outputMode?)`. Concrete implementations: `CodexAdapter`, `GeminiAdapter`, `ClaudeCodeAdapter`. The adapter is selected from `project.agent.provider` and cached per project in an `adapterCache` map. Secrets are available in `process.env` (injected by `loadConfig()`).
-
-### Dashboard layout
-
-Three-column layout: icon nav (left, 52px) | list panel (280px) | main content (fills remainder).
-
-- **NavBar** (`NavBar.tsx`) — icon-only vertical navigation for Tasks / Projects / Integrations
-- **ListPanel** (`ListPanel.tsx`) — scrollable list for the active section
-- **Main content** — `LogViewer`, `ProjectEditor`, `IntegrationDetail`, or `EmptyState`
-
-### API server (`packages/orchestrator/src/runtime/api-server.ts`)
-
-The `mutateConfig(updater)` helper reads `config.json`, applies an updater, writes back atomically, reloads the runtime, and emits `config_updated` over Socket.io. All CRUD endpoints for projects, agents, Slack, and secrets use it.
+Migrations are plain `.sql` files applied in filename order, one transaction each.
 
 ## Key conventions
 
-- **Fail fast**: missing required config or malformed input throws immediately — no silent fallbacks.
-- **Strict parsing**: all CLI arg and request parsing goes through dedicated parser functions in `args.ts` and `runtime/api/request-parsers.ts`; never parse inline.
-- **`pnpm parallax <command>`** is the canonical local testing entrypoint — do not invoke package-level scripts directly for runtime flows.
+- **Fail fast**: missing required config or malformed input throws immediately — no
+  silent fallbacks.
+- **Strict parsing**: all CLI arg and request parsing goes through dedicated parser
+  functions in `args.ts`; never parse inline. An unknown flag is an error.
+- **`pnpm parallax <command>`** is the canonical local testing entrypoint.
 - **Docs updates belong in the same commit** as behavior changes.
 - Tests live in `packages/<name>/test/` and mirror the `src/` structure.
+- Prefer testing pure logic directly. `test/hermes/fake-hermes-server.ts` exists so the
+  adapter's timeout, cancellation, and degradation paths are testable without a real
+  Hermes; it can misbehave on demand.

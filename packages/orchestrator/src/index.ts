@@ -1,395 +1,319 @@
+import os from 'node:os'
 import pLimit from 'p-limit'
-import { Server as SocketServer } from 'socket.io'
-import { dbService } from './database.js'
-import { GitService } from './git-service.js'
-import { BaseAgentAdapter } from './ai-adapters/index.js'
 import {
-  ProjectConfig,
-  TASK_REVIEW_STATE,
-  TASK_STATUS,
-  TaskPlanState,
-  type Task,
   sleep,
+  type AgentDescriptor,
+  type AppConfig,
+  type ProjectConfig,
+  type RoutingRule,
+  type TriggerEvent,
 } from '@parallax/common'
-import { loadConfig, resolveDataDir } from './config-loader.js'
-import { logger, setIo, setLogLevels } from './logger.js'
 import { HostExecutor } from '@parallax/common/executor'
-import { GitHubReviewService } from './github/review-service.js'
-import { createTaskId } from './task-id.js'
-import { buildExternalServices, fetchProjectTasks } from './runtime/provider-services.js'
+import { loadConfig, resolveDataDir } from './config-loader.js'
+import { getDatabase } from './database.js'
+import { logger, setLoggerDatabase, setLogLevels } from './logger.js'
+import { createRunId } from './run-id.js'
+import { HermesAdapter } from './hermes/adapter.js'
+import { createClientForProfile, discoverAgents } from './hermes/discovery.js'
+import { Dispatcher } from './routing/dispatcher.js'
+import { RunLifecycle } from './routing/run-lifecycle.js'
+import { CloudClient, MirrorOutbox, type RunnerCommand } from './cloud/client.js'
+import { loadCachedRoutes, saveCachedRoutes } from './routing/route-cache.js'
+import { buildProviderServices, trackerWriterFor, triggerSourceFor } from './runtime/services.js'
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
-import { resolveUiDistPath, startUiServer } from './runtime/ui-server.js'
-import { allowSocketRequest } from './runtime/network-access.js'
-import {
-  createAgentAdapter,
-  processPullRequestReview,
-  processTask,
-  processTaskPlan,
-} from './workflow/task-runner.js'
-import {
-  deriveTaskMessage,
-  isPlanAwaitingApproval,
-  isTaskExecutable,
-  normalizePlanState,
-  requiresPlan,
-} from './workflow/task-state.js'
-import { taskLifecycle } from './task-lifecycle.js'
-import { setSlackBot } from './slack-integration.js'
 
-const activeWorktrees = new Map<string, string>()
+/** Fallback cadence when there is no cloud to long-poll against. */
+const OFFLINE_POLL_INTERVAL_MS = 20_000
 
-async function startRuntimeServers(
-  getConfig: () => Awaited<ReturnType<typeof loadConfig>>,
-  reloadRuntime: () => Promise<Awaited<ReturnType<typeof loadConfig>>>,
-  triggerPullRequestReview: (taskId: string) => Promise<{ reviewTaskId: string; prNumber: number }>,
-  gitService: GitService,
-  activeTasks: Set<string>,
-  canceledTasks: Set<string>
-) {
+const RUNNER_VERSION = process.env.PARALLAX_VERSION ?? '0.2.0'
+
+interface Runtime {
+  config: AppConfig
+  agents: AgentDescriptor[]
+  adapters: Map<string, HermesAdapter>
+  routes: RoutingRule[]
+  cloud?: CloudClient
+  outbox?: MirrorOutbox
+}
+
+function buildAdapters(config: AppConfig): Map<string, HermesAdapter> {
+  const adapters = new Map<string, HermesAdapter>()
+  if (!config.hermes) {
+    return adapters
+  }
+  for (const profile of config.hermes.profiles) {
+    if (!profile.enabled) {
+      continue
+    }
+    adapters.set(
+      profile.name,
+      new HermesAdapter(createClientForProfile(config.hermes, profile), logger)
+    )
+  }
+  return adapters
+}
+
+/**
+ * Discovers agents and, when a cloud is configured, publishes the inventory.
+ *
+ * Discovery failures are reported but never fatal: five healthy profiles should
+ * keep working while one has a stale key.
+ */
+async function refreshInventory(
+  config: AppConfig,
+  cloud?: CloudClient
+): Promise<AgentDescriptor[]> {
+  if (!config.hermes) {
+    logger.warn('No Hermes configuration; no agents available. Run "parallax init".')
+    return []
+  }
+
+  const { agents, failures } = await discoverAgents(config.hermes)
+  for (const failure of failures) {
+    logger.error(`Hermes profile "${failure.profile}" is unreachable: ${failure.error}`)
+  }
+  logger.info(
+    `Discovered ${agents.length} Hermes agent(s): ${agents.map((a) => a.profile).join(', ') || 'none'}`
+  )
+
+  if (cloud && agents.length > 0) {
+    try {
+      await cloud.pushInventory(agents)
+    } catch (error: unknown) {
+      logger.warn(`Failed to publish agent inventory: ${errorMessage(error)}`)
+    }
+  }
+
+  return agents
+}
+
+/**
+ * Pulls routes from the cloud, falling back to the last known good set.
+ *
+ * The runner must keep dispatching through a cloud outage, so a fetch failure
+ * degrades to the on-disk cache rather than silently disabling every route.
+ */
+async function refreshRoutes(dataDir: string, cloud?: CloudClient): Promise<RoutingRule[]> {
+  if (!cloud) {
+    return loadCachedRoutes(dataDir)
+  }
+
+  try {
+    const { routes } = await cloud.fetchRoutes()
+    await saveCachedRoutes(dataDir, routes)
+    return routes
+  } catch (error: unknown) {
+    const cached = await loadCachedRoutes(dataDir)
+    logger.warn(
+      `Could not fetch routes (${errorMessage(error)}); using ${cached.length} cached route(s).`
+    )
+    return cached
+  }
+}
+
+async function collectEvents(
+  project: ProjectConfig,
+  services: ReturnType<typeof buildProviderServices>
+): Promise<TriggerEvent[]> {
+  try {
+    return await triggerSourceFor(project, services).collect(project)
+  } catch (error: unknown) {
+    logger.error(`Trigger collection failed for project "${project.id}": ${errorMessage(error)}`)
+    return []
+  }
+}
+
+async function main(): Promise<void> {
+  const executor = new HostExecutor()
+  const dataDir = resolveDataDir()
+  const db = getDatabase()
+  setLoggerDatabase(db)
+
+  let config = await loadConfig()
+  setLogLevels(config.logs)
+  await validateRuntimeRequirements(config, executor)
+
+  const cloud = config.cloud ? new CloudClient(config.cloud) : undefined
+  const outbox = cloud ? new MirrorOutbox(cloud, (message) => logger.warn(message)) : undefined
+
+  if (cloud) {
+    try {
+      const hello = await cloud.hello(os.hostname(), RUNNER_VERSION)
+      logger.success(`Registered with Parallax cloud as runner ${hello.runnerId}`)
+    } catch (error: unknown) {
+      // Not fatal: a runner that cannot reach the cloud still dispatches from
+      // its cached routes, which is the whole point of caching them.
+      logger.warn(`Cloud registration failed: ${errorMessage(error)}`)
+    }
+  } else {
+    logger.warn('No cloud configured; routes will be read from the local cache only.')
+  }
+
+  const runtime: Runtime = {
+    config,
+    agents: await refreshInventory(config, cloud),
+    adapters: buildAdapters(config),
+    routes: await refreshRoutes(dataDir, cloud),
+    cloud,
+    outbox,
+  }
+
+  logger.info(`Loaded ${runtime.routes.length} route(s).`)
+
+  const lifecycle = new RunLifecycle(db, logger)
+  const limit = pLimit(config.concurrency)
+  const inFlight = new Map<string, AbortController>()
+
+  let services = buildProviderServices(config, executor)
+
+  const reload = async (): Promise<AppConfig> => {
+    config = await loadConfig()
+    setLogLevels(config.logs)
+    await validateRuntimeRequirements(config, executor)
+    runtime.config = config
+    runtime.adapters = buildAdapters(config)
+    runtime.agents = await refreshInventory(config, cloud)
+    runtime.routes = await refreshRoutes(dataDir, cloud)
+    services = buildProviderServices(config, executor)
+    return config
+  }
+
+  const dispatcherFor = (project: ProjectConfig) =>
+    new Dispatcher({
+      db,
+      logger,
+      lifecycle,
+      outcomes: trackerWriterFor(project, services),
+      adapters: runtime.adapters,
+      agents: runtime.agents,
+      newRunId: createRunId,
+      inFlight,
+    })
+
+  const cancelRun = async (runId: string): Promise<boolean> => {
+    const controller = inFlight.get(runId)
+    if (controller) {
+      controller.abort()
+      return true
+    }
+    // Not running locally: it may still be alive on the Hermes side after a
+    // runner restart, so stop it there too rather than only marking the row.
+    const run = db.getRun(runId)
+    if (run?.hermesRunId) {
+      const adapter = runtime.adapters.get(run.agentProfile)
+      if (adapter) {
+        await adapter.cancel(run.hermesRunId).catch(() => undefined)
+      }
+    }
+    if (run) {
+      lifecycle.canceled(runId, 'Canceled by operator.')
+      return true
+    }
+    return false
+  }
+
   const fastify = await createApiServer({
-    getConfig,
-    reloadRuntime,
-    triggerPullRequestReview,
-    gitService,
-    activeTasks,
-    canceledTasks,
-    activeWorktrees,
-    dataDir: resolveDataDir(),
-    networkAccess: getConfig().server.networkAccess,
+    getConfig: () => runtime.config,
+    getAgents: () => runtime.agents,
+    getRoutes: () => runtime.routes,
+    reload,
+    cancelRun,
+    db,
+    dataDir,
   })
 
-  const config = getConfig()
   await fastify.listen({
     port: config.server.apiPort,
     host: config.server.networkAccess ? '0.0.0.0' : '127.0.0.1',
   })
-  const io = new SocketServer(fastify.server, {
-    cors: {
-      origin: config.server.networkAccess ? true : /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/,
-    },
-    allowRequest: allowSocketRequest(config.server.networkAccess),
-  })
-  setIo(io)
+  logger.success(`Runner API listening on port ${config.server.apiPort}`)
 
-  if (process.env.NODE_ENV === 'dev') {
-    return
+  const runDispatch = (project: ProjectConfig, event: TriggerEvent): Promise<void> =>
+    limit(async () => {
+      const result = await dispatcherFor(project).dispatch(event, runtime.routes)
+      if (result.outcome === 'skipped' && result.detail) {
+        logger.info(result.detail)
+      }
+    }).catch((error: unknown) => {
+      logger.error(`Dispatch failed for ${event.ref}: ${errorMessage(error)}`)
+    })
+
+  const handleCommand = async (command: RunnerCommand): Promise<void> => {
+    switch (command.type) {
+      case 'cancel': {
+        const runId = String(command.payload.runId ?? '')
+        logger.info(`Cloud requested cancellation of ${runId}`)
+        await cancelRun(runId)
+        break
+      }
+      case 'resync': {
+        logger.info('Cloud requested a resync')
+        await reload()
+        break
+      }
+      case 'run': {
+        // A human pressing "run this now" is just another trigger event.
+        const event = command.payload.event as TriggerEvent | undefined
+        const project = runtime.config.projects.find((entry) => entry.id === event?.projectId)
+        if (!event || !project) {
+          logger.warn(`Ignoring manual run command with no resolvable project.`)
+          return
+        }
+        await runDispatch(project, event)
+        break
+      }
+    }
   }
 
-  const uiDistPath = resolveUiDistPath()
-  if (uiDistPath) {
-    await startUiServer(
-      uiDistPath,
-      config.server.uiPort,
-      config.server.apiPort,
-      config.server.networkAccess
-    )
-    logger.info(`UI server ready on http://localhost:${config.server.uiPort}`)
-    return
-  }
-}
+  let cursor = 0
+  let pollFailures = 0
 
-async function pollProjects(
-  config: Awaited<ReturnType<typeof loadConfig>>,
-  gitService: GitService,
-  activeTasks: Set<string>,
-  canceledTasks: Set<string>,
-  getAdapterForTask: (task: Task, resolvedProject: ProjectConfig) => BaseAgentAdapter,
-  services: ReturnType<typeof buildExternalServices>,
-  limit: ReturnType<typeof pLimit>
-) {
-  for (const project of config.projects) {
+  for (;;) {
     try {
-      const issues = await fetchProjectTasks(project, services)
-      const newIssues = issues.filter((task) => !dbService.getTaskByExternalId(task.externalId))
+      await outbox?.flush()
 
-      if (newIssues.length > 0) {
-        logger.info(`New tasks found for ${project.id}; syncing repository main branch.`)
-        await gitService.syncMainBranch(project.workspaceDir)
+      for (const project of runtime.config.projects) {
+        const events = await collectEvents(project, services)
+        for (const event of events) {
+          void runDispatch(project, event)
+        }
       }
 
-      for (const taskWithLabels of newIssues) {
-        const { labels: _labels, ...task } = taskWithLabels
-        dbService.saveTask(task)
-        const savedTask = dbService.getTaskByExternalId(task.externalId)!
-        dbService.updateTaskPlanState(savedTask.id, TaskPlanState.PLAN_GENERATING)
-        taskLifecycle.queue(savedTask.id, 'Queued for execution plan')
-        logger.info(`New ticket discovered: ${task.externalId}`)
-      }
-
-      const pending = dbService
-        .getPendingTasks()
-        .filter((task) => task.projectId === project.id && !activeTasks.has(task.id))
-
-      for (const task of pending) {
-        if (canceledTasks.has(task.id) || task.status === TASK_STATUS.CANCELED) {
-          continue
-        }
-
-        let taskPlanState: TaskPlanState
-        try {
-          taskPlanState = normalizePlanState(task)
-        } catch (error: any) {
-          logger.error(`Skipping task with invalid plan state: ${error.message}`, task.id)
-          taskLifecycle.fail(task.id, `Invalid plan state: ${error.message}`)
-          continue
-        }
-
-        if (isPlanAwaitingApproval(taskPlanState)) {
-          taskLifecycle.queue(task.id, deriveTaskMessage(task))
-          continue
-        }
-
-        if (
-          taskPlanState === TaskPlanState.PLAN_REJECTED ||
-          taskPlanState === TaskPlanState.PLAN_FAILED
-        ) {
-          continue
-        }
-
-        const resolvedProject = project
-        const adapter = getAdapterForTask(task, resolvedProject)
-
-        if (requiresPlan(task)) {
-          activeTasks.add(task.id)
-          limit(async () => {
-            try {
-              if (canceledTasks.has(task.id)) {
-                return
-              }
-              await processTaskPlan(
-                task,
-                resolvedProject,
-                adapter,
-                gitService,
-                canceledTasks,
-                services
-              )
-            } finally {
-              canceledTasks.delete(task.id)
-              activeTasks.delete(task.id)
-            }
-          })
-          continue
-        }
-
-        if (!isTaskExecutable(task)) {
-          continue
-        }
-
-        activeTasks.add(task.id)
-        limit(async () => {
-          try {
-            if (canceledTasks.has(task.id)) {
-              return
-            }
-            await processTask(
-              task,
-              resolvedProject,
-              adapter,
-              gitService,
-              canceledTasks,
-              services,
-              activeWorktrees
-            )
-          } finally {
-            canceledTasks.delete(task.id)
-            activeTasks.delete(task.id)
-          }
-        })
-      }
-    } catch (projectError: any) {
-      logger.error(`Project poll error (${project.id}): ${projectError.message}`)
-    }
-  }
-}
-
-function createPullRequestReviewTask(originalTask: Task, project: ProjectConfig): Task {
-  if (!originalTask.prNumber || !originalTask.branchName || !originalTask.prUrl) {
-    throw new Error(`Task ${originalTask.id} does not have a related open PR.`)
-  }
-
-  const externalId = `${originalTask.externalId}/pr-review/${Date.now()}`
-  const now = Date.now()
-
-  return {
-    id: createTaskId(project.id, externalId),
-    externalId,
-    title: `PR Review: ${originalTask.title}`,
-    description: `On-demand PR review remediation for ${originalTask.externalId} on PR #${originalTask.prNumber}.`,
-    status: TASK_STATUS.PENDING,
-    projectId: project.id,
-    branchName: originalTask.branchName,
-    prUrl: originalTask.prUrl,
-    prNumber: originalTask.prNumber,
-    reviewState: TASK_REVIEW_STATE.REVIEW_PENDING,
-    createdAt: now,
-    updatedAt: now,
-    executionAttempts: 0,
-    planState: TaskPlanState.NOT_REQUIRED,
-  }
-}
-
-async function main() {
-  const executor = new HostExecutor()
-  let runtimeConfig = await loadConfig()
-  setLogLevels(runtimeConfig.logs)
-  await validateRuntimeRequirements(runtimeConfig, executor)
-
-  let services = buildExternalServices(executor, {
-    requiresGitHub: runtimeConfig.projects.length > 0,
-    linearApiKey: process.env.LINEAR_API_KEY,
-  })
-  const getConfig = () => runtimeConfig
-  const getServices = () => services
-  const reloadRuntime = async () => {
-    const nextConfig = await loadConfig()
-    setLogLevels(nextConfig.logs)
-    await validateRuntimeRequirements(nextConfig, executor)
-    runtimeConfig = nextConfig
-    services = buildExternalServices(executor, {
-      requiresGitHub: nextConfig.projects.length > 0,
-      linearApiKey: process.env.LINEAR_API_KEY,
-    })
-    return runtimeConfig
-  }
-
-  const gitService = new GitService(executor)
-  const reviewService = new GitHubReviewService(executor)
-  const limit = pLimit(runtimeConfig.concurrency)
-  const activeTasks = new Set<string>()
-  const canceledTasks = new Set<string>()
-  const adapterCache = new Map<string, BaseAgentAdapter>()
-
-  const getAdapterForTask = (task: Task, resolvedProject: ProjectConfig) => {
-    const key = `${resolvedProject.id}:${resolvedProject.agent.provider}`
-    const existing = adapterCache.get(key)
-    if (existing) {
-      return existing
+      db.pruneDispatchLedger(Date.now() - 30 * 24 * 60 * 60 * 1_000)
+    } catch (error: unknown) {
+      logger.error(`Poll cycle error: ${errorMessage(error)}`)
     }
 
-    const adapter = createAgentAdapter(resolvedProject, executor, logger)
-    adapterCache.set(key, adapter)
-    return adapter
-  }
-
-  const triggerPullRequestReview = async (sourceTaskId: string) => {
-    const sourceTask = dbService.getTaskByLookup(sourceTaskId)
-    if (!sourceTask) {
-      throw new Error(`Task ${sourceTaskId} not found.`)
-    }
-
-    const project = getConfig().projects.find((candidate) => candidate.id === sourceTask.projectId)
-    if (!project) {
-      throw new Error(`Project ${sourceTask.projectId} not found in config.`)
-    }
-
-    if (!sourceTask.prNumber || sourceTask.prNumber < 1) {
-      throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
-    }
-
-    const pullRequestDetails = await reviewService.getPullRequestDetails(
-      project,
-      sourceTask.prNumber
-    )
-    if (pullRequestDetails.state !== 'OPEN') {
-      throw new Error(`Task ${sourceTask.id} does not have a related open PR.`)
-    }
-
-    const comments = await reviewService.listOpenReviewComments(project, sourceTask.prNumber)
-    if (comments.length === 0) {
-      throw new Error(`PR #${sourceTask.prNumber} does not have open human review comments.`)
-    }
-
-    const reviewTask = createPullRequestReviewTask(
-      {
-        ...sourceTask,
-        branchName: sourceTask.branchName ?? pullRequestDetails.headRefName,
-        prUrl: sourceTask.prUrl ?? pullRequestDetails.url,
-      },
-      project
-    )
-
-    dbService.saveTask(reviewTask)
-    dbService.updateTaskPlanOutput(reviewTask.id, {
-      planState: TaskPlanState.NOT_REQUIRED,
-      planPrompt: 'On-demand pull request review remediation.',
-    })
-    dbService.updateTaskReviewState(reviewTask.id, TASK_REVIEW_STATE.REVIEW_PENDING)
-
-    const adapter = getAdapterForTask(reviewTask, project)
-    activeTasks.add(reviewTask.id)
-    taskLifecycle.queue(reviewTask.id, `Queued PR review run for #${reviewTask.prNumber}`)
-    void limit(async () => {
+    // The long poll doubles as the loop's pacing: it returns as soon as a human
+    // queues something, and otherwise costs one held connection per window.
+    if (cloud) {
       try {
-        await processPullRequestReview(
-          reviewTask,
-          project,
-          adapter,
-          gitService,
-          reviewService,
-          comments,
-          canceledTasks,
-          activeWorktrees
+        const { commands } = await cloud.pollCommands(cursor)
+        pollFailures = 0
+        for (const command of commands) {
+          cursor = Math.max(cursor, command.cursor)
+          await handleCommand(command)
+        }
+        if (commands.length > 0) {
+          await cloud.ackCommands(cursor).catch(() => undefined)
+        }
+      } catch (error: unknown) {
+        pollFailures += 1
+        const backoff = Math.min(60_000, 2 ** Math.min(pollFailures, 5) * 1_000)
+        logger.warn(
+          `Command poll failed (${pollFailures}); retrying in ${backoff / 1000}s: ${errorMessage(error)}`
         )
-      } finally {
-        canceledTasks.delete(reviewTask.id)
-        activeTasks.delete(reviewTask.id)
+        await sleep(backoff)
       }
-    }).catch((error: any) => {
-      logger.error(`Failed to schedule PR review run: ${error.message}`, reviewTask.id)
-      taskLifecycle.fail(reviewTask.id, `Failed to schedule PR review run: ${error.message}`)
-    })
-
-    return {
-      reviewTaskId: reviewTask.id,
-      prNumber: reviewTask.prNumber!,
+    } else {
+      await sleep(OFFLINE_POLL_INTERVAL_MS)
     }
   }
+}
 
-  await startRuntimeServers(
-    getConfig,
-    reloadRuntime,
-    triggerPullRequestReview,
-    gitService,
-    activeTasks,
-    canceledTasks
-  )
-
-  if (runtimeConfig.slack) {
-    try {
-      const { SlackBot } = await import('@parallax/slack')
-      const bot = new SlackBot({
-        config: runtimeConfig.slack,
-        apiBaseUrl: `http://127.0.0.1:${runtimeConfig.server.apiPort}`,
-        onError: (err) => logger.error(`Slack bot error: ${err.message}`),
-      })
-      await bot.start()
-      setSlackBot(bot)
-      logger.info(`Slack bot connected (channel: ${runtimeConfig.slack.channel})`)
-    } catch (err: any) {
-      logger.error(`Slack bot failed to start: ${err?.message ?? err}`)
-    }
-  }
-
-  while (true) {
-    try {
-      const config = getConfig()
-      await pollProjects(
-        config,
-        gitService,
-        activeTasks,
-        canceledTasks,
-        getAdapterForTask,
-        getServices(),
-        limit
-      )
-    } catch (error: any) {
-      logger.error(`Poll Error: ${error.message}`)
-    }
-
-    await sleep(15000)
-  }
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 main().catch((error) => {

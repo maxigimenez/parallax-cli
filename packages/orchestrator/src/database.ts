@@ -1,441 +1,382 @@
 import { DatabaseSync } from 'node:sqlite'
-import { TASK_REVIEW_STATE, TASK_STATUS, Task, TaskPlanState, TaskStatus } from '@parallax/common'
-import path from 'path'
+import path from 'node:path'
+import {
+  RUN_STATUS,
+  isTerminalRunStatus,
+  type RunLogEntry,
+  type RunRecord,
+  type RunStatus,
+  type RunUsage,
+} from '@parallax/common'
 
-const defaultDbPath = path.resolve(process.cwd(), 'parallax.db')
-const dbPath = process.env.PARALLAX_DB_PATH
-  ? path.resolve(process.env.PARALLAX_DB_PATH)
-  : process.env.PARALLAX_DATA_DIR
-    ? path.resolve(process.env.PARALLAX_DATA_DIR, 'parallax.db')
-    : defaultDbPath
-
-const db = new DatabaseSync(dbPath === 'memory' ? ':memory:' : dbPath)
-
-// Initialize schema
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tasks (
-    id TEXT PRIMARY KEY,
-    externalId TEXT UNIQUE,
-    title TEXT,
-    description TEXT,
-    status TEXT,
-    projectId TEXT,
-    branchName TEXT,
-    prUrl TEXT,
-    prNumber INTEGER,
-    lastReviewEventAt TEXT,
-    reviewState TEXT,
-    createdAt INTEGER,
-    updatedAt INTEGER,
-    planState TEXT,
-    planMarkdown TEXT,
-    planPrompt TEXT,
-    planResult TEXT,
-    approvedBy TEXT,
-    approvedAt INTEGER,
-    executionAttempts INTEGER DEFAULT 0,
-    lastAgent TEXT,
-    trackerCommentId TEXT
-  );
-`)
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS task_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    taskExternalId TEXT NOT NULL,
-    title TEXT,
-    message TEXT NOT NULL,
-    icon TEXT NOT NULL,
-    level TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    kind TEXT,
-    source TEXT,
-    groupId TEXT
-  );
-`)
-
-db.exec(
-  'CREATE INDEX IF NOT EXISTS idx_task_logs_task_external_id_timestamp ON task_logs(taskExternalId, timestamp, id)'
-)
-
-const existingColumns = new Set(
-  (db.prepare('PRAGMA table_info(tasks)').all() as Array<{ name: string }>).map(
-    (column) => column.name
-  )
-)
-
-const ensureColumn = (name: string, definition: string) => {
-  if (existingColumns.has(name)) {
-    return
+export function resolveDbPath(): string {
+  if (process.env.PARALLAX_DB_PATH) {
+    return process.env.PARALLAX_DB_PATH === 'memory'
+      ? 'memory'
+      : path.resolve(process.env.PARALLAX_DB_PATH)
   }
-
-  db.exec(`ALTER TABLE tasks ADD COLUMN ${name} ${definition}`)
-  existingColumns.add(name)
+  if (process.env.PARALLAX_DATA_DIR) {
+    return path.resolve(process.env.PARALLAX_DATA_DIR, 'parallax.db')
+  }
+  return path.resolve(process.cwd(), 'parallax.db')
 }
 
-ensureColumn('prNumber', 'INTEGER')
-ensureColumn('lastReviewEventAt', 'TEXT')
-ensureColumn('reviewState', 'TEXT')
-ensureColumn('planState', 'TEXT')
-ensureColumn('planMarkdown', 'TEXT')
-ensureColumn('planPrompt', 'TEXT')
-ensureColumn('planResult', 'TEXT')
-ensureColumn('approvedBy', 'TEXT')
-ensureColumn('approvedAt', 'INTEGER')
-ensureColumn('executionAttempts', 'INTEGER DEFAULT 0')
-ensureColumn('lastAgent', 'TEXT')
-ensureColumn('agentName', 'TEXT')
-ensureColumn('agentSessionId', 'TEXT')
-ensureColumn('trackerCommentId', 'TEXT')
+function migrate(db: DatabaseSync): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS runs (
+      id TEXT PRIMARY KEY,
+      routeId TEXT NOT NULL,
+      routeName TEXT NOT NULL,
+      agentProfile TEXT NOT NULL,
+      projectId TEXT NOT NULL,
+      triggerType TEXT NOT NULL,
+      triggerRef TEXT NOT NULL,
+      triggerRevision TEXT NOT NULL,
+      triggerUrl TEXT,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL,
+      hermesRunId TEXT,
+      hermesSessionId TEXT,
+      summary TEXT,
+      error TEXT,
+      usage TEXT,
+      startedAt INTEGER,
+      endedAt INTEGER,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    );
+  `)
 
-const existingLogColumns = new Set(
-  (db.prepare('PRAGMA table_info(task_logs)').all() as Array<{ name: string }>).map(
-    (column) => column.name
-  )
-)
+  // `runId` here is the run's actual primary key. The predecessor table called
+  // this column `taskExternalId` while storing the internal id -- a misnomer
+  // that cost real debugging time. Naming it for what it holds is the fix.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS run_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      runId TEXT NOT NULL,
+      title TEXT,
+      message TEXT NOT NULL,
+      icon TEXT NOT NULL,
+      level TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      source TEXT NOT NULL,
+      groupId TEXT
+    );
+  `)
 
-const ensureLogColumn = (name: string, definition: string) => {
-  if (existingLogColumns.has(name)) {
-    return
-  }
+  // The dedupe ledger. The primary key IS the concurrency control: claiming a
+  // dispatch is one INSERT OR IGNORE, so the poll loop cannot double-fire a
+  // route for an unchanged ticket even if two cycles overlap.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS dispatch_ledger (
+      dedupeKey TEXT PRIMARY KEY,
+      runId TEXT NOT NULL,
+      routeId TEXT NOT NULL,
+      triggerRef TEXT NOT NULL,
+      createdAt INTEGER NOT NULL
+    );
+  `)
 
-  db.exec(`ALTER TABLE task_logs ADD COLUMN ${name} ${definition}`)
-  existingLogColumns.add(name)
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_updated ON runs(updatedAt DESC)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status, updatedAt DESC)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_runs_agent ON runs(agentProfile, status)')
+  db.exec('CREATE INDEX IF NOT EXISTS idx_run_events_run ON run_events(runId, timestamp, id)')
 }
 
-ensureLogColumn('kind', 'TEXT')
-ensureLogColumn('source', 'TEXT')
-ensureLogColumn('groupId', 'TEXT')
-ensureLogColumn('title', 'TEXT')
+interface RunRow {
+  id: string
+  routeId: string
+  routeName: string
+  agentProfile: string
+  projectId: string
+  triggerType: string
+  triggerRef: string
+  triggerRevision: string
+  triggerUrl: string | null
+  title: string
+  status: string
+  hermesRunId: string | null
+  hermesSessionId: string | null
+  summary: string | null
+  error: string | null
+  usage: string | null
+  startedAt: number | null
+  endedAt: number | null
+  createdAt: number
+  updatedAt: number
+}
 
-export const dbService = {
-  saveTask(task: Task) {
-    const upsert = db.prepare(`
-      INSERT INTO tasks (id, externalId, title, description, status, projectId, branchName, prUrl, prNumber, lastReviewEventAt, reviewState, planState, planMarkdown, planPrompt, planResult, approvedBy, approvedAt, executionAttempts, lastAgent, agentName, agentSessionId, trackerCommentId, createdAt, updatedAt)
-      VALUES (@id, @externalId, @title, @description, @status, @projectId, @branchName, @prUrl, @prNumber, @lastReviewEventAt, @reviewState, @planState, @planMarkdown, @planPrompt, @planResult, @approvedBy, @approvedAt, @executionAttempts, @lastAgent, @agentName, @agentSessionId, @trackerCommentId, @createdAt, @updatedAt)
-      ON CONFLICT(externalId) DO UPDATE SET
-        title=excluded.title,
-        description=excluded.description,
-        status=excluded.status,
-        planState=COALESCE(excluded.planState, planState),
-        planMarkdown=COALESCE(excluded.planMarkdown, planMarkdown),
-        planPrompt=COALESCE(excluded.planPrompt, planPrompt),
-        planResult=COALESCE(excluded.planResult, planResult),
-        approvedBy=COALESCE(excluded.approvedBy, approvedBy),
-        approvedAt=COALESCE(excluded.approvedAt, approvedAt),
-        executionAttempts=COALESCE(excluded.executionAttempts, executionAttempts),
-        lastAgent=COALESCE(excluded.lastAgent, lastAgent),
-        agentName=COALESCE(excluded.agentName, agentName),
-        agentSessionId=COALESCE(excluded.agentSessionId, agentSessionId),
-        trackerCommentId=COALESCE(excluded.trackerCommentId, trackerCommentId),
-        updatedAt=excluded.updatedAt
-    `)
+function toRun(row: RunRow): RunRecord {
+  return {
+    id: row.id,
+    routeId: row.routeId,
+    routeName: row.routeName,
+    agentProfile: row.agentProfile,
+    projectId: row.projectId,
+    triggerType: row.triggerType as RunRecord['triggerType'],
+    triggerRef: row.triggerRef,
+    triggerRevision: row.triggerRevision,
+    triggerUrl: row.triggerUrl ?? undefined,
+    title: row.title,
+    status: row.status as RunStatus,
+    hermesRunId: row.hermesRunId ?? undefined,
+    hermesSessionId: row.hermesSessionId ?? undefined,
+    summary: row.summary ?? undefined,
+    error: row.error ?? undefined,
+    usage: row.usage ? (JSON.parse(row.usage) as RunUsage) : undefined,
+    startedAt: row.startedAt ?? undefined,
+    endedAt: row.endedAt ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
 
-    upsert.run({
-      branchName: null,
-      prUrl: null,
-      prNumber: null,
-      lastReviewEventAt: null,
-      reviewState: TASK_REVIEW_STATE.NONE,
-      planState: TaskPlanState.PLAN_GENERATING,
-      planMarkdown: null,
-      planPrompt: null,
-      planResult: null,
-      approvedBy: null,
-      approvedAt: null,
-      executionAttempts: 0,
-      lastAgent: task.lastAgent || null,
-      agentName: null,
-      agentSessionId: null,
-      trackerCommentId: null,
-      ...task,
-    })
-  },
+export interface ListRunsOptions {
+  limit?: number
+  projectId?: string
+  status?: RunStatus
+}
 
-  getTaskByExternalId(externalId: string): Task | undefined {
-    return db.prepare('SELECT * FROM tasks WHERE externalId = ?').get(externalId) as
-      | Task
-      | undefined
-  },
+export interface RunPatch {
+  status?: RunStatus
+  hermesRunId?: string
+  hermesSessionId?: string
+  summary?: string
+  error?: string
+  usage?: RunUsage
+  startedAt?: number
+  endedAt?: number
+}
 
-  getTaskById(id: string): Task | undefined {
-    return db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Task | undefined
-  },
+export class ParallaxDatabase {
+  constructor(private readonly db: DatabaseSync) {
+    migrate(db)
+  }
 
-  getTaskByLookup(lookup: string): Task | undefined {
+  createRun(run: RunRecord): void {
+    this.db
+      .prepare(
+        `INSERT INTO runs (
+          id, routeId, routeName, agentProfile, projectId,
+          triggerType, triggerRef, triggerRevision, triggerUrl,
+          title, status, createdAt, updatedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        run.id,
+        run.routeId,
+        run.routeName,
+        run.agentProfile,
+        run.projectId,
+        run.triggerType,
+        run.triggerRef,
+        run.triggerRevision,
+        run.triggerUrl ?? null,
+        run.title,
+        run.status,
+        run.createdAt,
+        run.updatedAt
+      )
+  }
+
+  getRun(id: string): RunRecord | undefined {
+    const row = this.db.prepare('SELECT * FROM runs WHERE id = ?').get(id) as RunRow | undefined
+    return row ? toRun(row) : undefined
+  }
+
+  listRuns(options: ListRunsOptions = {}): RunRecord[] {
+    const clauses: string[] = []
+    const params: Array<string | number> = []
+
+    if (options.projectId) {
+      clauses.push('projectId = ?')
+      params.push(options.projectId)
+    }
+    if (options.status) {
+      clauses.push('status = ?')
+      params.push(options.status)
+    }
+
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
+    const limit = Math.min(Math.max(options.limit ?? 100, 1), 500)
+    params.push(limit)
+
+    const rows = this.db
+      .prepare(`SELECT * FROM runs ${where} ORDER BY updatedAt DESC LIMIT ?`)
+      .all(...params) as unknown as RunRow[]
+
+    return rows.map(toRun)
+  }
+
+  updateRun(id: string, patch: RunPatch, now: number = Date.now()): void {
+    const sets: string[] = ['updatedAt = ?']
+    const params: Array<string | number | null> = [now]
+
+    const assign = (column: string, value: string | number | null | undefined): void => {
+      if (value !== undefined) {
+        sets.push(`${column} = ?`)
+        params.push(value)
+      }
+    }
+
+    assign('status', patch.status)
+    assign('hermesRunId', patch.hermesRunId)
+    assign('hermesSessionId', patch.hermesSessionId)
+    assign('summary', patch.summary)
+    assign('error', patch.error)
+    assign('startedAt', patch.startedAt)
+    assign('endedAt', patch.endedAt)
+    assign('usage', patch.usage ? JSON.stringify(patch.usage) : undefined)
+
+    params.push(id)
+    this.db.prepare(`UPDATE runs SET ${sets.join(', ')} WHERE id = ?`).run(...params)
+  }
+
+  /**
+   * Runs currently occupying an agent.
+   *
+   * Hermes corrupts a profile's memory if two agents drive it at once, so the
+   * dispatcher consults this before starting work on a profile.
+   */
+  countActiveRunsForAgent(agentProfile: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM runs
+         WHERE agentProfile = ? AND status IN (?, ?, ?)`
+      )
+      .get(agentProfile, RUN_STATUS.QUEUED, RUN_STATUS.RUNNING, RUN_STATUS.AWAITING_APPROVAL) as {
+      count: number
+    }
+    return row.count
+  }
+
+  listUnfinishedRuns(): RunRecord[] {
+    const rows = this.db
+      .prepare('SELECT * FROM runs WHERE status IN (?, ?, ?) ORDER BY createdAt ASC')
+      .all(
+        RUN_STATUS.QUEUED,
+        RUN_STATUS.RUNNING,
+        RUN_STATUS.AWAITING_APPROVAL
+      ) as unknown as RunRow[]
+    return rows.map(toRun)
+  }
+
+  // ── Events ─────────────────────────────────────────────────
+
+  appendRunEvent(runId: string, entry: RunLogEntry): void {
+    this.db
+      .prepare(
+        `INSERT INTO run_events (runId, title, message, icon, level, timestamp, kind, source, groupId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        runId,
+        entry.title ?? null,
+        entry.message,
+        entry.icon,
+        entry.level,
+        entry.timestamp,
+        entry.kind,
+        entry.source,
+        entry.groupId ?? null
+      )
+  }
+
+  listRunEvents(runId: string, options: { since?: number; limit?: number } = {}): RunLogEntry[] {
+    const limit = Math.min(Math.max(options.limit ?? 500, 1), 2000)
+    const rows = this.db
+      .prepare(
+        `SELECT title, message, icon, level, timestamp, kind, source, groupId
+         FROM run_events WHERE runId = ? AND timestamp >= ?
+         ORDER BY timestamp ASC, id ASC LIMIT ?`
+      )
+      .all(runId, options.since ?? 0, limit) as Array<Record<string, unknown>>
+
+    return rows.map((row) => ({
+      title: (row.title as string | null) ?? undefined,
+      message: row.message as string,
+      icon: row.icon as string,
+      level: row.level as RunLogEntry['level'],
+      timestamp: row.timestamp as number,
+      kind: row.kind as RunLogEntry['kind'],
+      source: row.source as RunLogEntry['source'],
+      groupId: (row.groupId as string | null) ?? undefined,
+    }))
+  }
+
+  // ── Dispatch ledger ────────────────────────────────────────
+
+  /**
+   * Atomically claim the right to dispatch this (route, trigger, revision).
+   *
+   * Returns false when the key was already claimed, which is the normal case:
+   * every poll cycle re-observes every open ticket, and only a genuine change
+   * to the ticket produces a new revision and therefore a new key.
+   */
+  claimDispatch(
+    dedupeKey: string,
+    claim: { runId: string; routeId: string; triggerRef: string },
+    now: number = Date.now()
+  ): boolean {
+    const result = this.db
+      .prepare(
+        `INSERT OR IGNORE INTO dispatch_ledger (dedupeKey, runId, routeId, triggerRef, createdAt)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(dedupeKey, claim.runId, claim.routeId, claim.triggerRef, now)
+
+    return Number(result.changes) > 0
+  }
+
+  /**
+   * Undo a claim. Used when dispatch fails before the agent was ever reached,
+   * so a transient error does not permanently suppress that trigger.
+   */
+  releaseDispatch(dedupeKey: string): void {
+    this.db.prepare('DELETE FROM dispatch_ledger WHERE dedupeKey = ?').run(dedupeKey)
+  }
+
+  hasDispatched(dedupeKey: string): boolean {
     return (
-      (db.prepare('SELECT * FROM tasks WHERE id = ?').get(lookup) as Task | undefined) ||
-      (db.prepare('SELECT * FROM tasks WHERE externalId = ?').get(lookup) as Task | undefined)
+      this.db.prepare('SELECT 1 FROM dispatch_ledger WHERE dedupeKey = ?').get(dedupeKey) !==
+      undefined
     )
-  },
+  }
 
-  getTaskByPrNumber(projectId: string, prNumber: number): Task | undefined {
-    return db
-      .prepare('SELECT * FROM tasks WHERE projectId = ? AND prNumber = ?')
-      .get(projectId, prNumber) as Task | undefined
-  },
+  /** Drops ledger rows whose runs have long since finished. */
+  pruneDispatchLedger(olderThan: number): number {
+    const result = this.db.prepare('DELETE FROM dispatch_ledger WHERE createdAt < ?').run(olderThan)
+    return Number(result.changes)
+  }
 
-  listTasks(): Task[] {
-    return db.prepare('SELECT * FROM tasks ORDER BY updatedAt DESC').all() as unknown as Task[]
-  },
+  close(): void {
+    this.db.close()
+  }
+}
 
-  getLogsByTaskExternalId(taskExternalId: string) {
-    return db
-      .prepare(
-        'SELECT title, message, icon, level, timestamp, kind, source, groupId FROM task_logs WHERE taskExternalId = ? ORDER BY timestamp ASC, id ASC'
-      )
-      .all(taskExternalId) as Array<{
-      title?: string
-      message: string
-      icon: string
-      level: 'info' | 'warning' | 'error'
-      timestamp: number
-      kind?: string
-      source?: string
-      groupId?: string
-    }>
-  },
+export function openDatabase(dbPath: string = resolveDbPath()): ParallaxDatabase {
+  return new ParallaxDatabase(new DatabaseSync(dbPath === 'memory' ? ':memory:' : dbPath))
+}
 
-  getPendingTasks(): Task[] {
-    return db
-      .prepare('SELECT * FROM tasks WHERE status = ?')
-      .all(TASK_STATUS.PENDING) as unknown as Task[]
-  },
+export { isTerminalRunStatus }
 
-  updateTaskStatus(id: string, status: TaskStatus) {
-    db.prepare('UPDATE tasks SET status = ?, updatedAt = ? WHERE id = ?').run(
-      status,
-      Date.now(),
-      id
-    )
-  },
+let singleton: ParallaxDatabase | undefined
 
-  updateTaskPlanState(id: string, planState: TaskPlanState) {
-    db.prepare('UPDATE tasks SET planState = ?, updatedAt = ? WHERE id = ?').run(
-      planState,
-      Date.now(),
-      id
-    )
-  },
+/**
+ * Process-wide handle, opened on first use.
+ *
+ * Lazy on purpose: the previous module-level `const db = new DatabaseSync(...)`
+ * created a SQLite file as an import side effect, so merely importing this
+ * module from a CLI command or a test wrote a stray `parallax.db` into the cwd.
+ * Tests should open their own with `openDatabase('memory')`.
+ */
+export function getDatabase(): ParallaxDatabase {
+  singleton ??= openDatabase()
+  return singleton
+}
 
-  updateTaskPlanOutput(
-    id: string,
-    details: {
-      planState?: TaskPlanState
-      planMarkdown?: string | null
-      planPrompt?: string | null
-      planResult?: string | null
-      lastAgent?: string | null
-    }
-  ) {
-    db.prepare(
-      `
-        UPDATE tasks
-        SET
-          planState = COALESCE(?, planState),
-          planMarkdown = COALESCE(?, planMarkdown),
-          planPrompt = COALESCE(?, planPrompt),
-          planResult = COALESCE(?, planResult),
-          lastAgent = COALESCE(?, lastAgent),
-          updatedAt = ?
-        WHERE id = ?
-      `
-    ).run(
-      details.planState ?? null,
-      details.planMarkdown ?? null,
-      details.planPrompt ?? null,
-      details.planResult ?? null,
-      details.lastAgent ?? null,
-      Date.now(),
-      id
-    )
-  },
-
-  approveTaskPlan(id: string, approvedBy?: string) {
-    db.prepare(
-      'UPDATE tasks SET planState = ?, approvedBy = ?, approvedAt = ?, updatedAt = ? WHERE id = ?'
-    ).run(TaskPlanState.PLAN_APPROVED, approvedBy ?? null, Date.now(), Date.now(), id)
-  },
-
-  rejectTaskPlan(id: string) {
-    db.prepare('UPDATE tasks SET planState = ?, updatedAt = ? WHERE id = ?').run(
-      TaskPlanState.PLAN_REJECTED,
-      Date.now(),
-      id
-    )
-  },
-
-  incrementExecutionAttempts(id: string) {
-    db.prepare(
-      `
-      UPDATE tasks
-      SET executionAttempts = COALESCE(executionAttempts, 0) + 1,
-          updatedAt = ?
-      WHERE id = ?
-    `
-    ).run(Date.now(), id)
-  },
-
-  updateTaskPullRequestInfo(
-    id: string,
-    details: { branchName: string; prUrl: string; prNumber: number }
-  ) {
-    db.prepare(
-      'UPDATE tasks SET branchName = ?, prUrl = ?, prNumber = ?, reviewState = ?, updatedAt = ? WHERE id = ?'
-    ).run(
-      details.branchName,
-      details.prUrl,
-      details.prNumber,
-      TASK_REVIEW_STATE.NONE,
-      Date.now(),
-      id
-    )
-  },
-
-  updateTaskReviewEventAt(id: string, timestamp: string) {
-    db.prepare('UPDATE tasks SET lastReviewEventAt = ?, updatedAt = ? WHERE id = ?').run(
-      timestamp,
-      Date.now(),
-      id
-    )
-  },
-
-  updateTaskReviewState(id: string, reviewState: Task['reviewState']) {
-    db.prepare('UPDATE tasks SET reviewState = ?, updatedAt = ? WHERE id = ?').run(
-      reviewState ?? TASK_REVIEW_STATE.NONE,
-      Date.now(),
-      id
-    )
-  },
-
-  appendTaskLog(entry: {
-    taskExternalId: string
-    title?: string
-    message: string
-    icon: string
-    level: 'info' | 'warning' | 'error'
-    timestamp: number
-    kind?: string
-    source?: string
-    groupId?: string
-  }) {
-    db.prepare(
-      'INSERT INTO task_logs (taskExternalId, title, message, icon, level, timestamp, kind, source, groupId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(
-      entry.taskExternalId,
-      entry.title ?? null,
-      entry.message,
-      entry.icon,
-      entry.level,
-      entry.timestamp,
-      entry.kind ?? null,
-      entry.source ?? null,
-      entry.groupId ?? null
-    )
-  },
-
-  clearTaskLogs(taskExternalId: string) {
-    db.prepare('DELETE FROM task_logs WHERE taskExternalId = ?').run(taskExternalId)
-  },
-
-  resetExecutionAttempts(id: string) {
-    db.prepare('UPDATE tasks SET executionAttempts = 0, updatedAt = ? WHERE id = ?').run(
-      Date.now(),
-      id
-    )
-  },
-
-  clearTaskPullRequestInfo(id: string) {
-    db.prepare(
-      'UPDATE tasks SET branchName = NULL, prUrl = NULL, prNumber = NULL, lastReviewEventAt = NULL, reviewState = ?, updatedAt = ? WHERE id = ?'
-    ).run(TASK_REVIEW_STATE.NONE, Date.now(), id)
-  },
-
-  resetTaskForFullRetry(id: string) {
-    db.prepare(
-      `
-        UPDATE tasks
-        SET
-          planState = ?,
-          planMarkdown = NULL,
-          planPrompt = NULL,
-          planResult = NULL,
-          approvedBy = NULL,
-          approvedAt = NULL,
-          executionAttempts = 0,
-          agentSessionId = NULL,
-          updatedAt = ?
-        WHERE id = ?
-      `
-    ).run(TaskPlanState.PLAN_GENERATING, Date.now(), id)
-  },
-
-  updateAgentSessionId(id: string, sessionId: string) {
-    db.prepare('UPDATE tasks SET agentSessionId = ?, updatedAt = ? WHERE id = ?').run(
-      sessionId,
-      Date.now(),
-      id
-    )
-  },
-
-  updateTaskTrackerCommentId(id: string, commentId: string | null) {
-    db.prepare('UPDATE tasks SET trackerCommentId = ?, updatedAt = ? WHERE id = ?').run(
-      commentId,
-      Date.now(),
-      id
-    )
-  },
-
-  listTaskLogs(options?: { since?: number; taskExternalId?: string; limit?: number }) {
-    const since = options?.since ?? 0
-    const limit = Math.max(1, Math.min(500, options?.limit ?? 200))
-    const taskExternalId = options?.taskExternalId?.trim()
-
-    if (taskExternalId) {
-      return db
-        .prepare(
-          `
-            SELECT taskExternalId, title, message, icon, level, timestamp
-            , kind, source, groupId
-            FROM task_logs
-            WHERE taskExternalId = ? AND timestamp >= ?
-            ORDER BY timestamp ASC, id ASC
-            LIMIT ?
-          `
-        )
-        .all(taskExternalId, since, limit) as Array<{
-        taskExternalId: string
-        title?: string
-        message: string
-        icon: string
-        level: 'info' | 'warning' | 'error'
-        timestamp: number
-        kind?: string
-        source?: string
-        groupId?: string
-      }>
-    }
-
-    return db
-      .prepare(
-        `
-          SELECT taskExternalId, title, message, icon, level, timestamp, kind, source, groupId
-          FROM task_logs
-          WHERE timestamp >= ?
-          ORDER BY timestamp ASC, id ASC
-          LIMIT ?
-        `
-      )
-      .all(since, limit) as Array<{
-      taskExternalId: string
-      title?: string
-      message: string
-      icon: string
-      level: 'info' | 'warning' | 'error'
-      timestamp: number
-      kind?: string
-      source?: string
-      groupId?: string
-    }>
-  },
+/** Test seam: point the process-wide handle at an explicit database. */
+export function setDatabase(db: ParallaxDatabase): void {
+  singleton = db
 }

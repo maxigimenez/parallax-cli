@@ -12,20 +12,14 @@
   },
   "dependencies": {
     "@parallax/common": "workspace:*",
-    "@parallax/slack": "workspace:*",
     "@fastify/cors": "11.2.0",
     "chalk": "4",
     "fastify": "5.7.4",
-    "log-update": "7.1.0",
     "p-limit": "6.1.0",
-    "simple-git": "3.32.3",
-    "socket.io": "4.8.3",
-    "strip-ansi": "7.1.2",
-    "terminal-size": "4.0.1",
-    "uuid": "11.0.0"
+    "strip-ansi": "7.1.2"
   },
   "devDependencies": {
-    "@types/uuid": "10.0.0"
+    "@types/node": "25.3.0"
   },
   "files": [
     "dist"

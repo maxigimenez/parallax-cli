@@ -1,152 +1,113 @@
-# parallax-cli
+# Parallax
 
-> WARNING: Parallax is currently in alpha. Expect rough edges, missing polish, and occasional breaking changes.
+Trigger your [Hermes](https://hermes-agent.nousresearch.com) agents from your tickets
+and pull requests.
 
-Parallax is a local AI orchestration runtime for software tasks.
-It pulls work from Linear or GitHub, creates isolated worktrees, runs an agent in two phases (`plan` then `execute`), and requires explicit approval before implementation.
+You already run a fleet of Hermes profiles — a product reviewer, a code reviewer, an
+implementer, each with its own memory, model, and GitHub account. Parallax is the layer
+that decides **which one should start, when, and with what context**, then records what
+happened and tells your team about it.
 
-![](./dashboard.png)
-
-## First version scope
-
-- Plan-first task lifecycle with explicit approval/rejection.
-- Issue intake from Linear and GitHub.
-- Global runtime state under `~/.parallax`.
-- CLI onboarding wizard plus dashboard UI.
-- Codex, Gemini, and Claude Code adapters (configurable per project).
-- Slack bot for plan approvals and task notifications (Socket Mode, no public URL needed).
-
-## Requirements
-
-- Node.js `>= 23.7.0`
-- `pnpm` `10.x`
-- `git`
-- `gh`
-- at least one supported agent CLI (`codex`, `gemini`, or `claude`)
-
-## Local development setup
-
-```bash
-pnpm install
-pnpm parallax preflight
-pnpm test
-pnpm build
+```jsonc
+// "When a Linear ticket gets the feasibility label,
+//  have the product agent assess it and comment back."
+{
+  "name": "Product review on feasibility label",
+  "trigger": { "type": "ticket", "provider": "linear", "projectId": "taplands" },
+  "match":   { "labels": { "any": ["feasibility"] } },
+  "target":  { "agentRef": { "profile": "product" } },
+  "execution": { "promptTemplate": "product-review", "timeoutSeconds": 1800 },
+  "outcome": {
+    "postComment": { "target": "ticket" },
+    "labels": { "add": ["reviewed"], "remove": ["feasibility"] }
+  }
+}
 ```
 
-## Install global CLI
+That is the whole idea. Routes are data, so a new workflow is a row, not a code change.
 
-```bash
-npm i -g parallax-cli
-parallax preflight
+## How it fits together
+
+```
+Mac Mini                                    Railway
+┌──────────────────────────────┐      ┌──────────────────────┐
+│ Hermes gateway               │      │ parallax cloud       │
+│   :8642  /p/<profile>/v1/…   │      │   config · registry  │
+│   owns git, PRs, identity    │      │   run history        │
+│            ▲                 │      │   Slack              │
+│            │ POST /v1/runs   │      │                      │
+│ parallax runner              │─────►│                      │
+│   triggers → routes →        │ long │                      │
+│   dispatch → outcomes        │ poll └──────────────────────┘
+└──────────────────────────────┘
 ```
 
-## First-time setup
+**Parallax never runs an agent itself and never touches a repository.** It decides;
+Hermes does the work. The runner needs no clone of your code — only API access to your
+tracker and HTTP access to Hermes on the same machine.
 
-Run the interactive setup wizard:
+The runner only makes outbound connections, so the Mac Mini works behind NAT with no
+tunnel and no port forwarding.
 
-```bash
-parallax init
-```
+## Getting started
 
-The wizard collects:
-- Project ID and path to your local git repository
-- Issue source (GitHub or Linear) and filter settings
-- AI agent (Claude Code, Codex, or Gemini)
-- Slack notifications (optional)
-- API secrets (Linear key if needed)
-
-Configuration is stored in `~/.parallax/config.json`. Projects and integrations can also be managed from the dashboard UI.
-
-## Starting Parallax
+Full walkthrough: **[docs/getting-started.md](./docs/getting-started.md)**
 
 ```bash
+# On the Mac Mini, next to Hermes
+npm install -g parallax-cli
+
+parallax init          # cloud key, Hermes profiles — each key is probed as you enter it
+parallax preflight     # Node, Hermes, cloud, gh auth
 parallax start
-parallax open        # opens the dashboard in your browser
-parallax status      # check health + running projects
-parallax stop
+parallax runner install  # survive reboots (launchd)
 ```
 
-To access a headless machine's dashboard from a trusted internal network, opt in when starting:
+Then:
 
 ```bash
-parallax start --network-access
+parallax agents               # profiles it discovered, with models and toolsets
+parallax routes               # what it will act on
+parallax runs                 # recent runs
+parallax logs --follow        # watch one happen
+parallax cancel <id>          # stop it here and on Hermes
 ```
 
-Parallax prints the network URL, such as `http://cerebro.local:9372`. Network access is
-unauthenticated and allows dashboard users to approve work and modify configuration, so enable it
-only on a trusted network. Localhost-only access remains the default.
-
-## CLI
+Debugging a machine, not a workflow:
 
 ```bash
-parallax --version
-parallax init                                               # first-time setup wizard
-parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>] [--network-access]
-parallax stop
-parallax status
-parallax open
-parallax preflight
-parallax pr-review <task-id>
-parallax retry <task-id>
-parallax cancel <task-id>
-parallax logs [--task <id>]
+parallax run --agent product --prompt "Reply with the word ready."
 ```
-
-## Slack bot
-
-Parallax can connect to a Slack workspace using Bolt Socket Mode. When configured, it posts plan-ready notifications with Approve and Reject buttons directly in Slack, posts PR and failure events, and responds to a `/parallax` slash command for retry, cancel, status, and pr-review. Because Socket Mode uses an outbound WebSocket, no public URL is required — it works on localhost and behind NAT.
-
-Configure Slack during `parallax init` or via the **Integrations** tab in the dashboard.
-
-See [docs/slack-bot.md](docs/slack-bot.md) for the full setup guide.
-
-## Dashboard
-
-The dashboard is accessible at `http://localhost:9372` by default. With
-`parallax start --network-access`, it is also available through the host's network name or IP:
-
-- **Tasks** — live task list with plan approval and log streaming
-- **Projects** — add, edit, and delete project configurations
-- **Integrations** — configure GitHub, Linear, Slack, and API keys
-
-## Runtime behavior
-
-1. Pull eligible tasks from provider filters.
-2. Generate plan text and persist it.
-3. Wait for explicit plan approval from UI, CLI, or Slack.
-4. Execute only approved plan steps.
-5. Open/update PR and move task lifecycle state.
-
-## Publish Global CLI (`parallax-cli`)
-
-Parallax is published as a single global CLI package:
-
-```bash
-npm i -g parallax-cli
-```
-
-Releases are published through the manual GitHub Actions workflow:
-
-- open the `Release parallax-cli` workflow in GitHub Actions
-- trigger it with `Run workflow`
-- the workflow publishes the exact version already set in [`packages/cli/package.json`](packages/cli/package.json)
-
-Before triggering the release, update the version in `packages/cli/package.json`.
-
-Default runtime locations and ports:
-
-- runtime state: `~/.parallax`
-- API: `http://localhost:9371`
-- dashboard: `http://localhost:9372`
-
-## Development
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Documentation
 
-For full user guides, see [docs/README.md](docs/README.md).
+| | |
+|---|---|
+| [Getting started](./docs/getting-started.md) | Hermes setup, deploy, keys, first route |
+| [Cloud API](./docs/api.md) | Orgs, keys, projects, routes, runs, Slack |
+| [Deploying to Railway](./docs/deploy-cloud.md) | Docker build, migrations, env vars |
+| [CLAUDE.md](./CLAUDE.md) | Architecture, for contributors |
 
-## License
+## Requirements
 
-MIT. See [LICENSE](LICENSE).
+- **Hermes Agent** with its API server enabled and `gateway.multiplex_profiles` on,
+  and a distinct `API_SERVER_KEY` per profile
+- **Node.js >= 23.7**
+- **Postgres**, for the control plane
+- `gh`, authenticated, if any project pulls from GitHub
+
+## Repository layout
+
+```
+packages/
+  common/         shared types — run status, routing rules, config
+  orchestrator/   the runner: triggers, routes, dispatch, outcomes
+  cli/            the published parallax-cli package
+  cloud/          Railway control plane (Fastify + Postgres)
+```
+
+```bash
+pnpm install
+pnpm build
+pnpm test
+```

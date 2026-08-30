@@ -1,30 +1,34 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { parseStopOptions } from '../args.js'
-import { startSpinner, stopProcessBestEffort } from '../process.js'
+import chalk from 'chalk'
+import { isProcessAlive, waitForExit } from '../process.js'
 import type { CliContext } from '../types.js'
 
-export async function runStop(args: string[], context: CliContext) {
-  parseStopOptions(args)
+export async function runStop(context: CliContext): Promise<void> {
   const manifestPath = path.join(context.defaultDataDir, context.manifestFile)
-  const spinner = startSpinner('Stopping Parallax...')
 
-  let state
+  let running
   try {
-    state = await context.loadRunningState()
+    running = await context.loadRunningState()
   } catch {
-    spinner?.stop()
     console.log('Parallax is not running.')
     return
   }
 
-  try {
-    await stopProcessBestEffort(state.orchestratorPid, 'orchestrator', true)
-    await stopProcessBestEffort(state.uiPid, 'UI', true)
-    await fs.unlink(manifestPath).catch(() => undefined)
-  } finally {
-    spinner?.stop()
+  if (!isProcessAlive(running.runnerPid)) {
+    await fs.rm(manifestPath, { force: true })
+    console.log('Parallax was not running; cleared a stale manifest.')
+    return
   }
 
-  console.log('Parallax stopped.')
+  process.kill(running.runnerPid, 'SIGTERM')
+  const exited = await waitForExit(running.runnerPid, 8_000)
+  if (!exited) {
+    // The runner holds a long poll open; SIGTERM during one can take a moment.
+    process.kill(running.runnerPid, 'SIGKILL')
+    await waitForExit(running.runnerPid, 2_000)
+  }
+
+  await fs.rm(manifestPath, { force: true })
+  console.log(chalk.green(`Stopped Parallax runner (pid ${running.runnerPid}).`))
 }

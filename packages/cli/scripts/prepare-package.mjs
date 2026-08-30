@@ -42,24 +42,6 @@ const bundledPackages = [
       type: 'module',
     },
   },
-  {
-    name: '@parallax/ui',
-    sourceDir: path.join(workspaceRoot, 'packages/ui'),
-    packageJson: {
-      name: '@parallax/ui',
-      version: '0.0.4',
-      type: 'module',
-    },
-  },
-  {
-    name: '@parallax/slack',
-    sourceDir: path.join(workspaceRoot, 'packages/slack'),
-    packageJson: {
-      name: '@parallax/slack',
-      version: '0.0.4',
-      type: 'module',
-    },
-  },
 ]
 
 // Pin each bundled package to its real workspace version so the published
@@ -118,8 +100,6 @@ async function writeBundledPackage(metadata) {
 async function main() {
   runPnpm(['--filter', '@parallax/common', 'build'])
   runPnpm(['--filter', '@parallax/orchestrator', 'build'])
-  runPnpm(['--filter', '@parallax/ui', 'build'])
-  runPnpm(['--filter', '@parallax/slack', 'build'])
   runPnpm(['--filter', 'parallax-cli', 'build'])
 
   const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, 'utf8'))
@@ -139,8 +119,6 @@ async function main() {
       ...cliPackageJson.dependencies,
       '@parallax/common': bundledPackages[0].packageJson.version,
       '@parallax/orchestrator': bundledPackages[1].packageJson.version,
-      '@parallax/ui': bundledPackages[2].packageJson.version,
-      '@parallax/slack': bundledPackages[3].packageJson.version,
     },
   }
   await fs.writeFile(cliPackageJsonPath, JSON.stringify(rewrittenCliPackageJson, null, 2) + '\n')

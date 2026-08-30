@@ -1,25 +1,90 @@
-import { AppConfig, PULL_PROVIDER } from '@parallax/common'
-import { HostExecutor } from '@parallax/common/executor'
+import { TICKET_PROVIDER, type AppConfig } from '@parallax/common'
+import type { LocalExecutor } from '@parallax/common/executor'
+import { HermesClient } from '../hermes/client.js'
 
+/**
+ * Fail-fast checks run at boot and on every reload.
+ *
+ * Scoped to what the runner genuinely needs now: a reachable Hermes gateway
+ * with a working key per profile, tracker credentials, and nothing else. The
+ * predecessor also required git, pnpm, and a local agent CLI -- none of which
+ * this runner touches, because it no longer executes anything itself.
+ */
 export async function validateRuntimeRequirements(
   config: AppConfig,
-  executor: HostExecutor
+  executor: LocalExecutor
 ): Promise<void> {
+  if (!config.hermes) {
+    throw new Error('No Hermes gateway configured. Run "parallax init".')
+  }
+
+  const enabled = config.hermes.profiles.filter((profile) => profile.enabled)
+  if (enabled.length === 0) {
+    throw new Error('No enabled Hermes profiles. Enable at least one and reload.')
+  }
+
   const requiresLinear = config.projects.some(
-    (project) => project.pullFrom.provider === PULL_PROVIDER.LINEAR
+    (project) => project.provider === TICKET_PROVIDER.LINEAR
   )
-  const requiresGitHub = config.projects.length > 0
-
   if (requiresLinear && !process.env.LINEAR_API_KEY) {
-    throw new Error('LINEAR_API_KEY missing from environment.')
+    throw new Error('LINEAR_API_KEY missing; required by at least one Linear project.')
   }
 
-  if (!requiresGitHub) {
-    return
+  const requiresGitHub = config.projects.some(
+    (project) => project.provider === TICKET_PROVIDER.GITHUB
+  )
+  if (requiresGitHub) {
+    const check = await executor.executeCommand(['gh', 'auth', 'status'], { cwd: process.cwd() })
+    if (check.exitCode === 127) {
+      throw new Error('GitHub CLI not found. Install gh and run "gh auth login".')
+    }
+    if (check.exitCode !== 0) {
+      throw new Error('GitHub CLI is not authenticated. Run "gh auth login".')
+    }
+  }
+}
+
+export interface HermesProbeResult {
+  profile: string
+  ok: boolean
+  detail: string
+}
+
+/**
+ * Probes every configured profile.
+ *
+ * Reports per profile rather than throwing on the first failure: when three of
+ * five profiles are misconfigured, an operator wants all three names at once.
+ */
+export async function probeHermes(config: AppConfig): Promise<HermesProbeResult[]> {
+  if (!config.hermes) {
+    return []
   }
 
-  const ghCheck = await executor.executeCommand(['gh', 'auth', 'status'], { cwd: process.cwd() })
-  if (ghCheck.exitCode !== 0) {
-    throw new Error('GitHub CLI is not authenticated. Run `gh auth login`.')
-  }
+  return Promise.all(
+    config.hermes.profiles.map(async (profile) => {
+      if (!profile.enabled) {
+        return { profile: profile.name, ok: true, detail: 'disabled' }
+      }
+      try {
+        const client = new HermesClient({
+          baseUrl: config.hermes!.baseUrl,
+          profile: profile.name,
+          apiKey: profile.apiKey,
+        })
+        const capabilities = await client.capabilities()
+        return {
+          profile: profile.name,
+          ok: true,
+          detail: capabilities.model ?? capabilities.platform ?? 'reachable',
+        }
+      } catch (error: unknown) {
+        return {
+          profile: profile.name,
+          ok: false,
+          detail: error instanceof Error ? error.message : String(error),
+        }
+      }
+    })
+  )
 }

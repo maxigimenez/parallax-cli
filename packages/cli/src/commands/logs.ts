@@ -1,80 +1,65 @@
 import chalk from 'chalk'
-import { sleep } from '@parallax/common'
-import { parseLogsOptions } from '../args.js'
-import type { CliContext } from '../types.js'
+import { sleep, type RunLogEntry, type RunRecord } from '@parallax/common'
+import { getJson, runnerUnreachable } from '../api.js'
+import type { CliContext, LogsCommandOptions } from '../types.js'
 
-export type TaskLogsApiRecord = {
-  taskExternalId: string
-  message: string
-  icon: string
-  level: 'info' | 'warning' | 'error'
-  timestamp: number
+const LEVEL_COLOR = {
+  info: chalk.white,
+  warning: chalk.yellow,
+  error: chalk.red,
+} as const
+
+function render(entry: RunLogEntry): void {
+  const time = new Date(entry.timestamp).toLocaleTimeString()
+  const color = LEVEL_COLOR[entry.level] ?? chalk.white
+  const title = entry.title ? chalk.cyan(`${entry.title} `) : ''
+  console.log(`${chalk.dim(time)} ${entry.icon} ${title}${color(entry.message)}`)
 }
 
-export function formatLogLine(entry: TaskLogsApiRecord, colors: typeof chalk = chalk): string {
-  const timestamp = colors.dim(new Date(entry.timestamp).toISOString())
-  const taskExternalId = colors.magenta(`[${entry.taskExternalId}]`)
-  const level =
-    entry.level === 'warning'
-      ? colors.yellow(entry.level.toUpperCase())
-      : entry.level === 'error'
-        ? colors.red(entry.level.toUpperCase())
-        : colors.blue(entry.level.toUpperCase())
-  const icon =
-    entry.level === 'warning'
-      ? colors.yellow(entry.icon)
-      : entry.level === 'error'
-        ? colors.red(entry.icon)
-        : colors.blue(entry.icon)
+/**
+ * Tails one run, or the most recent one.
+ *
+ * Polls rather than streams: the runner has no socket layer any more, and a
+ * 1s poll against local SQLite is cheaper than the machinery a stream needs.
+ */
+export async function runLogs(context: CliContext, options: LogsCommandOptions): Promise<void> {
+  const apiBase = await context.resolveDefaultApiBase()
 
-  return `${timestamp} ${taskExternalId} ${level} ${icon} ${entry.message}`
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url)
-  if (!response.ok) {
-    throw new Error(`Request failed: ${url} ${response.status} ${response.statusText}`)
+  let runId = options.runId
+  if (!runId) {
+    const { runs } = await getJson<{ runs: RunRecord[] }>(`${apiBase}/runs?limit=1`).catch(() => {
+      throw runnerUnreachable(apiBase)
+    })
+    if (runs.length === 0) {
+      console.log(chalk.yellow('No runs yet.'))
+      return
+    }
+    runId = runs[0].id
+    console.log(chalk.dim(`Showing ${runId} — ${runs[0].title}\n`))
   }
 
-  return (await response.json()) as T
-}
-
-export async function runLogs(args: string[], context: CliContext) {
-  const options = parseLogsOptions(args)
-  const apiBase = await context.resolveDefaultApiBase()
-  let cursor = Date.now()
-  let seenAtCursor = new Set<string>()
-
-  while (true) {
-    const params = new URLSearchParams({
-      since: String(cursor),
-      limit: '500',
-    })
-    if (options.taskId) {
-      params.set('taskId', options.taskId)
-    }
-
-    const response = await fetchJson<{ logs: TaskLogsApiRecord[] }>(
-      `${apiBase}/logs?${params.toString()}`
+  let since = 0
+  for (;;) {
+    const { events } = await getJson<{ events: RunLogEntry[] }>(
+      `${apiBase}/runs/${runId}/events?since=${since}`
     )
 
-    for (const entry of response.logs) {
-      const signature = `${entry.timestamp}|${entry.level}|${entry.icon}|${entry.message}`
-      if (entry.timestamp < cursor) {
-        continue
-      }
-      if (entry.timestamp === cursor && seenAtCursor.has(signature)) {
-        continue
-      }
-
-      console.log(formatLogLine(entry))
-      if (entry.timestamp > cursor) {
-        cursor = entry.timestamp
-        seenAtCursor = new Set<string>()
-      }
-      seenAtCursor.add(signature)
+    for (const entry of events) {
+      render(entry)
+      // +1 so the next poll does not replay the newest event.
+      since = Math.max(since, entry.timestamp + 1)
     }
 
-    await sleep(2000)
+    if (!options.follow) {
+      return
+    }
+
+    const { run } = await getJson<{ run: RunRecord }>(`${apiBase}/runs/${runId}`)
+    if (['completed', 'failed', 'canceled'].includes(run.status)) {
+      console.log(chalk.dim(`\nRun ${run.status}.`))
+      return
+    }
+
+    await sleep(1_000)
   }
 }

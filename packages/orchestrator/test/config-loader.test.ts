@@ -1,275 +1,211 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { loadConfig } from '../src/config-loader'
+import { CONFIG_VERSION } from '@parallax/common'
+import { loadConfig } from '../src/config-loader.js'
+import { readConfigStore, writeConfigStore, emptyStoredConfig } from '../src/config-store.js'
 
-const originalCwd = process.cwd()
-const originalDataDir = process.env.PARALLAX_DATA_DIR
-const originalConcurrency = process.env.PARALLAX_CONCURRENCY
-const originalApiPort = process.env.PARALLAX_SERVER_API_PORT
-const originalUiPort = process.env.PARALLAX_SERVER_UI_PORT
-const originalNetworkAccess = process.env.PARALLAX_NETWORK_ACCESS
+const ENV_KEYS = [
+  'PARALLAX_DATA_DIR',
+  'PARALLAX_CONCURRENCY',
+  'PARALLAX_SERVER_API_PORT',
+  'PARALLAX_NETWORK_ACCESS',
+] as const
 
-afterEach(async () => {
-  process.chdir(originalCwd)
-  if (originalDataDir === undefined) {
-    delete process.env.PARALLAX_DATA_DIR
-  } else {
-    process.env.PARALLAX_DATA_DIR = originalDataDir
+const saved = new Map<string, string | undefined>()
+let dataDir = ''
+
+beforeEach(async () => {
+  for (const key of ENV_KEYS) {
+    saved.set(key, process.env[key])
+    delete process.env[key]
   }
-  if (originalConcurrency === undefined) {
-    delete process.env.PARALLAX_CONCURRENCY
-  } else {
-    process.env.PARALLAX_CONCURRENCY = originalConcurrency
-  }
-  if (originalApiPort === undefined) {
-    delete process.env.PARALLAX_SERVER_API_PORT
-  } else {
-    process.env.PARALLAX_SERVER_API_PORT = originalApiPort
-  }
-  if (originalUiPort === undefined) {
-    delete process.env.PARALLAX_SERVER_UI_PORT
-  } else {
-    process.env.PARALLAX_SERVER_UI_PORT = originalUiPort
-  }
-  if (originalNetworkAccess === undefined) {
-    delete process.env.PARALLAX_NETWORK_ACCESS
-  } else {
-    process.env.PARALLAX_NETWORK_ACCESS = originalNetworkAccess
-  }
+  dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
+  process.env.PARALLAX_DATA_DIR = dataDir
 })
 
-function makeStoredConfig(overrides: object = {}) {
-  return JSON.stringify(
-    {
-      version: 1,
-      projects: [],
-      slack: null,
-      secrets: {},
-      updatedAt: Date.now(),
-      ...overrides,
+afterEach(async () => {
+  for (const key of ENV_KEYS) {
+    const value = saved.get(key)
+    if (value === undefined) {
+      delete process.env[key]
+    } else {
+      process.env[key] = value
+    }
+  }
+  delete process.env.SOME_SECRET
+  await fs.rm(dataDir, { recursive: true, force: true })
+})
+
+async function writeRaw(config: object): Promise<void> {
+  await fs.writeFile(path.join(dataDir, 'config.json'), JSON.stringify(config, null, 2))
+}
+
+function validConfig(overrides: object = {}) {
+  return {
+    version: CONFIG_VERSION,
+    cloud: null,
+    hermes: {
+      baseUrl: 'http://127.0.0.1:8642',
+      profiles: [{ name: 'product', apiKey: 'k', enabled: true, role: 'product' }],
     },
-    null,
-    2
-  )
+    projects: [{ id: 'taplands', provider: 'linear', filters: { team: 'ENG' } }],
+    secrets: {},
+    updatedAt: Date.now(),
+    ...overrides,
+  }
 }
 
-async function setupDataDir(root: string) {
-  const dataDir = path.join(root, '.parallax')
-  await fs.mkdir(dataDir, { recursive: true })
-  process.env.PARALLAX_DATA_DIR = dataDir
-  return dataDir
-}
+describe('readConfigStore', () => {
+  it('returns an empty v2 config when the file does not exist', async () => {
+    await expect(readConfigStore(dataDir)).resolves.toEqual(emptyStoredConfig())
+  })
 
-describe('config-loader', () => {
-  it('returns empty config when config.json is missing', async () => {
-    const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    process.env.PARALLAX_DATA_DIR = dataDir
+  it('refuses a v1 config with an actionable message rather than guessing a migration', async () => {
+    await writeRaw({ version: 1, projects: [], slack: null, secrets: {} })
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/version 1.*requires version 2/s)
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/parallax init/)
+  })
 
+  it('treats a config with no version field as v1', async () => {
+    await writeRaw({ projects: [] })
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/version 1/)
+  })
+
+  it('refuses a config from a newer build', async () => {
+    await writeRaw({ version: CONFIG_VERSION + 1 })
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/newer than this build/)
+  })
+
+  it('round-trips through writeConfigStore and stamps the version', async () => {
+    await writeConfigStore(dataDir, { ...emptyStoredConfig(), version: 0 })
+    const stored = await readConfigStore(dataDir)
+    expect(stored.version).toBe(CONFIG_VERSION)
+    expect(stored.updatedAt).toBeGreaterThan(0)
+  })
+
+  it('reports malformed JSON with the path', async () => {
+    await fs.writeFile(path.join(dataDir, 'config.json'), '{ not json')
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/Invalid config at .*config\.json/)
+  })
+})
+
+describe('loadConfig', () => {
+  it('loads projects and hermes profiles', async () => {
+    await writeRaw(validConfig())
     const config = await loadConfig()
-    expect(config.projects).toHaveLength(0)
-    expect(config.server.apiPort).toBe(9371)
-    expect(config.server.uiPort).toBe(9372)
-    expect(config.server.networkAccess).toBe(false)
-    expect(config.concurrency).toBe(2)
+
+    expect(config.projects).toEqual([
+      { id: 'taplands', provider: 'linear', filters: { team: 'ENG' } },
+    ])
+    expect(config.hermes?.profiles[0]).toMatchObject({ name: 'product', enabled: true })
+    expect(config.cloud).toBeNull()
   })
 
-  it('loads a valid config from config.json', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'codex' },
-          },
-        ],
+  it('normalizes a trailing slash off the hermes base url', async () => {
+    await writeRaw(
+      validConfig({
+        hermes: {
+          baseUrl: 'http://127.0.0.1:8642/',
+          profiles: [{ name: 'p', apiKey: 'k' }],
+        },
       })
     )
-
-    process.env.PARALLAX_CONCURRENCY = '4'
-    process.env.PARALLAX_SERVER_API_PORT = '4100'
-    process.env.PARALLAX_SERVER_UI_PORT = '4101'
-    process.env.PARALLAX_NETWORK_ACCESS = 'true'
-
     const config = await loadConfig()
-    expect(config.projects).toHaveLength(1)
-    expect(config.projects[0].id).toBe('test')
-    expect(config.concurrency).toBe(4)
-    expect(config.server.apiPort).toBe(4100)
-    expect(config.server.uiPort).toBe(4101)
-    expect(config.server.networkAccess).toBe(true)
+    expect(config.hermes?.baseUrl).toBe('http://127.0.0.1:8642')
   })
 
-  it('accepts claude-code as a supported agent provider', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'claude-code' },
-          },
-        ],
+  it('defaults a profile to enabled when the flag is omitted', async () => {
+    await writeRaw(
+      validConfig({
+        hermes: { baseUrl: 'http://h', profiles: [{ name: 'p', apiKey: 'k' }] },
       })
     )
-
     const config = await loadConfig()
-    expect(config.projects[0].agent.provider).toBe('claude-code')
+    expect(config.hermes?.profiles[0].enabled).toBe(true)
   })
 
-  it('rejects unsupported agent provider', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'unknown-agent' },
-          },
-        ],
-      })
+  it('rejects a profile with no api key, which would 401 on a named prefix', async () => {
+    await writeRaw(
+      validConfig({ hermes: { baseUrl: 'http://h', profiles: [{ name: 'product' }] } })
     )
-
-    await expect(loadConfig()).rejects.toThrow('Unsupported agent provider "unknown-agent"')
+    await expect(loadConfig()).rejects.toThrow(/apiKey \("product"\) must be a non-empty string/)
   })
 
-  it('loads slack config', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        slack: { botToken: 'xoxb-test-token', appToken: 'xapp-test-token', channel: '#ai-tasks' },
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'codex' },
-          },
-        ],
+  it('rejects duplicate profile names', async () => {
+    await writeRaw(
+      validConfig({
+        hermes: {
+          baseUrl: 'http://h',
+          profiles: [
+            { name: 'p', apiKey: 'a' },
+            { name: 'p', apiKey: 'b' },
+          ],
+        },
       })
     )
-
-    const config = await loadConfig()
-    expect(config.slack).toEqual({
-      botToken: 'xoxb-test-token',
-      appToken: 'xapp-test-token',
-      channel: '#ai-tasks',
-    })
+    await expect(loadConfig()).rejects.toThrow(/Duplicate hermes profile "p"/)
   })
 
-  it('rejects slack botToken not starting with xoxb-', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        slack: { botToken: 'bad-token', appToken: 'xapp-test-token', channel: '#ai-tasks' },
-        projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'codex' },
-          },
-        ],
+  it('rejects a non-http hermes base url', async () => {
+    await writeRaw(
+      validConfig({
+        hermes: { baseUrl: 'ftp://h', profiles: [{ name: 'p', apiKey: 'k' }] },
       })
     )
-
-    await expect(loadConfig()).rejects.toThrow('xoxb-')
+    await expect(loadConfig()).rejects.toThrow(/must use http or https/)
   })
 
   it('rejects duplicate project ids', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    const project = {
-      id: 'test',
-      workspaceDir: workspace,
-      pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-      agent: { provider: 'codex' },
-    }
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({ projects: [project, project] })
-    )
-
-    await expect(loadConfig()).rejects.toThrow('Duplicate project id "test"')
-  })
-
-  it('injects secrets into process.env without overwriting existing values', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const workspace = path.join(root, 'workspace')
-    await fs.mkdir(workspace, { recursive: true })
-    const dataDir = await setupDataDir(root)
-
-    process.env.EXISTING_KEY = 'existing'
-    delete process.env.NEW_KEY
-
-    await fs.writeFile(
-      path.join(dataDir, 'config.json'),
-      makeStoredConfig({
-        secrets: { EXISTING_KEY: 'should-not-overwrite', NEW_KEY: 'injected' },
+    await writeRaw(
+      validConfig({
         projects: [
-          {
-            id: 'test',
-            workspaceDir: workspace,
-            pullFrom: { provider: 'github', filters: { owner: 'org', repo: 'repo' } },
-            agent: { provider: 'codex' },
-          },
+          { id: 'dup', provider: 'linear', filters: { team: 'A' } },
+          { id: 'dup', provider: 'linear', filters: { team: 'B' } },
         ],
       })
     )
-
-    await loadConfig()
-    expect(process.env.EXISTING_KEY).toBe('existing')
-    expect(process.env.NEW_KEY).toBe('injected')
-
-    delete process.env.EXISTING_KEY
-    delete process.env.NEW_KEY
+    await expect(loadConfig()).rejects.toThrow(/Duplicate project id "dup"/)
   })
 
-  it('returns empty config when config.json is empty object', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-    const dataDir = await setupDataDir(root)
+  it('requires owner and repo for a github project', async () => {
+    await writeRaw(
+      validConfig({ projects: [{ id: 'gh', provider: 'github', filters: { owner: 'me' } }] })
+    )
+    await expect(loadConfig()).rejects.toThrow(/filters\.repo for "gh"/)
+  })
 
-    await fs.writeFile(path.join(dataDir, 'config.json'), '{}')
+  it('injects secrets into the environment without clobbering existing values', async () => {
+    process.env.SOME_SECRET = 'from-env'
+    await writeRaw(validConfig({ secrets: { SOME_SECRET: 'from-config', OTHER: 'set' } }))
+
+    await loadConfig()
+
+    expect(process.env.SOME_SECRET).toBe('from-env')
+    expect(process.env.OTHER).toBe('set')
+    delete process.env.OTHER
+  })
+
+  it('reads runtime knobs from the environment', async () => {
+    await writeRaw(validConfig())
+    process.env.PARALLAX_CONCURRENCY = '5'
+    process.env.PARALLAX_SERVER_API_PORT = '9999'
+    process.env.PARALLAX_NETWORK_ACCESS = 'true'
 
     const config = await loadConfig()
-    expect(config.projects).toHaveLength(0)
-    expect(config.slack).toBeUndefined()
+
+    expect(config.concurrency).toBe(5)
+    expect(config.server).toEqual({ apiPort: 9999, networkAccess: true })
+  })
+
+  it('rejects out-of-range runtime knobs instead of silently clamping', async () => {
+    await writeRaw(validConfig())
+    process.env.PARALLAX_CONCURRENCY = '99'
+    await expect(loadConfig()).rejects.toThrow(/between 1 and 16/)
+
+    process.env.PARALLAX_CONCURRENCY = '2'
+    process.env.PARALLAX_NETWORK_ACCESS = 'yes'
+    await expect(loadConfig()).rejects.toThrow(/must be "true" or "false"/)
   })
 })

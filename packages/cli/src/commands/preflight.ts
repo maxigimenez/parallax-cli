@@ -1,120 +1,132 @@
-import { parsePreflightOptions } from '../args.js'
-import { checkGhAuth, commandExists, startSpinner } from '../process.js'
-import type { VerifyCheck } from '../types.js'
+import { spawn } from 'node:child_process'
+import chalk from 'chalk'
+import type { CliContext, VerifyCheck } from '../types.js'
+import { getJson } from '../api.js'
+
+const MIN_NODE = [23, 7, 0] as const
 
 function isSupportedNodeVersion(version: string): boolean {
-  const [majorRaw, minorRaw, patchRaw] = version.replace(/^v/, '').split('.')
-  const major = Number.parseInt(majorRaw ?? '0', 10)
-  const minor = Number.parseInt(minorRaw ?? '0', 10)
-  const patch = Number.parseInt(patchRaw ?? '0', 10)
-
-  if (!Number.isFinite(major) || !Number.isFinite(minor) || !Number.isFinite(patch)) {
-    return false
+  const parts = version.replace(/^v/, '').split('.').map(Number)
+  for (let i = 0; i < MIN_NODE.length; i += 1) {
+    const actual = parts[i] ?? 0
+    if (actual > MIN_NODE[i]) {
+      return true
+    }
+    if (actual < MIN_NODE[i]) {
+      return false
+    }
   }
-
-  if (major > 23) {
-    return true
-  }
-  if (major < 23) {
-    return false
-  }
-  if (minor > 7) {
-    return true
-  }
-  if (minor < 7) {
-    return false
-  }
-
-  return patch >= 0
+  return true
 }
 
-function printVerifyChecks(checks: VerifyCheck[]) {
-  const GREEN = '\x1b[32m'
-  const RED = '\x1b[31m'
-  const DIM = '\x1b[2m'
-  const RESET = '\x1b[0m'
-
-  for (const check of checks) {
-    const symbol = check.ok ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`
-    const scope = check.required ? '' : ` ${DIM}(optional)${RESET}`
-    const detail = check.detail ? ` ${DIM}- ${check.detail}${RESET}` : ''
-    console.log(`${symbol} ${check.name}${scope}${detail}`)
-  }
+async function commandSucceeds(cmd: string, args: string[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, { stdio: 'ignore' })
+    child.on('error', () => resolve(false))
+    child.on('close', (code) => resolve(code === 0))
+  })
 }
 
-export async function runPreflight(args: string[]) {
-  parsePreflightOptions(args)
+/**
+ * Checks exactly what this runner needs.
+ *
+ * Notably absent: git, pnpm, and any agent CLI. The runner does not execute
+ * agents or touch a repository any more -- Hermes does both -- so requiring
+ * them here would fail machines that are in fact correctly configured.
+ */
+export async function runPreflight(context: CliContext): Promise<void> {
   const checks: VerifyCheck[] = []
-  const spinner = startSpinner('Running preflight checks...')
 
-  try {
-    checks.push({
-      name: 'Node.js >= 23.7.0',
-      ok: isSupportedNodeVersion(process.version),
-      required: true,
-      detail: isSupportedNodeVersion(process.version) ? undefined : `Current: ${process.version}`,
-    })
+  checks.push({
+    name: `Node.js >= ${MIN_NODE.join('.')}`,
+    ok: isSupportedNodeVersion(process.version),
+    required: true,
+    detail: process.version,
+  })
 
-    const gitOk = await commandExists('git')
-    checks.push({ name: 'git CLI', ok: gitOk, required: true })
+  const config = await context.loadStoredConfig()
 
-    const pnpmOk = await commandExists('pnpm')
-    checks.push({ name: 'pnpm CLI', ok: pnpmOk, required: true })
+  checks.push({
+    name: 'Configuration present',
+    ok: Boolean(config.hermes && config.cloud),
+    required: true,
+    detail: config.hermes && config.cloud ? '~/.parallax/config.json' : 'run "parallax init"',
+  })
 
-    const ghOk = await commandExists('gh')
-    checks.push({ name: 'gh CLI', ok: ghOk, required: true })
-
-    const ghAuthOk = ghOk ? await checkGhAuth() : false
-    checks.push({
-      name: 'gh auth status',
-      ok: ghAuthOk,
-      required: true,
-      detail: ghAuthOk ? undefined : 'Run: gh auth login',
-    })
-
-    const codexOk = await commandExists('codex')
-    checks.push({
-      name: 'codex CLI',
-      ok: codexOk,
-      required: false,
-      detail: codexOk ? undefined : 'Install Codex CLI and ensure it is in PATH.',
-    })
-
-    const geminiOk = await commandExists('gemini')
-    checks.push({
-      name: 'gemini CLI',
-      ok: geminiOk,
-      required: false,
-      detail: geminiOk ? undefined : 'Install Gemini CLI (npm i -g @google/gemini-cli).',
-    })
-
-    const claudeOk = await commandExists('claude')
-    checks.push({
-      name: 'claude CLI',
-      ok: claudeOk,
-      required: false,
-      detail: claudeOk
-        ? undefined
-        : 'Install Claude Code CLI (npm i -g @anthropic-ai/claude-code).',
-    })
-
-    checks.push({
-      name: 'At least one agent CLI (codex, gemini, or claude)',
-      ok: codexOk || geminiOk || claudeOk,
-      required: true,
-      detail: codexOk || geminiOk || claudeOk ? undefined : 'Install codex, gemini, or claude.',
-    })
-  } finally {
-    spinner?.stop()
+  if (config.hermes) {
+    for (const profile of config.hermes.profiles.filter((entry) => entry.enabled)) {
+      const prefix = profile.name === 'default' ? '' : `/p/${profile.name}`
+      let detail = ''
+      let ok = false
+      try {
+        const capabilities = await getJson<{ model?: string; platform?: string }>(
+          `${config.hermes.baseUrl}${prefix}/v1/capabilities`,
+          { authorization: `Bearer ${profile.apiKey}` }
+        )
+        ok = true
+        detail = capabilities.model ?? capabilities.platform ?? 'reachable'
+      } catch (error: unknown) {
+        detail = error instanceof Error ? error.message : String(error)
+      }
+      checks.push({ name: `Hermes profile "${profile.name}"`, ok, required: true, detail })
+    }
   }
 
-  printVerifyChecks(checks)
+  if (config.cloud) {
+    let ok = false
+    let detail = ''
+    try {
+      const health = await getJson<{ status: string }>(`${config.cloud.baseUrl}/health`)
+      ok = health.status === 'ok'
+      detail = config.cloud.baseUrl
+    } catch (error: unknown) {
+      detail = error instanceof Error ? error.message : String(error)
+    }
+    checks.push({ name: 'Parallax cloud reachable', ok, required: true, detail })
+  }
 
-  if (checks.some((check) => check.required && !check.ok)) {
-    console.log('\nVerdict: FAIL - Parallax is not ready to run in this environment.')
+  const ghInstalled = await commandSucceeds('gh', ['--version'])
+  checks.push({
+    name: 'GitHub CLI installed',
+    ok: ghInstalled,
+    required: false,
+    detail: ghInstalled ? '' : 'Needed only for GitHub projects.',
+  })
+  if (ghInstalled) {
+    const authed = await commandSucceeds('gh', ['auth', 'status'])
+    checks.push({
+      name: 'GitHub CLI authenticated',
+      ok: authed,
+      required: false,
+      // Only show the remedy when there is something to remedy.
+      detail: authed ? '' : 'gh auth login',
+    })
+  }
+
+  checks.push({
+    name: 'LINEAR_API_KEY',
+    ok: Boolean(process.env.LINEAR_API_KEY || config.secrets.LINEAR_API_KEY),
+    required: false,
+    detail: 'Needed only for Linear projects.',
+  })
+
+  console.log('')
+  for (const check of checks) {
+    const mark = check.ok
+      ? chalk.green('ok  ')
+      : check.required
+        ? chalk.red('FAIL')
+        : chalk.yellow('warn')
+    const suffix = check.detail ? chalk.dim(`  ${check.detail}`) : ''
+    console.log(`  ${mark}  ${check.name}${suffix}`)
+  }
+
+  const failed = checks.filter((check) => check.required && !check.ok)
+  console.log('')
+  if (failed.length > 0) {
+    console.log(chalk.red(`Verdict: FAIL (${failed.length} required check(s))`))
     process.exitCode = 1
     return
   }
-
-  console.log('\nVerdict: PASS - Parallax prerequisites are satisfied.')
+  console.log(chalk.green('Verdict: ready'))
 }

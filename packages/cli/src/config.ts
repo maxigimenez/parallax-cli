@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
-import type { StoredConfig } from '@parallax/common'
+import { CONFIG_VERSION, type StoredConfig } from '@parallax/common'
 import type { RunningState } from './types.js'
 
 export function resolveCliRoot(startDir: string): string {
@@ -48,28 +48,26 @@ export function parseRunningState(raw: string, source: string): RunningState {
     )
   }
 
-  if (
-    !parsed ||
-    typeof parsed !== 'object' ||
-    typeof (parsed as { startedAt?: unknown }).startedAt !== 'number' ||
-    typeof (parsed as { orchestratorPid?: unknown }).orchestratorPid !== 'number' ||
-    typeof (parsed as { apiPort?: unknown }).apiPort !== 'number' ||
-    typeof (parsed as { uiPort?: unknown }).uiPort !== 'number' ||
-    (parsed as { orchestratorPid: number }).orchestratorPid <= 0 ||
-    (parsed as { apiPort: number }).apiPort <= 0 ||
-    (parsed as { uiPort: number }).uiPort <= 0 ||
-    ('networkAccess' in parsed &&
-      typeof (parsed as { networkAccess?: unknown }).networkAccess !== 'boolean') ||
-    ('uiPid' in parsed && typeof (parsed as { uiPid?: unknown }).uiPid !== 'number') ||
-    (typeof (parsed as { uiPid?: unknown }).uiPid === 'number' &&
-      (parsed as { uiPid: number }).uiPid <= 0)
-  ) {
+  const state = parsed as Partial<RunningState> | null
+  const valid =
+    state &&
+    typeof state === 'object' &&
+    typeof state.startedAt === 'number' &&
+    typeof state.runnerPid === 'number' &&
+    state.runnerPid > 0 &&
+    typeof state.apiPort === 'number' &&
+    state.apiPort > 0 &&
+    (state.networkAccess === undefined || typeof state.networkAccess === 'boolean')
+
+  if (!valid) {
     throw new Error(`Invalid running manifest at ${source}.`)
   }
 
   return {
-    ...(parsed as RunningState),
-    networkAccess: (parsed as { networkAccess?: boolean }).networkAccess === true,
+    startedAt: state.startedAt as number,
+    runnerPid: state.runnerPid as number,
+    apiPort: state.apiPort as number,
+    networkAccess: state.networkAccess === true,
   }
 }
 
@@ -103,17 +101,25 @@ function parseStoredConfigFromDisk(raw: string, source: string): StoredConfig {
   }
 
   const obj = parsed as Record<string, unknown>
+  const record = (value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null
+
+  const version = typeof obj.version === 'number' ? obj.version : 1
+  if (version !== CONFIG_VERSION) {
+    throw new Error(
+      `Config at ${source} is version ${version}; this CLI requires version ${CONFIG_VERSION}. ` +
+        `Move it aside and run "parallax init".`
+    )
+  }
+
   return {
-    version: typeof obj.version === 'number' ? obj.version : 1,
+    version,
+    cloud: record(obj.cloud) as StoredConfig['cloud'],
+    hermes: record(obj.hermes) as StoredConfig['hermes'],
     projects: Array.isArray(obj.projects) ? (obj.projects as StoredConfig['projects']) : [],
-    slack:
-      obj.slack && typeof obj.slack === 'object' && !Array.isArray(obj.slack)
-        ? (obj.slack as StoredConfig['slack'])
-        : null,
-    secrets:
-      obj.secrets && typeof obj.secrets === 'object' && !Array.isArray(obj.secrets)
-        ? (obj.secrets as Record<string, string>)
-        : {},
+    secrets: (record(obj.secrets) as Record<string, string>) ?? {},
     updatedAt: typeof obj.updatedAt === 'number' ? obj.updatedAt : 0,
   }
 }
@@ -122,9 +128,10 @@ export async function loadStoredConfig(dataDir: string): Promise<StoredConfig> {
   const configPath = path.join(dataDir, CONFIG_FILE)
   if (!(await ensureFileExists(configPath))) {
     return {
-      version: 1,
+      version: CONFIG_VERSION,
+      cloud: null,
+      hermes: null,
       projects: [],
-      slack: null,
       secrets: {},
       updatedAt: 0,
     }

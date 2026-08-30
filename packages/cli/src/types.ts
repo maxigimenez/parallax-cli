@@ -1,40 +1,9 @@
 import type { StoredConfig } from '@parallax/common'
 
-export type StopCommandOptions = Record<string, never>
-
-export type RetryCommandOptions = { taskId: string }
-
-export type CancelCommandOptions = {
-  taskId: string
-}
-
-export type PrReviewCommandOptions = {
-  taskId: string
-}
-
-export type LogsCommandOptions = {
-  taskId?: string
-}
-
-export type PreflightCommandOptions = Record<string, never>
-
-export type StatusCommandOptions = Record<string, never>
-
-export type TasksCommandOptions = Record<string, never>
-
-export type StartCommandOptions = {
-  apiPort: number
-  uiPort: number
-  concurrency: number
-  networkAccess: boolean
-}
-
 export type RunningState = {
   startedAt: number
-  orchestratorPid: number
-  uiPid?: number
+  runnerPid: number
   apiPort: number
-  uiPort: number
   networkAccess?: boolean
 }
 
@@ -45,21 +14,35 @@ export type VerifyCheck = {
   detail?: string
 }
 
+export type StartCommandOptions = {
+  apiPort: number
+  concurrency: number
+  networkAccess: boolean
+  foreground: boolean
+}
+
+export type LogsCommandOptions = { runId?: string; follow: boolean }
+export type RunsCommandOptions = { status?: string; limit: number }
+export type RunCommandOptions = { agent: string; prompt: string; timeoutSeconds: number }
+export type CancelCommandOptions = { runId: string }
+export type RunnerCommandOptions = { action: 'install' | 'uninstall' | 'status' }
+export type EmptyOptions = Record<string, never>
+
 export type CliContext = {
   defaultApiBase: string
   defaultDataDir: string
   manifestFile: string
   rootDir: string
   cliVersion: string
+  packageVersion: string
   resolvePath: (raw: string) => string
   ensureFileExists: (filePath: string) => Promise<boolean>
   loadRunningState: () => Promise<RunningState>
   loadStoredConfig: () => Promise<StoredConfig>
   saveStoredConfig: (config: StoredConfig) => Promise<void>
   resolveDefaultApiBase: () => Promise<string>
-  packageVersion: string
   buildEnvConfig: (
     dataDir: string,
-    runtime: { apiPort: number; uiPort: number; concurrency: number; networkAccess: boolean }
+    runtime: { apiPort: number; concurrency: number; networkAccess: boolean }
   ) => Record<string, string>
 }

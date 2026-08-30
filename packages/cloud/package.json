@@ -1,0 +1,30 @@
+{
+  "name": "@parallax/cloud",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "rm -rf dist && tsc && cp -r src/migrations dist/migrations",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "db:migrate": "node dist/migrate-cli.js",
+    "org:create": "node dist/org-cli.js",
+    "lint": "eslint src test",
+    "lint:fix": "eslint src test --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.2.0",
+    "@parallax/common": "workspace:*",
+    "fastify": "5.7.4",
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "25.3.0",
+    "@types/pg": "^8.23.1"
+  },
+  "files": [
+    "dist"
+  ]
+}
