@@ -60,6 +60,7 @@ export function validateHermesProfile(raw: unknown, index: number): HermesProfil
     apiKey,
     githubLogin: assertOptionalString(raw.githubLogin, `hermes.profiles[${index}].githubLogin`),
     role: assertOptionalString(raw.role, `hermes.profiles[${index}].role`),
+    avatarUrl: assertOptionalString(raw.avatarUrl, `hermes.profiles[${index}].avatarUrl`),
     enabled: raw.enabled !== false,
   }
 }

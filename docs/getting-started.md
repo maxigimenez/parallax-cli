@@ -134,7 +134,7 @@ curl -X POST "$CLOUD/v1/routes" \
     "match":   { "labels": { "any": ["feasibility"] } },
     "target":  { "agentRef": { "profile": "product" } },
     "execution": {
-      "promptTemplate": "product-review",
+      "prompt": "Assess {{ticket.ref}} for feasibility.\n\nTitle: {{ticket.title}}\n\n{{ticket.body}}\n\nDo not write code.",
       "requireApproval": false,
       "timeoutSeconds": 1800
     },
@@ -176,9 +176,12 @@ entry point, so that file must be executable. `pnpm build` sets the bit; if you 
 see `zsh: permission denied: parallax`, the build did not run or ran from an older
 checkout — rebuild, or `chmod +x $(readlink -f "$(which parallax)")`.
 
-`init` asks for your cloud URL, the **runner** key, the Hermes base URL, and each
-profile's `API_SERVER_KEY`. It probes every profile as you enter it, so a wrong key
-fails there rather than silently an hour later.
+`init` asks for your cloud URL and the **runner** key, then reads your Hermes install
+directly: it lists every profile under `~/.hermes/profiles/`, picks each one's
+`API_SERVER_KEY` out of its own `.env`, and asks you which to add. It probes each as it
+goes, so a wrong key fails there rather than silently an hour later. Optional per
+profile: a role, a GitHub login (for PR-review routes), and an avatar image URL (shown
+in Slack).
 
 ```bash
 parallax preflight     # Node, Hermes profiles, cloud, gh auth
@@ -203,8 +206,10 @@ parallax agents     # every Hermes profile it discovered, with model and toolset
 parallax routes     # what it will act on
 ```
 
-Configuration changes in the cloud are picked up on the next poll, or immediately with
-`parallax reload`.
+Projects and routes are re-read from the cloud every poll cycle, so adding either in
+the dashboard takes effect within about 25 seconds with no restart. `parallax reload`
+forces it immediately; `parallax restart` is only for changes to
+`~/.parallax/config.json` or a new build.
 
 Send one prompt straight to Hermes, bypassing all routing — the fastest way to tell
 whether the machine can drive an agent at all:

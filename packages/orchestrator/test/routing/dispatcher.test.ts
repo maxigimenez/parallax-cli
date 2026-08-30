@@ -58,7 +58,7 @@ function route(overrides: Partial<RoutingRule> = {}): RoutingRule {
     trigger: { type: TRIGGER_TYPE.TICKET, provider: TICKET_PROVIDER.LINEAR, projectId: 'taplands' },
     match: {},
     target: { agentRef: { profile: 'product' } },
-    execution: { promptTemplate: 'product-review', requireApproval: false, timeoutSeconds: 30 },
+    execution: { prompt: 'Review {{ticket.ref}}', requireApproval: false, timeoutSeconds: 30 },
     outcome: { postComment: { target: COMMENT_TARGET.TICKET } },
     ...overrides,
   }
@@ -283,7 +283,11 @@ describe('Dispatcher.dispatch', () => {
         route({
           trigger: { type: TRIGGER_TYPE.PR_REVIEW_REQUESTED, projectId: 'taplands' },
           target: { agentRef: { githubLogin: 'acme-bot' } },
-          execution: { promptTemplate: 'pr-review', requireApproval: false, timeoutSeconds: 30 },
+          execution: {
+            prompt: 'Review {{ticket.ref}}',
+            requireApproval: false,
+            timeoutSeconds: 30,
+          },
         }),
       ]
     )
@@ -291,11 +295,30 @@ describe('Dispatcher.dispatch', () => {
     expect(result.outcome).toBe('dispatched')
   })
 
-  it('releases the claim on a bad prompt template so a fix can run', async () => {
-    server = await startFakeHermes({})
+  it('runs anyway when a prompt uses an unknown placeholder, and says so', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+    const typo = route({
+      execution: {
+        prompt: 'Review {{ticket.titel}}',
+        requireApproval: false,
+        timeoutSeconds: 30,
+      },
+    })
+
+    const result = await dispatcher.dispatch(event(), [typo])
+
+    // A typo should not block work; it should be visible.
+    expect(result).toMatchObject({ outcome: 'dispatched', status: RUN_STATUS.COMPLETED })
+    expect(warnings.join(' ')).toContain('unknown placeholder')
+    expect(warnings.join(' ')).toContain('ticket.titel')
+  })
+
+  it('releases the claim when a route has no prompt at all, so a fix can run', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
     const dispatcher = await makeDispatcher(server)
     const broken = route({
-      execution: { promptTemplate: 'does-not-exist', requireApproval: false, timeoutSeconds: 30 },
+      execution: { requireApproval: false, timeoutSeconds: 30 } as never,
     })
 
     const result = await dispatcher.dispatch(event(), [broken])
@@ -303,13 +326,8 @@ describe('Dispatcher.dispatch', () => {
     expect(result).toMatchObject({ outcome: 'failed' })
     expect(db.listRuns()).toHaveLength(0)
 
-    // Same route id, same trigger: because the claim was released, correcting
-    // the template lets it run rather than being suppressed as a duplicate.
-    const fixed = await dispatcher.dispatch(event(), [route()])
-    expect(fixed.outcome).toBe('dispatched')
-
-    // And it is claimed now, so it does not run twice.
-    expect((await dispatcher.dispatch(event(), [route()])).outcome).toBe('skipped')
+    // Same route id and trigger: the corrected route is not suppressed as a duplicate.
+    expect((await dispatcher.dispatch(event(), [route()])).outcome).toBe('dispatched')
   })
 
   it('records a failed run and tells the tracker about it', async () => {

@@ -354,6 +354,19 @@ async function main(): Promise<void> {
     try {
       await outbox?.flush()
 
+      // Projects and routes are cloud-owned, so a change made in the dashboard
+      // has to reach a long-running runner without anyone restarting it. Two
+      // small GETs per cycle is a rounding error next to the poll they pace.
+      if (cloud) {
+        const [nextProjects, nextRoutes] = await Promise.all([
+          refreshProjects(dataDir, config.projects, cloud),
+          refreshRoutes(dataDir, cloud),
+        ])
+        reportConfigDrift(runtime, nextProjects, nextRoutes)
+        runtime.projects = nextProjects
+        runtime.routes = nextRoutes
+      }
+
       const tally = newTally()
 
       for (const project of runtime.projects) {
@@ -401,6 +414,40 @@ async function main(): Promise<void> {
       await sleep(OFFLINE_POLL_INTERVAL_MS)
     }
   }
+}
+
+/**
+ * Announces cloud-side configuration changes.
+ *
+ * Refreshing every cycle is silent by design, but a route appearing or
+ * disappearing changes what the runner will do, and that should be visible in
+ * the log without diffing two poll summaries.
+ */
+function reportConfigDrift(
+  runtime: Runtime,
+  nextProjects: ProjectConfig[],
+  nextRoutes: RoutingRule[]
+): void {
+  const describe = (
+    label: string,
+    before: Array<{ id: string }>,
+    after: Array<{ id: string }>
+  ): void => {
+    const previous = new Set(before.map((entry) => entry.id))
+    const current = new Set(after.map((entry) => entry.id))
+    const added = after.filter((entry) => !previous.has(entry.id)).map((entry) => entry.id)
+    const removed = before.filter((entry) => !current.has(entry.id)).map((entry) => entry.id)
+
+    if (added.length > 0) {
+      logger.success(`${label} added: ${added.join(', ')}`)
+    }
+    if (removed.length > 0) {
+      logger.info(`${label} removed: ${removed.join(', ')}`)
+    }
+  }
+
+  describe('Project', runtime.projects, nextProjects)
+  describe('Route', runtime.routes, nextRoutes)
 }
 
 interface CycleTally {

@@ -3,6 +3,12 @@ import chalk from 'chalk'
 import { CONFIG_VERSION, type HermesProfileConfig, type StoredConfig } from '@parallax/common'
 import type { CliContext } from '../types.js'
 import { getJson } from '../api.js'
+import {
+  defaultHermesBaseUrl,
+  discoverLocalHermes,
+  resolveHermesHome,
+  type LocalHermesProfile,
+} from '../hermes-local.js'
 
 const BRAND = chalk.hex('#f97316')
 
@@ -78,44 +84,54 @@ export async function runInit(context: CliContext): Promise<void> {
 
   // ── Hermes ───────────────────────────────────────────────
   p.log.step('Hermes gateway')
+
+  const install = await discoverLocalHermes()
+
+  if (install) {
+    p.log.info(`Found a Hermes install at ${install.home}`)
+    if (!install.apiServerEnabled) {
+      p.log.warn(
+        `API_SERVER_ENABLED is not set in ${install.home}/.env — the gateway will not serve an API.`
+      )
+    }
+  } else {
+    p.log.warn(
+      `No Hermes install at ${resolveHermesHome()}. You can still configure profiles by hand.`
+    )
+  }
+
   const hermesBaseUrl = assertNotCancel(
     await requiredText(
       'Hermes API server base URL',
-      existing.hermes?.baseUrl ?? 'http://127.0.0.1:8642'
+      existing.hermes?.baseUrl ?? defaultHermesBaseUrl(install)
     )
   ).trim()
 
-  p.note(
-    [
-      'Each profile needs its own API_SERVER_KEY.',
-      'With gateway.multiplex_profiles enabled, the default profile’s key is',
-      'rejected on /p/<profile> routes, so a shared key will not work.',
-      '',
-      'Keys live in ~/.hermes/profiles/<name>/.env (default: ~/.hermes/.env).',
-    ].join('\n'),
-    'Before you continue'
+  const previous = new Map(
+    (existing.hermes?.profiles ?? []).map((profile) => [profile.name, profile])
   )
 
-  const profiles: HermesProfileConfig[] = []
-  for (;;) {
-    const name = assertNotCancel(
-      await requiredText(
-        profiles.length === 0 ? 'Hermes profile name' : 'Another profile name',
-        profiles.length === 0 ? 'default' : ''
+  /** Confirms one profile and collects the bits Parallax needs beyond the key. */
+  async function configureProfile(
+    name: string,
+    discovered?: LocalHermesProfile
+  ): Promise<HermesProfileConfig | undefined> {
+    const remembered = previous.get(name)
+
+    // Prefer what is on disk: it is the key the gateway is actually serving.
+    let apiKey = discovered?.apiKey ?? remembered?.apiKey
+    if (apiKey) {
+      p.log.info(
+        `Using the API_SERVER_KEY from ${discovered?.apiKey ? discovered.envPath : 'your existing Parallax config'}`
       )
-    ).trim()
-
-    if (profiles.some((profile) => profile.name === name)) {
-      p.log.warn(`Profile "${name}" was already added.`)
-      continue
+    } else {
+      apiKey = assertNotCancel(
+        await p.password({
+          message: `API_SERVER_KEY for "${name}"`,
+          validate: (value) => (value?.trim() ? undefined : 'Required.'),
+        })
+      )
     }
-
-    const apiKey = assertNotCancel(
-      await p.password({
-        message: `API_SERVER_KEY for "${name}"`,
-        validate: (value) => (value?.trim() ? undefined : 'Required.'),
-      })
-    )
 
     const spinner = p.spinner()
     spinner.start(`Checking ${name}`)
@@ -125,38 +141,100 @@ export async function runInit(context: CliContext): Promise<void> {
     if (!probe.ok) {
       p.log.error(probe.detail)
       const keep = assertNotCancel(
-        await p.confirm({ message: 'Save this profile anyway?', initialValue: false })
+        await p.confirm({ message: `Add "${name}" anyway?`, initialValue: false })
       )
       if (!keep) {
-        continue
+        return undefined
       }
     }
 
     const role = assertNotCancel(
-      await p.text({ message: `Role for "${name}" (optional)`, placeholder: 'product, reviewer…' })
+      await p.text({
+        message: `Role for "${name}" (optional)`,
+        initialValue: remembered?.role ?? '',
+        placeholder: 'product, reviewer…',
+      })
     ).trim()
 
     const githubLogin = assertNotCancel(
       await p.text({
         message: `GitHub login for "${name}" (optional)`,
+        initialValue: remembered?.githubLogin ?? '',
         placeholder: 'Needed only for PR-review routes',
       })
     ).trim()
 
-    profiles.push({
+    const avatarUrl = assertNotCancel(
+      await p.text({
+        message: `Avatar image URL for "${name}" (optional)`,
+        initialValue: remembered?.avatarUrl ?? '',
+        placeholder: 'Shown beside this agent’s Slack notifications',
+      })
+    ).trim()
+
+    return {
       name,
       apiKey,
       enabled: true,
       ...(role ? { role } : {}),
       ...(githubLogin ? { githubLogin } : {}),
-    })
+      ...(avatarUrl ? { avatarUrl } : {}),
+    }
+  }
 
+  const profiles: HermesProfileConfig[] = []
+
+  if (install && install.profiles.length > 0) {
+    p.log.step(`Found ${install.profiles.length} profile(s)`)
+
+    for (const discovered of install.profiles) {
+      const label = discovered.apiKey
+        ? `Add "${discovered.name}"?`
+        : `Add "${discovered.name}"? (no API_SERVER_KEY found in its .env)`
+
+      const include = assertNotCancel(
+        await p.confirm({ message: label, initialValue: Boolean(discovered.apiKey) })
+      )
+      if (!include) {
+        continue
+      }
+
+      const profile = await configureProfile(discovered.name, discovered)
+      if (profile) {
+        profiles.push(profile)
+      }
+    }
+  }
+
+  // Always allow adding one by hand: a profile can live on another host, and
+  // discovery finding nothing must not be a dead end.
+  for (;;) {
+    const prompt =
+      profiles.length === 0
+        ? 'No profiles added yet. Add one by name?'
+        : 'Add another profile by name?'
     const more = assertNotCancel(
-      await p.confirm({ message: 'Add another profile?', initialValue: false })
+      await p.confirm({ message: prompt, initialValue: profiles.length === 0 })
     )
     if (!more) {
       break
     }
+
+    const name = assertNotCancel(await requiredText('Profile name')).trim()
+    if (profiles.some((profile) => profile.name === name)) {
+      p.log.warn(`"${name}" was already added.`)
+      continue
+    }
+
+    const profile = await configureProfile(name)
+    if (profile) {
+      profiles.push(profile)
+    }
+  }
+
+  if (profiles.length === 0) {
+    p.cancel('No Hermes profiles configured; there would be nothing to dispatch to.')
+    return
   }
 
   // ── Secrets ──────────────────────────────────────────────

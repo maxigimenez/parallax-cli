@@ -16,7 +16,7 @@ function rule(overrides: Partial<RoutingRule> = {}): RoutingRule {
     trigger: { type: TRIGGER_TYPE.TICKET, provider: TICKET_PROVIDER.LINEAR, projectId: 'taplands' },
     match: {},
     target: { agentRef: { profile: 'product' } },
-    execution: { promptTemplate: 'product-review', requireApproval: false, timeoutSeconds: 1800 },
+    execution: { prompt: 'Review {{ticket.ref}}', requireApproval: false, timeoutSeconds: 1800 },
     outcome: {},
     ...overrides,
   }

@@ -11,7 +11,7 @@ import {
 } from '@parallax/common'
 import type { ParallaxDatabase } from '../database.js'
 import type { HermesAdapter } from '../hermes/adapter.js'
-import { renderPrompt } from '../prompts/templates.js'
+import { renderRoutePrompt } from '../prompts/render.js'
 import { resolveSummary } from '../prompts/output-contract.js'
 import { dedupeKey, evaluate } from './rule-engine.js'
 import type { RunLifecycle } from './run-lifecycle.js'
@@ -137,10 +137,22 @@ export class Dispatcher {
 
     let prompt: string
     try {
-      prompt = renderPrompt({ event, route, agentRole: agent.role })
+      const rendered = renderRoutePrompt({
+        event,
+        route,
+        agentProfile: agent.profile,
+        agentRole: agent.role,
+      })
+      prompt = rendered.prompt
+      if (rendered.unknown.length > 0) {
+        // Not fatal: the placeholder is left visible in the prompt, so the run
+        // still happens and the mistake is obvious rather than silent.
+        this.deps.logger.warn(
+          `Route "${route.id}" uses unknown placeholder(s): ${rendered.unknown.join(', ')}`
+        )
+      }
     } catch (error: unknown) {
-      // A bad template is a config error that will not fix itself on retry, but
-      // releasing the claim keeps the trigger live so a corrected route can run.
+      // Releasing the claim keeps the trigger live so a corrected route can run.
       this.deps.db.releaseDispatch(key)
       const reason = error instanceof Error ? error.message : String(error)
       this.deps.logger.error(reason)

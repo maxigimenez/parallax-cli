@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import type { RoutingRule } from '@parallax/common'
+import { PROMPT_CATALOG, PROMPT_VARIABLES, type RoutingRule } from '@parallax/common'
 import { authenticate, generateKey, newId, parseBearer, type AuthContext } from '../auth.js'
 import type { Database } from '../db.js'
 
@@ -41,7 +41,8 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     const { orgId } = authOf(request)
     const { rows } = await db.query(
       `SELECT a.id, a.profile, a.display_name, a.role, a.model, a.provider,
-              a.toolsets, a.skills, a.github_login, a.enabled, a.synced_at, r.name AS runner
+              a.toolsets, a.skills, a.github_login, a.avatar_url, a.enabled, a.synced_at,
+              r.name AS runner
        FROM agents a JOIN runners r ON r.id = a.runner_id
        WHERE a.org_id = $1 ORDER BY a.profile`,
       [orgId]
@@ -133,6 +134,17 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     await db.query('DELETE FROM routes WHERE org_id = $1 AND id = $2', [orgId, id])
     return { ok: true }
   })
+
+  /**
+   * Starter prompts and the placeholders they can use.
+   *
+   * The dashboard prefills its prompt editor from this; nothing dispatches by
+   * template id, so changing the catalog never alters an existing route.
+   */
+  app.get('/v1/prompt-templates', async () => ({
+    templates: PROMPT_CATALOG,
+    variables: PROMPT_VARIABLES,
+  }))
 
   // ── Runs ───────────────────────────────────────────────────
 
@@ -322,8 +334,8 @@ function validateRoute(route: RoutingRule): string | undefined {
   if (!route.target.agentRef.profile && !route.target.agentRef.githubLogin) {
     return 'target.agentRef needs either a profile or a githubLogin.'
   }
-  if (!route.execution?.promptTemplate) {
-    return 'execution.promptTemplate is required.'
+  if (!route.execution?.prompt?.trim()) {
+    return 'execution.prompt is required.'
   }
   if (typeof route.execution.timeoutSeconds !== 'number') {
     return 'execution.timeoutSeconds must be a number.'

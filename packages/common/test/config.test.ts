@@ -68,7 +68,7 @@ describe('routing rule shape', () => {
       },
       match: { labels: { any: ['feasibility'] } },
       target: { agentRef: { profile: 'product' } },
-      execution: { promptTemplate: 'product-review', requireApproval: false, timeoutSeconds: 1800 },
+      execution: { prompt: 'Review {{ticket.ref}}', requireApproval: false, timeoutSeconds: 1800 },
       outcome: { postComment: { target: 'ticket' } },
     }
 
@@ -86,7 +86,7 @@ describe('routing rule shape', () => {
       trigger: { type: TRIGGER_TYPE.PR_REVIEW_REQUESTED, projectId: 'taplands' },
       match: {},
       target: { agentRef: { githubLogin: 'acme-reviewer-bot' } },
-      execution: { promptTemplate: 'pr-review', requireApproval: false, timeoutSeconds: 900 },
+      execution: { prompt: 'Review {{ticket.ref}}', requireApproval: false, timeoutSeconds: 900 },
       outcome: { postComment: { target: 'pr' } },
     }
 

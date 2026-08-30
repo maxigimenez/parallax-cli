@@ -30,7 +30,11 @@ export async function runRoutes(context: CliContext): Promise<void> {
     if (route.match.state?.any?.length) {
       console.log(chalk.dim(`      state  ${route.match.state.any.join(' | ')}`))
     }
-    console.log(chalk.dim(`      then   ${target} via "${route.execution.promptTemplate}"`))
+    const firstLine = route.execution.prompt.split('\n').find((line) => line.trim()) ?? ''
+    console.log(chalk.dim(`      then   ${target}`))
+    console.log(
+      chalk.dim(`      prompt ${firstLine.slice(0, 68)}${firstLine.length > 68 ? '…' : ''}`)
+    )
   }
   console.log('')
 }

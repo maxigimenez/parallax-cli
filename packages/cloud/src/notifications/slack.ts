@@ -34,7 +34,8 @@ function duration(run: RunRecord): string | undefined {
  */
 export function buildSlackMessage(
   event: NotificationEvent,
-  run: RunRecord
+  run: RunRecord,
+  agent?: { avatarUrl?: string; displayName?: string }
 ): Record<string, unknown> {
   const took = duration(run)
   const lines = [
@@ -54,7 +55,31 @@ export function buildSlackMessage(
     lines.push('', detail.length > 600 ? `${detail.slice(0, 600)}…` : detail)
   }
 
-  return { text: lines.join('\n'), mrkdwn: true }
+  const text = lines.join('\n')
+
+  // The agent's avatar goes *inside* the message, as a Block Kit accessory --
+  // never as top-level `username`/`icon_url`, which would override the Slack
+  // app's own identity on the webhook. `text` is kept alongside `blocks` so
+  // notifications and previews still read correctly where blocks are not shown.
+  if (!agent?.avatarUrl) {
+    return { text, mrkdwn: true }
+  }
+
+  return {
+    text,
+    mrkdwn: true,
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text },
+        accessory: {
+          type: 'image',
+          image_url: agent.avatarUrl,
+          alt_text: agent.displayName ?? run.agentProfile,
+        },
+      },
+    ],
+  }
 }
 
 function verb(event: NotificationEvent): string {
@@ -104,10 +129,16 @@ export async function notifyRunEvent(
       return
     }
 
+    // Claim the delivery. Re-claiming is allowed only when the previous attempt
+    // did not succeed: without that, one transient Slack outage would suppress
+    // that notification permanently, because the claim row already existed.
     const claimed = await db.query(
       `INSERT INTO notification_deliveries (org_id, run_id, event, status, attempts)
        VALUES ($1,$2,$3,'pending',1)
-       ON CONFLICT (run_id, event) DO NOTHING
+       ON CONFLICT (run_id, event) DO UPDATE
+         SET attempts = notification_deliveries.attempts + 1
+         WHERE notification_deliveries.status <> 'delivered'
+           AND notification_deliveries.attempts < 5
        RETURNING id`,
       [orgId, run.id, event]
     )
@@ -115,10 +146,23 @@ export async function notifyRunEvent(
       return
     }
 
+    const agent = await db
+      .query<{ avatar_url: string | null; display_name: string | null }>(
+        'SELECT avatar_url, display_name FROM agents WHERE org_id = $1 AND profile = $2 LIMIT 1',
+        [orgId, run.agentProfile]
+      )
+      .then((result) => result.rows[0])
+      .catch(() => undefined)
+
     const response = await fetch(config.webhook_url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(buildSlackMessage(event as NotificationEvent, run)),
+      body: JSON.stringify(
+        buildSlackMessage(event as NotificationEvent, run, {
+          avatarUrl: agent?.avatar_url ?? undefined,
+          displayName: agent?.display_name ?? undefined,
+        })
+      ),
       signal: AbortSignal.timeout(10_000),
     })
 

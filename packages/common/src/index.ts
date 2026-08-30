@@ -125,6 +125,7 @@ export interface AgentDescriptor {
   toolsets: string[]
   skills: string[]
   githubLogin?: string
+  avatarUrl?: string
   enabled: boolean
   discoveredAt: number
 }
@@ -189,11 +190,42 @@ export interface RouteTarget {
 }
 
 export interface RouteExecution {
-  promptTemplate: string
+  /**
+   * The prompt sent to the agent, as free text with `{{variable}}` placeholders.
+   *
+   * Stored per route rather than selected from a fixed set of built-ins: the
+   * wording of what an agent is asked to do is the main thing an operator wants
+   * to tune, and shipping a code change to reword a prompt is absurd. The
+   * built-in templates survive only as a catalog to prefill this at creation
+   * time -- see PROMPT_VARIABLES for what can be interpolated.
+   */
+  prompt: string
   requireApproval: boolean
   modelOverride?: string | null
   timeoutSeconds: number
 }
+
+/**
+ * Placeholders available inside `RouteExecution.prompt`.
+ *
+ * Declared here rather than in the renderer so the cloud can advertise them to
+ * the dashboard without importing the runner.
+ */
+export const PROMPT_VARIABLES = [
+  'ticket.ref',
+  'ticket.title',
+  'ticket.body',
+  'ticket.url',
+  'ticket.state',
+  'ticket.labels',
+  'project.id',
+  'agent.profile',
+  'agent.role',
+  'pr.number',
+  'pr.reviewers',
+] as const
+
+export type PromptVariable = (typeof PROMPT_VARIABLES)[number]
 
 export const COMMENT_TARGET = {
   TICKET: 'ticket',
@@ -267,6 +299,8 @@ export interface HermesProfileConfig {
   apiKey: string
   githubLogin?: string
   role?: string
+  /** Shown beside this agent's Slack notifications. */
+  avatarUrl?: string
   enabled: boolean
 }
 
@@ -323,6 +357,8 @@ export const DEFAULT_CONCURRENCY = 2
 
 /** Hermes' own docs warn that two agents must never drive one profile at once. */
 export const MAX_CONCURRENT_RUNS_PER_AGENT = 1
+
+export * from './prompt-catalog.js'
 
 // ─────────────────────────────────────────────────────────────
 // Utilities

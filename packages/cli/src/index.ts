@@ -30,6 +30,7 @@ import { runLogs } from './commands/logs.js'
 import { runPreflight } from './commands/preflight.js'
 import { runProjects } from './commands/projects.js'
 import { runReload } from './commands/reload.js'
+import { runRestart } from './commands/restart.js'
 import { runRoutes } from './commands/routes.js'
 import { runRunner } from './commands/runner.js'
 import { runRuns } from './commands/runs.js'
@@ -122,6 +123,8 @@ async function dispatch(command: string | undefined, args: string[]): Promise<vo
     case 'stop':
       parseEmptyOptions(args, 'stop')
       return runStop(context)
+    case 'restart':
+      return runRestart(context, parseStartOptions(args))
     case 'status':
       parseEmptyOptions(args, 'status')
       return runStatus(context)

@@ -150,7 +150,7 @@ DELETE /v1/routes/:id
   },
 
   "execution": {
-    "promptTemplate": "product-review",  // product-review | pr-review | implementation | generic
+    "prompt": "Review {{ticket.ref}}: {{ticket.title}}\n\n{{ticket.body}}",
     "requireApproval": false,            // uses Hermes' own approval gate
     "modelOverride": null,               // null = the profile's own model
     "timeoutSeconds": 1800
@@ -162,6 +162,38 @@ DELETE /v1/routes/:id
   }
 }
 ```
+
+### The prompt
+
+`execution.prompt` is free text stored on the route — there are no built-in
+templates to choose between. Rewording what an agent is asked to do is the main thing
+you will want to tune, and that should never require a release.
+
+Placeholders are `{{name}}`:
+
+| | |
+|---|---|
+| `ticket.ref` `ticket.title` `ticket.body` | the ticket |
+| `ticket.url` `ticket.state` `ticket.labels` | `labels` renders as a comma-separated list |
+| `project.id` | the project that produced the trigger |
+| `agent.profile` `agent.role` | the agent about to run |
+| `pr.number` `pr.reviewers` | populated for pull-request triggers |
+
+An unrecognized placeholder is **left in the text verbatim** and logged as a warning,
+rather than blanked. A typo like `{{ticket.titel}}` silently becoming an empty string
+produces a confidently wrong run; leaving it visible makes the mistake obvious in the
+transcript.
+
+Parallax appends its own closing instruction asking for a `PARALLAX_SUMMARY:` line —
+that summary is what lands in the ticket comment and the Slack message. If your prompt
+already mentions `PARALLAX_SUMMARY`, yours is used as written.
+
+```http
+GET /v1/prompt-templates
+```
+
+Returns starter prompts and the placeholder list, for prefilling an editor. Nothing
+dispatches by template id: changing the catalog never alters an existing route.
 
 ### Match semantics
 
@@ -214,7 +246,7 @@ Statuses: `queued`, `running`, `awaiting_approval`, `completed`, `failed`, `canc
 ## Agents and runners
 
 ```http
-GET /v1/agents      Hermes profiles, as discovered by the runner
+GET /v1/agents      Hermes profiles, as discovered by the runner (incl. avatar_url)
 GET /v1/runners     registered runners, with a `stale` flag after 90s of silence
 ```
 
@@ -236,6 +268,10 @@ DELETE /v1/integrations/slack
 
 Events: `run.started`, `run.completed`, `run.failed`, `run.needs_approval`,
 `run.canceled`, `runner.stale`. Restrict them by passing `events` to `PUT`.
+
+An agent with an `avatarUrl` has its image rendered **inside** the message, as a Block
+Kit accessory. The Slack app's own name and icon are never overridden — the webhook's
+identity belongs to the app, not to whichever agent happens to be running.
 
 Notifications are sent cloud-side rather than by the runner for one reason worth
 knowing: only the cloud can report `runner.stale` when the Mac Mini drops off the

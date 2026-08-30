@@ -82,3 +82,45 @@ describe('buildSlackMessage', () => {
     expect(new Set(openers).size).toBe(events.length)
   })
 })
+
+describe('agent avatar', () => {
+  it('omits blocks entirely when the agent has no avatar', () => {
+    const message = buildSlackMessage('run.completed', run(), {})
+    expect(message.blocks).toBeUndefined()
+    expect(message.text).toContain('*product*')
+  })
+
+  it('renders the avatar inside the message, as an accessory', () => {
+    const message = buildSlackMessage('run.completed', run(), {
+      avatarUrl: 'https://cdn/product.png',
+      displayName: 'Product agent',
+    }) as { blocks: Array<Record<string, any>> }
+
+    const accessory = message.blocks[0].accessory
+    expect(accessory).toMatchObject({
+      type: 'image',
+      image_url: 'https://cdn/product.png',
+      alt_text: 'Product agent',
+    })
+  })
+
+  it('never overrides the webhook app identity', () => {
+    const message = buildSlackMessage('run.completed', run(), {
+      avatarUrl: 'https://cdn/product.png',
+      displayName: 'Product agent',
+    })
+
+    // The Slack app owns how it appears; the avatar belongs in the body.
+    expect(message.username).toBeUndefined()
+    expect(message.icon_url).toBeUndefined()
+  })
+
+  it('keeps text alongside blocks, for notifications and previews', () => {
+    const message = buildSlackMessage('run.failed', run({ error: 'boom' }), {
+      avatarUrl: 'https://cdn/x.png',
+    }) as { text: string; blocks: Array<Record<string, any>> }
+
+    expect(message.text).toContain('boom')
+    expect(message.blocks[0].text.text).toBe(message.text)
+  })
+})
