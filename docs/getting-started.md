@@ -193,9 +193,13 @@ parallax runner status
 ## 6. Check it works
 
 ```bash
+parallax projects   # ticket sources it is polling — zero here means nothing can fire
 parallax agents     # every Hermes profile it discovered, with model and toolsets
 parallax routes     # what it will act on
 ```
+
+Configuration changes in the cloud are picked up on the next poll, or immediately with
+`parallax reload`.
 
 Send one prompt straight to Hermes, bypassing all routing — the fastest way to tell
 whether the machine can drive an agent at all:
@@ -230,6 +234,18 @@ parallax runner status              launchd state
 
 **An agent is missing from `parallax agents`.** Its key is wrong or the profile is
 unreachable. `parallax preflight` names it and shows the error.
+
+**A labelled ticket produced no run.** Watch one poll cycle in the log — the runner
+prints a summary line every cycle:
+
+```
+poll: 12 event(s) (taplands 12) · dispatched 1 · skipped 11 (no-route 10, duplicate 1)
+```
+
+`0 event(s)` means the runner never fetched the ticket: either no projects
+(`parallax projects`) or the project's `filters` excluded it. `no-route` means it was
+fetched but no rule matched. `unknown-agent` means the route names a profile that is
+not in `parallax agents`.
 
 **Runs are queued but never start.** Hermes allows only one run per profile at a
 time — concurrent runs corrupt a profile's memory — so a route targeting a busy agent

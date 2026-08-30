@@ -18,7 +18,12 @@ import { createClientForProfile, discoverAgents } from './hermes/discovery.js'
 import { Dispatcher } from './routing/dispatcher.js'
 import { RunLifecycle } from './routing/run-lifecycle.js'
 import { CloudClient, MirrorOutbox, type RunnerCommand } from './cloud/client.js'
-import { loadCachedRoutes, saveCachedRoutes } from './routing/route-cache.js'
+import {
+  loadCachedProjects,
+  loadCachedRoutes,
+  saveCachedProjects,
+  saveCachedRoutes,
+} from './cloud/config-cache.js'
 import { buildProviderServices, trackerWriterFor, triggerSourceFor } from './runtime/services.js'
 import { createApiServer } from './runtime/api-server.js'
 import { validateRuntimeRequirements } from './runtime/preflight.js'
@@ -30,6 +35,7 @@ const RUNNER_VERSION = process.env.PARALLAX_VERSION ?? '0.2.0'
 
 interface Runtime {
   config: AppConfig
+  projects: ProjectConfig[]
   agents: AgentDescriptor[]
   adapters: Map<string, HermesAdapter>
   routes: RoutingRule[]
@@ -94,6 +100,36 @@ async function refreshInventory(
  * The runner must keep dispatching through a cloud outage, so a fetch failure
  * degrades to the on-disk cache rather than silently disabling every route.
  */
+/**
+ * Pulls the projects to watch from the cloud.
+ *
+ * Projects are cloud-owned configuration, not local config: `parallax init`
+ * never writes them. Any locally configured projects are treated as a fallback
+ * for running without a control plane at all.
+ */
+async function refreshProjects(
+  dataDir: string,
+  localProjects: ProjectConfig[],
+  cloud?: CloudClient
+): Promise<ProjectConfig[]> {
+  if (!cloud) {
+    const cached = await loadCachedProjects(dataDir)
+    return cached.length > 0 ? cached : localProjects
+  }
+
+  try {
+    const { projects } = await cloud.fetchProjects()
+    await saveCachedProjects(dataDir, projects)
+    return projects
+  } catch (error: unknown) {
+    const cached = await loadCachedProjects(dataDir)
+    logger.warn(
+      `Could not fetch projects (${errorMessage(error)}); using ${cached.length} cached project(s).`
+    )
+    return cached.length > 0 ? cached : localProjects
+  }
+}
+
 async function refreshRoutes(dataDir: string, cloud?: CloudClient): Promise<RoutingRule[]> {
   if (!cloud) {
     return loadCachedRoutes(dataDir)
@@ -152,6 +188,7 @@ async function main(): Promise<void> {
 
   const runtime: Runtime = {
     config,
+    projects: await refreshProjects(dataDir, config.projects, cloud),
     agents: await refreshInventory(config, cloud),
     adapters: buildAdapters(config),
     routes: await refreshRoutes(dataDir, cloud),
@@ -159,7 +196,19 @@ async function main(): Promise<void> {
     outbox,
   }
 
+  logger.info(
+    `Watching ${runtime.projects.length} project(s): ${runtime.projects.map((p) => p.id).join(', ') || 'none'}`
+  )
   logger.info(`Loaded ${runtime.routes.length} route(s).`)
+
+  if (runtime.projects.length === 0) {
+    logger.warn(
+      'No projects to watch, so nothing will ever trigger. Register one against the cloud: POST /v1/projects'
+    )
+  }
+  if (runtime.routes.length === 0) {
+    logger.warn('No routes loaded, so no trigger can start an agent. POST /v1/routes')
+  }
 
   const lifecycle = new RunLifecycle(db, logger)
   const limit = pLimit(config.concurrency)
@@ -172,6 +221,7 @@ async function main(): Promise<void> {
     setLogLevels(config.logs)
     await validateRuntimeRequirements(config, executor)
     runtime.config = config
+    runtime.projects = await refreshProjects(dataDir, config.projects, cloud)
     runtime.adapters = buildAdapters(config)
     runtime.agents = await refreshInventory(config, cloud)
     runtime.routes = await refreshRoutes(dataDir, cloud)
@@ -215,6 +265,7 @@ async function main(): Promise<void> {
 
   const fastify = await createApiServer({
     getConfig: () => runtime.config,
+    getProjects: () => runtime.projects,
     getAgents: () => runtime.agents,
     getRoutes: () => runtime.routes,
     reload,
@@ -229,9 +280,24 @@ async function main(): Promise<void> {
   })
   logger.success(`Runner API listening on port ${config.server.apiPort}`)
 
-  const runDispatch = (project: ProjectConfig, event: TriggerEvent): Promise<void> =>
+  const runDispatch = (
+    project: ProjectConfig,
+    event: TriggerEvent,
+    tally?: CycleTally
+  ): Promise<void> =>
     limit(async () => {
-      const result = await dispatcherFor(project).dispatch(event, runtime.routes)
+      const result = await dispatcherFor(project).dispatch(event, runtime.routes, (decision) => {
+        if (!tally) {
+          return
+        }
+        if (decision.outcome === 'started') {
+          tally.dispatched += 1
+        } else if (decision.outcome === 'skipped') {
+          tally.skipped[decision.reason] = (tally.skipped[decision.reason] ?? 0) + 1
+        } else {
+          tally.failed += 1
+        }
+      })
       if (result.outcome === 'skipped' && result.detail) {
         logger.info(result.detail)
       }
@@ -255,7 +321,7 @@ async function main(): Promise<void> {
       case 'run': {
         // A human pressing "run this now" is just another trigger event.
         const event = command.payload.event as TriggerEvent | undefined
-        const project = runtime.config.projects.find((entry) => entry.id === event?.projectId)
+        const project = runtime.projects.find((entry) => entry.id === event?.projectId)
         if (!event || !project) {
           logger.warn(`Ignoring manual run command with no resolvable project.`)
           return
@@ -273,12 +339,22 @@ async function main(): Promise<void> {
     try {
       await outbox?.flush()
 
-      for (const project of runtime.config.projects) {
+      const tally = newTally()
+
+      for (const project of runtime.projects) {
         const events = await collectEvents(project, services)
+        tally.collected += events.length
+        tally.perProject.push(`${project.id} ${events.length}`)
         for (const event of events) {
-          void runDispatch(project, event)
+          void runDispatch(project, event, tally)
         }
       }
+
+      // Routing decisions resolve synchronously ahead of the agent run, so a
+      // tick of the event loop is enough to have counted them all -- without
+      // waiting on runs that may take half an hour.
+      await sleep(0)
+      logger.info(summarizeCycle(tally))
 
       db.pruneDispatchLedger(Date.now() - 30 * 24 * 60 * 60 * 1_000)
     } catch (error: unknown) {
@@ -310,6 +386,43 @@ async function main(): Promise<void> {
       await sleep(OFFLINE_POLL_INTERVAL_MS)
     }
   }
+}
+
+interface CycleTally {
+  collected: number
+  perProject: string[]
+  dispatched: number
+  failed: number
+  skipped: Record<string, number>
+}
+
+function newTally(): CycleTally {
+  return { collected: 0, perProject: [], dispatched: 0, failed: 0, skipped: {} }
+}
+
+/**
+ * One line per cycle, so "nothing happened" is always distinguishable from
+ * "nothing was seen". Without this, a route that simply does not match is
+ * indistinguishable from a runner that never fetched the ticket at all.
+ */
+function summarizeCycle(tally: CycleTally): string {
+  const parts = [`poll: ${tally.collected} event(s)`]
+  if (tally.perProject.length > 0) {
+    parts.push(`(${tally.perProject.join(', ')})`)
+  }
+  if (tally.dispatched > 0) {
+    parts.push(`· dispatched ${tally.dispatched}`)
+  }
+  if (tally.failed > 0) {
+    parts.push(`· failed ${tally.failed}`)
+  }
+
+  const skipped = Object.entries(tally.skipped)
+  if (skipped.length > 0) {
+    const total = skipped.reduce((sum, [, count]) => sum + count, 0)
+    parts.push(`· skipped ${total} (${skipped.map(([r, c]) => `${r} ${c}`).join(', ')})`)
+  }
+  return parts.join(' ')
 }
 
 function errorMessage(error: unknown): string {

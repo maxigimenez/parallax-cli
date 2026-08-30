@@ -1,6 +1,7 @@
 import type {
   AgentDescriptor,
   CloudConfig,
+  ProjectConfig,
   RoutingRule,
   RunLogEntry,
   RunRecord,
@@ -21,6 +22,10 @@ export interface HelloResponse {
 export interface RoutesResponse {
   revision: string
   routes: RoutingRule[]
+}
+
+export interface ProjectsResponse {
+  projects: ProjectConfig[]
 }
 
 export class CloudApiError extends Error {
@@ -97,6 +102,10 @@ export class CloudClient {
 
   fetchRoutes(): Promise<RoutesResponse> {
     return this.request<RoutesResponse>('/v1/runner/routes')
+  }
+
+  fetchProjects(): Promise<ProjectsResponse> {
+    return this.request<ProjectsResponse>('/v1/runner/projects')
   }
 
   /**

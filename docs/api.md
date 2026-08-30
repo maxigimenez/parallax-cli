@@ -87,6 +87,9 @@ DELETE /v1/keys/:id    revokes; the row stays for the audit trail
 What the runner should watch. A project is a ticket source, nothing more — there is no
 local clone and no agent attached to it.
 
+Projects live here, not in the runner's local config: `parallax init` never writes
+them. A runner with no projects polls nothing, so nothing can ever trigger.
+
 ```http
 GET    /v1/projects
 POST   /v1/projects
@@ -102,7 +105,10 @@ DELETE /v1/projects/:id
   "filters": { "owner": "acme", "repo": "www", "state": "open" } }
 ```
 
-`filters` is a coarse pre-filter applied at the source. Routes do the real matching.
+`filters` is a coarse pre-filter applied **at the source**, before routing sees
+anything. A route can only ever match a ticket a filter let through, which makes an
+over-narrow filter the most common reason a correct-looking route never fires. If a
+route matches on `labels`, leave `filters.labels` unset and let the route decide.
 
 ---
 
@@ -244,6 +250,7 @@ Documented for completeness. The runner calls these; you should not need to.
 ```http
 POST  /v1/runner/hello                    register and heartbeat
 PUT   /v1/runner/inventory                publish discovered agents
+GET   /v1/runner/projects                 pull ticket sources to watch
 GET   /v1/runner/routes                   pull enabled routes
 GET   /v1/runner/commands?cursor=&wait=   long poll, up to 30s
 POST  /v1/runner/commands/ack

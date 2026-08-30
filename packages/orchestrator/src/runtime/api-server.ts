@@ -1,12 +1,19 @@
 import Fastify, { type FastifyInstance } from 'fastify'
 import cors from '@fastify/cors'
-import type { AgentDescriptor, AppConfig, RoutingRule, RunStatus } from '@parallax/common'
+import type {
+  AgentDescriptor,
+  AppConfig,
+  ProjectConfig,
+  RoutingRule,
+  RunStatus,
+} from '@parallax/common'
 import type { ParallaxDatabase } from '../database.js'
 import { readRunnerErrors } from './diagnostics.js'
 import { isAllowedBrowserOrigin } from './network-access.js'
 
 export interface ApiServerDeps {
   getConfig: () => AppConfig
+  getProjects: () => ProjectConfig[]
   getAgents: () => AgentDescriptor[]
   getRoutes: () => RoutingRule[]
   reload: () => Promise<AppConfig>
@@ -52,7 +59,7 @@ export async function createApiServer(deps: ApiServerDeps): Promise<FastifyInsta
     return {
       status: 'ok',
       version: process.env.PARALLAX_VERSION ?? 'dev',
-      projects: config.projects.length,
+      projects: deps.getProjects().length,
       agents: deps.getAgents().length,
       routes: deps.getRoutes().length,
       cloud: config.cloud ? 'configured' : 'none',
@@ -64,12 +71,14 @@ export async function createApiServer(deps: ApiServerDeps): Promise<FastifyInsta
 
   app.post('/runtime/reload', async (_request, reply) => {
     try {
-      const config = await deps.reload()
-      return { ok: true, projects: config.projects.length, routes: deps.getRoutes().length }
+      await deps.reload()
+      return { ok: true, projects: deps.getProjects().length, routes: deps.getRoutes().length }
     } catch (error: unknown) {
       return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
+
+  app.get('/projects', async () => ({ projects: deps.getProjects() }))
 
   app.get('/agents', async () => ({ agents: deps.getAgents() }))
 

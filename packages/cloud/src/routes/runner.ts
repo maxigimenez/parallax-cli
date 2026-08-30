@@ -102,6 +102,19 @@ export function registerRunnerRoutes(app: FastifyInstance, db: Database): void {
     return { ok: true, count: agents.length }
   })
 
+  // ── Projects ───────────────────────────────────────────────
+
+  // The runner has no project configuration of its own: what to watch is
+  // decided in the cloud, so it has to be able to read it back.
+  app.get('/v1/runner/projects', async (request) => {
+    const { orgId } = authOf(request)
+    const { rows } = await db.query<{ id: string; provider: string; filters: unknown }>(
+      'SELECT id, provider, filters FROM projects WHERE org_id = $1 ORDER BY id',
+      [orgId]
+    )
+    return { projects: rows }
+  })
+
   // ── Routes ─────────────────────────────────────────────────
 
   app.get('/v1/runner/routes', async (request) => {

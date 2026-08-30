@@ -28,6 +28,8 @@ import { runCancel } from './commands/cancel.js'
 import { runInit } from './commands/init.js'
 import { runLogs } from './commands/logs.js'
 import { runPreflight } from './commands/preflight.js'
+import { runProjects } from './commands/projects.js'
+import { runReload } from './commands/reload.js'
 import { runRoutes } from './commands/routes.js'
 import { runRunner } from './commands/runner.js'
 import { runRuns } from './commands/runs.js'
@@ -125,6 +127,12 @@ async function dispatch(command: string | undefined, args: string[]): Promise<vo
       return runStatus(context)
     case 'runner':
       return runRunner(context, parseRunnerOptions(args))
+    case 'projects':
+      parseEmptyOptions(args, 'projects')
+      return runProjects(context)
+    case 'reload':
+      parseEmptyOptions(args, 'reload')
+      return runReload(context)
     case 'agents':
       parseEmptyOptions(args, 'agents')
       return runAgents(context)

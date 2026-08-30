@@ -72,10 +72,24 @@ export class Dispatcher {
     })
   }
 
-  async dispatch(event: TriggerEvent, routes: readonly RoutingRule[]): Promise<DispatchResult> {
+  /**
+   * @param onDecision Called the moment routing is decided, before the agent
+   *   run begins. A run can take half an hour, so anything that wants to report
+   *   on routing -- a per-cycle summary, say -- cannot wait for the promise.
+   */
+  async dispatch(
+    event: TriggerEvent,
+    routes: readonly RoutingRule[],
+    onDecision?: (decision: DispatchResult | { outcome: 'started'; runId: string }) => void
+  ): Promise<DispatchResult> {
+    const decide = <T extends DispatchResult>(result: T): T => {
+      onDecision?.(result)
+      return result
+    }
+
     const route = evaluate(routes, event)
     if (!route) {
-      return { outcome: 'skipped', reason: 'no-route' }
+      return decide({ outcome: 'skipped', reason: 'no-route' })
     }
 
     const agent = this.resolveAgent(route)
@@ -83,27 +97,27 @@ export class Dispatcher {
       const ref = route.target.agentRef
       const detail = `Route "${route.id}" targets ${ref.profile ? `profile "${ref.profile}"` : `github login "${ref.githubLogin}"`}, which is not a known enabled agent.`
       this.deps.logger.warn(detail)
-      return { outcome: 'skipped', reason: 'unknown-agent', detail }
+      return decide({ outcome: 'skipped', reason: 'unknown-agent', detail })
     }
 
     // Hermes corrupts a profile's memory if two agents drive it concurrently.
     // Deferring rather than queueing is deliberate: the trigger will still be
     // there next cycle, and the dedupe key is not claimed, so nothing is lost.
     if (this.deps.db.countActiveRunsForAgent(agent.profile) >= MAX_CONCURRENT_RUNS_PER_AGENT) {
-      return {
+      return decide({
         outcome: 'skipped',
         reason: 'agent-busy',
         detail: `Agent "${agent.profile}" is already running; deferring ${event.ref}.`,
-      }
+      })
     }
 
     const adapter = this.deps.adapters.get(agent.profile)
     if (!adapter) {
-      return {
+      return decide({
         outcome: 'skipped',
         reason: 'unknown-agent',
         detail: `No Hermes client configured for profile "${agent.profile}".`,
-      }
+      })
     }
 
     const key = dedupeKey(route, event)
@@ -118,7 +132,7 @@ export class Dispatcher {
         this.now()
       )
     ) {
-      return { outcome: 'skipped', reason: 'duplicate' }
+      return decide({ outcome: 'skipped', reason: 'duplicate' })
     }
 
     let prompt: string
@@ -130,7 +144,7 @@ export class Dispatcher {
       this.deps.db.releaseDispatch(key)
       const reason = error instanceof Error ? error.message : String(error)
       this.deps.logger.error(reason)
-      return { outcome: 'failed', reason }
+      return decide({ outcome: 'failed', reason })
     }
 
     const now = this.now()
@@ -150,6 +164,7 @@ export class Dispatcher {
       updatedAt: now,
     }
     this.deps.db.createRun(record)
+    onDecision?.({ outcome: 'started', runId })
 
     const controller = new AbortController()
     this.deps.inFlight?.set(runId, controller)

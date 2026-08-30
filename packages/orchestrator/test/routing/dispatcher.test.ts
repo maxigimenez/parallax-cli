@@ -444,3 +444,52 @@ describe('cancellation wiring', () => {
     expect(warnings.join(' ')).toContain('may be orphaned')
   })
 })
+
+describe('routing decisions are reported before the run', () => {
+  it('reports every skip reason, including the silent ones', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+    const seen: string[] = []
+    const record = (d: { outcome: string; reason?: string }) => seen.push(d.reason ?? d.outcome)
+
+    // no-route: the case that used to produce no output at all.
+    await dispatcher.dispatch(
+      event({ labels: [] }),
+      [route({ match: { labels: { any: ['nope'] } } })],
+      record
+    )
+
+    await dispatcher.dispatch(event(), [route()], record) // started
+    await dispatcher.dispatch(event(), [route()], record) // duplicate
+
+    expect(seen).toEqual(['no-route', 'started', 'duplicate'])
+  })
+
+  it('reports the decision before the agent run finishes', async () => {
+    server = await startFakeHermes({ statuses: ['running'] })
+    const inFlight = new Map<string, AbortController>()
+    const client = new HermesClient({ baseUrl: server.baseUrl, profile: 'product', apiKey: 'k' })
+    const adapter = new HermesAdapter(client, logger, { pollIntervalMs: 10 })
+
+    const dispatcher = new Dispatcher({
+      db,
+      logger,
+      lifecycle: new RunLifecycle(db, logger),
+      outcomes: makeOutcomes(),
+      adapters: new Map([['product', adapter]]),
+      agents: [agent()],
+      newRunId: () => 'pxr_1',
+      inFlight,
+    })
+
+    const decisions: string[] = []
+    const pending = dispatcher.dispatch(event(), [route()], (d) => decisions.push(d.outcome))
+
+    // The run is still going, but routing has already been reported -- which is
+    // what lets a per-cycle summary count it without waiting half an hour.
+    await vi.waitFor(() => expect(decisions).toEqual(['started']))
+
+    inFlight.get('pxr_1')!.abort()
+    await pending
+  })
+})
