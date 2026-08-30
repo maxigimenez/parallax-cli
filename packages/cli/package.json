@@ -18,7 +18,7 @@
     "parallax": "dist/cli/src/index.js"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && chmod +x dist/cli/src/index.js",
     "lint": "eslint src test scripts vitest.config.ts",
     "lint:fix": "eslint src test scripts vitest.config.ts --fix",
     "prepack": "node ./scripts/prepare-package.mjs",

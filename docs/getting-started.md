@@ -164,12 +164,17 @@ This rewrite is not published to npm yet, so install from a checkout on the Mac 
 git clone <this repo> && cd parallax-cli
 pnpm install
 pnpm build
-npm install -g ./packages/cli    # or: pnpm --filter parallax-cli pack:tarball
+npm install -g ./packages/cli
 
 parallax init
 ```
 
 Once it is published, `npm install -g parallax-cli` is all you need.
+
+A global install from a local path symlinks `parallax` straight at the compiled
+entry point, so that file must be executable. `pnpm build` sets the bit; if you ever
+see `zsh: permission denied: parallax`, the build did not run or ran from an older
+checkout — rebuild, or `chmod +x $(readlink -f "$(which parallax)")`.
 
 `init` asks for your cloud URL, the **runner** key, the Hermes base URL, and each
 profile's `API_SERVER_KEY`. It probes every profile as you enter it, so a wrong key
