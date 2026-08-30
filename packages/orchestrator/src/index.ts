@@ -210,7 +210,22 @@ async function main(): Promise<void> {
     logger.warn('No routes loaded, so no trigger can start an agent. POST /v1/routes')
   }
 
-  const lifecycle = new RunLifecycle(db, logger)
+  // Mirroring runs upward is what populates cloud run history and, through it,
+  // fires the org's Slack notifications. It goes through the outbox so a cloud
+  // outage degrades reporting rather than stalling a run.
+  const lifecycle = new RunLifecycle(db, logger, {
+    created: (run) => outbox?.enqueue({ kind: 'run', run }),
+    changed: (run) => outbox?.enqueue({ kind: 'run-update', run }),
+    settled: (run) => {
+      // The transcript ships once, when the run ends. Streaming every event as
+      // it happens would multiply requests by the length of the run for output
+      // nobody reads until it is over.
+      const events = db.listRunEvents(run.id, { limit: 2000 })
+      if (events.length > 0) {
+        outbox?.enqueue({ kind: 'events', runId: run.id, events })
+      }
+    },
+  })
   const limit = pLimit(config.concurrency)
   const inFlight = new Map<string, AbortController>()
 

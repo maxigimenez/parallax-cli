@@ -141,7 +141,7 @@ export class CloudClient {
   }
 }
 
-type OutboxItem =
+export type OutboxItem =
   | { kind: 'run'; run: RunRecord }
   | { kind: 'run-update'; run: RunRecord }
   | { kind: 'events'; runId: string; events: RunLogEntry[] }

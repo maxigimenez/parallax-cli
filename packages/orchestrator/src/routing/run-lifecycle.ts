@@ -1,5 +1,26 @@
-import { RUN_STATUS, type Logger, type RunStatus, type RunUsage } from '@parallax/common'
+import {
+  RUN_STATUS,
+  isTerminalRunStatus,
+  type Logger,
+  type RunRecord,
+  type RunStatus,
+  type RunUsage,
+} from '@parallax/common'
 import type { ParallaxDatabase } from '../database.js'
+
+/**
+ * Notified whenever a run is created or changes status.
+ *
+ * `created` is distinct from `changed` because the cloud treats the first
+ * report as the run starting and later ones as updates, and only the first
+ * should announce "started" to Slack. `settled` carries the finished run so
+ * its transcript can be shipped once, rather than streamed event by event.
+ */
+export interface RunObserver {
+  created?: (run: RunRecord) => void
+  changed?: (run: RunRecord) => void
+  settled?: (run: RunRecord) => void
+}
 
 /**
  * The single place a run's status changes.
@@ -12,8 +33,21 @@ import type { ParallaxDatabase } from '../database.js'
 export class RunLifecycle {
   constructor(
     private readonly db: ParallaxDatabase,
-    private readonly logger: Logger
+    private readonly logger: Logger,
+    private readonly observer: RunObserver = {}
   ) {}
+
+  /**
+   * Records a new run.
+   *
+   * Creation lives here rather than in the dispatcher so that every write to a
+   * run -- the first one included -- goes through one place, and so nothing can
+   * create a run the cloud never hears about.
+   */
+  created(run: RunRecord): void {
+    this.db.createRun(run)
+    this.observer.created?.(run)
+  }
 
   private transition(
     runId: string,
@@ -46,6 +80,15 @@ export class RunLifecycle {
       source: 'system',
       level: status === RUN_STATUS.FAILED ? 'error' : 'info',
     })
+
+    const updated = this.db.getRun(runId)
+    if (!updated) {
+      return
+    }
+    this.observer.changed?.(updated)
+    if (isTerminalRunStatus(updated.status)) {
+      this.observer.settled?.(updated)
+    }
   }
 
   queued(runId: string, message = 'Queued'): void {
@@ -75,5 +118,9 @@ export class RunLifecycle {
   /** Records the Hermes-side identifiers as soon as they are known. */
   attachHermesRun(runId: string, hermesRunId: string, sessionId?: string): void {
     this.db.updateRun(runId, { hermesRunId, hermesSessionId: sessionId })
+    const updated = this.db.getRun(runId)
+    if (updated) {
+      this.observer.changed?.(updated)
+    }
   }
 }

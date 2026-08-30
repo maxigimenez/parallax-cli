@@ -233,10 +233,11 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     const { orgId } = authOf(request)
     const body = request.body as { webhookUrl?: string; events?: string[]; enabled?: boolean }
 
-    if (!body.webhookUrl?.startsWith('https://hooks.slack.com/')) {
-      return reply
-        .code(400)
-        .send({ error: 'webhookUrl must be a https://hooks.slack.com/ incoming webhook URL.' })
+    // Slack's own host, unless an operator has deliberately pointed the
+    // notifier somewhere else (a sink, a relay) via SLACK_WEBHOOK_HOST.
+    const allowedPrefix = process.env.SLACK_WEBHOOK_HOST ?? 'https://hooks.slack.com/'
+    if (!body.webhookUrl?.startsWith(allowedPrefix)) {
+      return reply.code(400).send({ error: `webhookUrl must start with ${allowedPrefix}` })
     }
 
     await db.query(

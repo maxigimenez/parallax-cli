@@ -163,7 +163,7 @@ export class Dispatcher {
       createdAt: now,
       updatedAt: now,
     }
-    this.deps.db.createRun(record)
+    this.deps.lifecycle.created(record)
     onDecision?.({ outcome: 'started', runId })
 
     const controller = new AbortController()
