@@ -166,8 +166,13 @@ describe('dedupeKey', () => {
     expect(dedupeKey(rule(), event())).toBe(dedupeKey(rule(), event()))
   })
 
-  it('changes when the ticket revision changes', () => {
-    expect(dedupeKey(rule(), event())).not.toBe(dedupeKey(rule(), event({ revision: 'rev-2' })))
+  it('changes when the ticket revision changes, for a per-change route', () => {
+    const repeat = rule({ guard: { refire: 'per-change', markers: true } })
+    expect(dedupeKey(repeat, event())).not.toBe(dedupeKey(repeat, event({ revision: 'rev-2' })))
+  })
+
+  it('ignores the revision by default, because routes fire once by default', () => {
+    expect(dedupeKey(rule(), event())).toBe(dedupeKey(rule(), event({ revision: 'rev-2' })))
   })
 
   it('separates different rules and different tickets', () => {

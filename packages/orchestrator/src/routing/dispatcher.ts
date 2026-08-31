@@ -1,6 +1,7 @@
 import {
   COMMENT_TARGET,
   MAX_CONCURRENT_RUNS_PER_AGENT,
+  PARALLAX_LABEL,
   RUN_STATUS,
   type AgentDescriptor,
   type CommentTarget,
@@ -13,7 +14,7 @@ import type { ParallaxDatabase } from '../database.js'
 import type { HermesAdapter } from '../hermes/adapter.js'
 import { renderRoutePrompt } from '../prompts/render.js'
 import { resolveSummary } from '../prompts/output-contract.js'
-import { dedupeKey, evaluate } from './rule-engine.js'
+import { dedupeKey, evaluate, guardOf } from './rule-engine.js'
 import type { RunLifecycle } from './run-lifecycle.js'
 
 export type DispatchResult =
@@ -182,8 +183,20 @@ export class Dispatcher {
     this.deps.inFlight?.set(runId, controller)
     let hermesRunId: string | undefined
 
+    const guard = guardOf(route)
+
     try {
       this.deps.lifecycle.running(runId, `Dispatched ${event.ref} to agent "${agent.profile}"`)
+
+      // Mark before the agent touches anything. The marker is what stops a
+      // second route -- or this one on the next cycle -- picking the item up
+      // while work is in flight.
+      if (guard.markers) {
+        await this.safely(
+          () => this.deps.outcomes.updateLabels(event, { add: [PARALLAX_LABEL.IN_PROGRESS] }),
+          'mark in progress'
+        )
+      }
 
       const result = await adapter.run(
         {
@@ -208,16 +221,21 @@ export class Dispatcher {
       switch (result.status) {
         case RUN_STATUS.COMPLETED:
           this.deps.lifecycle.completed(runId, summary, result.usage)
+          await this.clearMarker(guard, event, PARALLAX_LABEL.DONE)
           await this.applyOutcomes(route, event, summary ?? 'Run completed with no summary.')
           break
         case RUN_STATUS.AWAITING_APPROVAL:
+          // Deliberately keeps parallax:in-progress: the item is still claimed
+          // by this run while a human decides.
           this.deps.lifecycle.awaitingApproval(runId)
           break
         case RUN_STATUS.CANCELED:
           this.deps.lifecycle.canceled(runId, result.error)
+          await this.clearMarker(guard, event, undefined)
           break
         default:
           this.deps.lifecycle.failed(runId, result.error ?? 'Agent run failed.', result.usage)
+          await this.clearMarker(guard, event, PARALLAX_LABEL.FAILED)
           // The tracker still hears about it: a failure the humans never see is
           // the worst outcome, and it is exactly the case an agent cannot report
           // on its own behalf.
@@ -232,6 +250,7 @@ export class Dispatcher {
       // status. Classifying on the signal keeps "the operator cancelled it"
       // from being reported as "the agent failed".
       if (controller.signal.aborted) {
+        await this.clearMarker(guard, event, undefined)
         // The adapter's own cancel path did not get to run, so stopping the
         // Hermes side is this branch's job -- otherwise the agent keeps working
         // on a run Parallax has already written off.
@@ -253,11 +272,37 @@ export class Dispatcher {
       }
       const reason = error instanceof Error ? error.message : String(error)
       this.deps.lifecycle.failed(runId, reason)
+      await this.clearMarker(guard, event, PARALLAX_LABEL.FAILED)
       await this.postFailure(route, event, reason)
       return { outcome: 'failed', runId, reason }
     } finally {
       this.deps.inFlight?.delete(runId)
     }
+  }
+
+  /**
+   * Swaps the in-progress marker for a terminal one.
+   *
+   * Always removes `in-progress`, even when there is no terminal marker to
+   * apply (a cancellation): leaving it behind would make the item permanently
+   * unroutable, since every route declines anything carrying it.
+   */
+  private async clearMarker(
+    guard: { markers: boolean },
+    event: TriggerEvent,
+    terminal: string | undefined
+  ): Promise<void> {
+    if (!guard.markers) {
+      return
+    }
+    await this.safely(
+      () =>
+        this.deps.outcomes.updateLabels(event, {
+          add: terminal ? [terminal] : [],
+          remove: [PARALLAX_LABEL.IN_PROGRESS],
+        }),
+      'clear in-progress marker'
+    )
   }
 
   private async applyOutcomes(

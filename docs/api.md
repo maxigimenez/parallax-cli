@@ -130,8 +130,13 @@ DELETE /v1/routes/:id
   "priority": 100,                  // highest wins; ties break on id
   "enabled": true,
 
+  "guard": {
+    "refire": "once",               // once | per-change
+    "markers": true                 // apply parallax:* labels around the run
+  },
+
   "trigger": {
-    "type": "ticket",               // ticket | pr_review_requested | pr_event | schedule | manual
+    "type": "ticket",               // ticket | pr_event | pr_review_requested | manual
     "provider": "linear",           // optional; omit to match either provider
     "projectId": "taplands"
   },
@@ -139,8 +144,18 @@ DELETE /v1/routes/:id
   "match": {                        // every clause must hold
     "labels": { "any": ["feasibility"], "none": ["blocked"] },
     "state":  { "any": ["Backlog"] },
+    "assignees": { "any": ["acme-bot"] },
     "titleMatches": "^RFC:",        // regex against the title
-    "bodyMatches": "billing"        // regex against the description
+    "bodyMatches": "billing",       // regex against the description
+
+    // pull requests only
+    "isDraft": false,
+    "baseBranch": { "any": ["main"] },
+
+    // transitions — what changed since the last poll
+    "labelsAdded":    { "any": ["needs-review"] },
+    "labelsRemoved":  { "any": ["blocked"] },
+    "assigneesAdded": { "any": ["acme-bot"] }
   },
 
   "target": {
@@ -194,6 +209,87 @@ GET /v1/prompt-templates
 
 Returns starter prompts and the placeholder list, for prefilling an editor. Nothing
 dispatches by template id: changing the catalog never alters an existing route.
+
+### Pull request routes
+
+`pr_event` fires for **every open pull request**, every cycle. Use it for anything
+keyed on labels, assignees, draft state or base branch.
+
+`pr_review_requested` fires only when someone is awaiting review, and is the one to
+use with `target.agentRef.githubLogin` — it matches the agent that was actually
+requested, not merely any agent.
+
+A pull request produces both events when it has a requested reviewer, so a route must
+pick the trigger type it means.
+
+```jsonc
+// "When acme-bot is assigned a PR, have the reviewer agent look at it."
+{
+  "name": "Review PRs assigned to the bot",
+  "trigger": { "type": "pr_event", "provider": "github", "projectId": "www" },
+  "match":   { "assignees": { "any": ["acme-bot"] }, "isDraft": false },
+  "target":  { "agentRef": { "profile": "reviewer" } },
+  "execution": { "prompt": "Review PR #{{pr.number}}: {{ticket.title}}\n\n{{ticket.body}}",
+                 "requireApproval": false, "timeoutSeconds": 900 }
+}
+```
+
+```jsonc
+// "When needs-review is ADDED to a PR" — fires on the transition, not on
+// every subsequent poll while the label happens to be there.
+{
+  "name": "Review on label",
+  "trigger": { "type": "pr_event", "provider": "github", "projectId": "www" },
+  "match":   { "labelsAdded": { "any": ["needs-review"] } },
+  "target":  { "agentRef": { "profile": "reviewer" } },
+  "execution": { "prompt": "Review PR #{{pr.number}}.", "requireApproval": false,
+                 "timeoutSeconds": 900 }
+}
+```
+
+### Transitions vs. state
+
+`labels` asks *does it have this label now*. `labelsAdded` asks *was it just added*.
+
+Transition clauses need a previous observation, so they **never match the first time
+an item is seen**. That is deliberate: without it, creating a route would fire it
+across every pull request that already carries the label. A new route starts quiet and
+acts on what happens next.
+
+`labelsRemoved` and `assigneesAdded` work the same way.
+
+### Not running twice: the loop guard
+
+An agent acting on a pull request *changes* it — a commit, a review, a comment. If a
+route re-fired on every change, it would retrigger itself on its own work. Two
+independent mechanisms prevent that.
+
+**`guard.refire`** — `once` (the default) means a route fires for an item exactly
+once, whatever happens to it afterwards; the item's revision is excluded from the
+dedupe key entirely. `per-change` restores fire-on-every-change and is only safe with
+markers on, which the API enforces.
+
+**`guard.markers`** — Parallax writes reserved labels around the run:
+
+| Label | Meaning |
+|---|---|
+| `parallax:in-progress` | a run is working on this right now |
+| `parallax:done` | a run completed |
+| `parallax:failed` | a run failed |
+
+Everything Parallax writes is prefixed `parallax:`, so machine-managed labels are
+obvious in the tracker. They are created automatically if the repo or team does not
+have them.
+
+**No route ever matches an item carrying `parallax:in-progress`** — unconditionally,
+even for a route that turned markers off. Starting a second agent on something already
+being worked on is never what you want.
+
+A `once` route also declines anything carrying `parallax:done` or `parallax:failed`.
+**Removing that label by hand is how you re-arm a route** — which is also how you retry
+something that failed.
+
+`GET /v1/reserved-labels` returns the list and the default guard.
 
 ### Match semantics
 

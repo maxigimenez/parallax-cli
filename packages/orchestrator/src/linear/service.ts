@@ -138,6 +138,35 @@ export class LinearService implements TriggerSource, TrackerWriter {
     )
   }
 
+  /** Creates a label on the issue's team and returns its id. */
+  private async ensureTeamLabel(identifier: string, name: string): Promise<string> {
+    const team = await this.request<{ issue: { team: { id: string } } | null }>(
+      `query IssueTeam($id: String!) { issue(id: $id) { team { id } } }`,
+      { id: identifier }
+    )
+    if (!team.issue) {
+      throw new Error(`Linear issue "${identifier}" not found.`)
+    }
+
+    const created = await this.request<{
+      issueLabelCreate: { success: boolean; issueLabel: { id: string } | null }
+    }>(
+      `mutation CreateLabel($teamId: String!, $name: String!, $color: String!) {
+         issueLabelCreate(input: { teamId: $teamId, name: $name, color: $color }) {
+           success
+           issueLabel { id }
+         }
+       }`,
+      { teamId: team.issue.team.id, name, color: '#f97316' }
+    )
+
+    const id = created.issueLabelCreate.issueLabel?.id
+    if (!id) {
+      throw new Error(`Could not create Linear label "${name}".`)
+    }
+    return id
+  }
+
   async updateLabels(
     event: TriggerEvent,
     labels: { add?: string[]; remove?: string[] }
@@ -182,10 +211,10 @@ export class LinearService implements TriggerSource, TrackerWriter {
       next.delete(id as string)
     }
     for (const name of labels.add ?? []) {
-      const id = byName.get(name.toLowerCase())
-      if (!id) {
-        throw new Error(`Linear label "${name}" does not exist on this issue's team.`)
-      }
+      // Create it rather than fail: the parallax:* markers are applied
+      // automatically, so requiring someone to pre-create them by hand would
+      // make the loop guard silently ineffective on a new team.
+      const id = byName.get(name.toLowerCase()) ?? (await this.ensureTeamLabel(event.ref, name))
       next.add(id)
     }
 

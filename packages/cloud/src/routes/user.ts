@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify'
-import { PROMPT_CATALOG, PROMPT_VARIABLES, type RoutingRule } from '@parallax/common'
+import {
+  DEFAULT_ROUTE_GUARD,
+  PARALLAX_LABELS,
+  PROMPT_CATALOG,
+  PROMPT_VARIABLES,
+  type RoutingRule,
+} from '@parallax/common'
 import { authenticate, generateKey, newId, parseBearer, type AuthContext } from '../auth.js'
 import type { Database } from '../db.js'
 
@@ -108,7 +114,9 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     }
 
     const id = route.id || newId('rt')
-    const stored: RoutingRule = { ...route, id }
+    // Stored explicitly rather than left to the runner's default, so what a
+    // route will do is visible in the API rather than implied.
+    const stored: RoutingRule = { ...route, id, guard: { ...DEFAULT_ROUTE_GUARD, ...route.guard } }
 
     await db.query(
       `INSERT INTO routes (id, org_id, name, priority, enabled, definition, updated_at)
@@ -144,6 +152,12 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
   app.get('/v1/prompt-templates', async () => ({
     templates: PROMPT_CATALOG,
     variables: PROMPT_VARIABLES,
+  }))
+
+  /** Labels Parallax manages itself, for a dashboard to render distinctly. */
+  app.get('/v1/reserved-labels', async () => ({
+    labels: PARALLAX_LABELS,
+    defaultGuard: DEFAULT_ROUTE_GUARD,
   }))
 
   // ── Runs ───────────────────────────────────────────────────
@@ -340,5 +354,21 @@ function validateRoute(route: RoutingRule): string | undefined {
   if (typeof route.execution.timeoutSeconds !== 'number') {
     return 'execution.timeoutSeconds must be a number.'
   }
+
+  if (route.guard) {
+    if (route.guard.refire !== 'once' && route.guard.refire !== 'per-change') {
+      return 'guard.refire must be "once" or "per-change".'
+    }
+    if (route.guard.markers !== undefined && typeof route.guard.markers !== 'boolean') {
+      return 'guard.markers must be a boolean.'
+    }
+  }
+
+  // per-change without markers is the one combination that can loop: the route
+  // re-fires on every change, and an agent working on the item is a change.
+  if (route.guard?.refire === 'per-change' && route.guard.markers === false) {
+    return 'guard.refire "per-change" requires guard.markers, or the route can retrigger itself.'
+  }
+
   return undefined
 }

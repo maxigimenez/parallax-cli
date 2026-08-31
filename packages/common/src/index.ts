@@ -160,8 +160,27 @@ export interface TriggerEvent {
   url?: string
   labels: string[]
   state?: string
+  assignees?: string[]
   prNumber?: number
   requestedReviewers?: string[]
+  isDraft?: boolean
+  baseBranch?: string
+  /**
+   * What changed since the last time this item was observed.
+   *
+   * Absent on first sight: an item seen for the first time has no history, and
+   * treating everything about it as newly added would fire "label added" routes
+   * across an entire existing backlog the moment a route is created.
+   */
+  changes?: TriggerChanges
+}
+
+export interface TriggerChanges {
+  labelsAdded: string[]
+  labelsRemoved: string[]
+  assigneesAdded: string[]
+  assigneesRemoved: string[]
+  reviewersAdded: string[]
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -176,10 +195,25 @@ export interface StringSetMatch {
 }
 
 export interface RouteMatch {
+  /** Matched against the item's current labels. */
   labels?: StringSetMatch
   state?: StringSetMatch
   titleMatches?: string
   bodyMatches?: string
+  /** Matched against current assignees. */
+  assignees?: StringSetMatch
+  /**
+   * Matched against what changed since the previous observation.
+   *
+   * These never match on first sight, which is what stops a new route from
+   * firing across every item that already exists.
+   */
+  labelsAdded?: StringSetMatch
+  labelsRemoved?: StringSetMatch
+  assigneesAdded?: StringSetMatch
+  /** Only meaningful for pull requests. */
+  isDraft?: boolean
+  baseBranch?: StringSetMatch
 }
 
 export interface RouteTarget {
@@ -218,11 +252,16 @@ export const PROMPT_VARIABLES = [
   'ticket.url',
   'ticket.state',
   'ticket.labels',
+  'ticket.assignees',
   'project.id',
   'agent.profile',
   'agent.role',
   'pr.number',
   'pr.reviewers',
+  'pr.baseBranch',
+  'changes.labelsAdded',
+  'changes.labelsRemoved',
+  'changes.assigneesAdded',
 ] as const
 
 export type PromptVariable = (typeof PROMPT_VARIABLES)[number]
@@ -240,11 +279,34 @@ export interface RouteOutcome {
   labels?: { add?: string[]; remove?: string[] }
 }
 
+/**
+ * How often a route may fire for the same item, and whether it marks its work.
+ *
+ * The default is the safe one. An agent that acts on a pull request changes it
+ * — a commit, a review, a comment — which changes the item's revision, which
+ * would otherwise re-trigger the very route that started it. Firing once per
+ * item unless told otherwise means a route cannot loop by construction.
+ */
+export interface RouteGuard {
+  /**
+   * `once`       fire at most once per item, whatever changes afterwards.
+   * `per-change` fire again each time the item changes.
+   */
+  refire: 'once' | 'per-change'
+  /**
+   * Apply `parallax:` marker labels around the run, and skip items already
+   * carrying one. Markers make an in-flight run visible in the tracker and let
+   * a human re-arm a route by removing the label.
+   */
+  markers: boolean
+}
+
 export interface RoutingRule {
   id: string
   name: string
   priority: number
   enabled: boolean
+  guard?: RouteGuard
   trigger: {
     type: TriggerType
     provider?: TicketProvider
@@ -357,6 +419,39 @@ export const DEFAULT_CONCURRENCY = 2
 
 /** Hermes' own docs warn that two agents must never drive one profile at once. */
 export const MAX_CONCURRENT_RUNS_PER_AGENT = 1
+
+// ─────────────────────────────────────────────────────────────
+// Reserved labels
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Namespace Parallax writes into.
+ *
+ * Everything Parallax applies to a ticket or pull request is prefixed, so it is
+ * obvious in the tracker which labels are machine-managed, and so a human can
+ * clear them to re-arm a route.
+ */
+export const PARALLAX_LABEL_PREFIX = 'parallax:'
+
+export const PARALLAX_LABEL = {
+  IN_PROGRESS: 'parallax:in-progress',
+  DONE: 'parallax:done',
+  FAILED: 'parallax:failed',
+} as const
+
+export type ParallaxLabel = (typeof PARALLAX_LABEL)[keyof typeof PARALLAX_LABEL]
+
+export const PARALLAX_LABELS: ParallaxLabel[] = [
+  PARALLAX_LABEL.IN_PROGRESS,
+  PARALLAX_LABEL.DONE,
+  PARALLAX_LABEL.FAILED,
+]
+
+export function isParallaxLabel(label: string): boolean {
+  return label.trim().toLowerCase().startsWith(PARALLAX_LABEL_PREFIX)
+}
+
+export const DEFAULT_ROUTE_GUARD: RouteGuard = { refire: 'once', markers: true }
 
 export * from './prompt-catalog.js'
 

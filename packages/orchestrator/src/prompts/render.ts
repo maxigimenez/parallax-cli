@@ -25,6 +25,8 @@ function resolveVariable(name: string, context: PromptContext): string | undefin
       return event.state ?? ''
     case 'ticket.labels':
       return event.labels.join(', ')
+    case 'ticket.assignees':
+      return (event.assignees ?? []).join(', ')
     case 'project.id':
       return event.projectId
     case 'agent.profile':
@@ -35,6 +37,14 @@ function resolveVariable(name: string, context: PromptContext): string | undefin
       return event.prNumber === undefined ? '' : String(event.prNumber)
     case 'pr.reviewers':
       return (event.requestedReviewers ?? []).join(', ')
+    case 'pr.baseBranch':
+      return event.baseBranch ?? ''
+    case 'changes.labelsAdded':
+      return (event.changes?.labelsAdded ?? []).join(', ')
+    case 'changes.labelsRemoved':
+      return (event.changes?.labelsRemoved ?? []).join(', ')
+    case 'changes.assigneesAdded':
+      return (event.changes?.assigneesAdded ?? []).join(', ')
     default:
       return undefined
   }

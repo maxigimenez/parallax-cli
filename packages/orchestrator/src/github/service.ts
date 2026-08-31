@@ -36,11 +36,18 @@ interface IssueSummary {
   state?: string
   updatedAt?: string
   labels?: Array<{ name: string }>
+  assignees?: Array<{ login?: string }>
 }
 
 interface PullRequestSummary extends IssueSummary {
   reviewRequests?: Array<{ login?: string; name?: string; slug?: string }>
+  assignees?: Array<{ login?: string }>
+  isDraft?: boolean
+  baseRefName?: string
 }
+
+/** Orange, matching Parallax's own colour, so managed labels read as a set. */
+const PARALLAX_LABEL_COLOR = 'f97316'
 
 export class GitHubService implements TriggerSource, TrackerWriter {
   readonly name = 'github'
@@ -67,7 +74,7 @@ export class GitHubService implements TriggerSource, TrackerWriter {
     }
     const [issues, pullRequests] = await Promise.all([
       this.collectIssues(project),
-      this.collectReviewRequests(project),
+      this.collectPullRequests(project),
     ])
     return [...issues, ...pullRequests]
   }
@@ -82,7 +89,7 @@ export class GitHubService implements TriggerSource, TrackerWriter {
       '--repo',
       `${owner}/${repo}`,
       '--json',
-      'number,title,body,url,state,updatedAt,labels',
+      'number,title,body,url,state,updatedAt,labels,assignees',
       '--limit',
       '100',
       '--state',
@@ -110,10 +117,19 @@ export class GitHubService implements TriggerSource, TrackerWriter {
       url: issue.url,
       state: issue.state,
       labels: issue.labels?.map((label) => label.name) ?? [],
+      assignees: logins(issue.assignees),
     }))
   }
 
-  private async collectReviewRequests(project: ProjectConfig): Promise<TriggerEvent[]> {
+  /**
+   * Every open pull request, as both a general `pr_event` and — when someone is
+   * actually awaiting review — a `pr_review_requested`.
+   *
+   * The general event is emitted unconditionally. Previously PRs were only
+   * looked at when a reviewer had been requested, so a route keyed on a label
+   * or an assignee never saw the pull request at all.
+   */
+  private async collectPullRequests(project: ProjectConfig): Promise<TriggerEvent[]> {
     const { owner, repo } = requireRepo(project)
 
     const pulls = JSON.parse(
@@ -123,7 +139,7 @@ export class GitHubService implements TriggerSource, TrackerWriter {
         '--repo',
         `${owner}/${repo}`,
         '--json',
-        'number,title,body,url,state,updatedAt,labels,reviewRequests',
+        'number,title,body,url,state,updatedAt,labels,assignees,reviewRequests,isDraft,baseRefName',
         '--limit',
         '100',
         '--state',
@@ -131,25 +147,49 @@ export class GitHubService implements TriggerSource, TrackerWriter {
       ])) || '[]'
     ) as PullRequestSummary[]
 
-    return pulls
-      .filter((pull) => (pull.reviewRequests?.length ?? 0) > 0)
-      .map((pull) => ({
-        type: TRIGGER_TYPE.PR_REVIEW_REQUESTED,
+    const events: TriggerEvent[] = []
+
+    for (const pull of pulls) {
+      const reviewers = reviewerLogins(pull)
+      const base = {
         projectId: project.id,
         provider: TICKET_PROVIDER.GITHUB,
         ref: `${owner}/${repo}#${pull.number}`,
-        // Reviewer sets are not reflected in updatedAt reliably, so the set
-        // itself is folded into the revision: adding an agent as a reviewer
-        // must re-fire even when nothing else about the PR changed.
-        revision: `${pull.updatedAt ?? ''}|${reviewerLogins(pull).sort().join(',')}`,
         title: pull.title,
         body: pull.body ?? '',
         url: pull.url,
         state: pull.state,
         labels: pull.labels?.map((label) => label.name) ?? [],
+        assignees: logins(pull.assignees),
         prNumber: pull.number,
-        requestedReviewers: reviewerLogins(pull),
-      }))
+        requestedReviewers: reviewers,
+        isDraft: pull.isDraft,
+        baseBranch: pull.baseRefName,
+      }
+
+      events.push({
+        ...base,
+        type: TRIGGER_TYPE.PR_EVENT,
+        // Assignee and reviewer sets are not reliably reflected in updatedAt,
+        // so they are folded in: adding someone must count as a change.
+        revision: [
+          pull.updatedAt ?? '',
+          base.assignees.slice().sort().join(','),
+          reviewers.slice().sort().join(','),
+          base.labels.slice().sort().join(','),
+        ].join('|'),
+      })
+
+      if (reviewers.length > 0) {
+        events.push({
+          ...base,
+          type: TRIGGER_TYPE.PR_REVIEW_REQUESTED,
+          revision: `${pull.updatedAt ?? ''}|${reviewers.slice().sort().join(',')}`,
+        })
+      }
+    }
+
+    return events
   }
 
   /** Fetches a PR's diff, for feeding a reviewer agent that needs the change itself. */
@@ -176,22 +216,59 @@ export class GitHubService implements TriggerSource, TrackerWriter {
     ])
   }
 
+  /**
+   * Creates a label if the repository does not have it.
+   *
+   * `gh issue edit --add-label` fails outright on an unknown label, so the
+   * `parallax:` markers would never apply to a repository that has not seen
+   * them before -- and the loop guard that depends on them would quietly not
+   * work. Already-exists is the expected case and is not an error.
+   */
+  private async ensureLabel(owner: string, repo: string, label: string): Promise<void> {
+    const result = await this.executor.executeCommand(
+      [
+        'gh',
+        'label',
+        'create',
+        label,
+        '--repo',
+        `${owner}/${repo}`,
+        '--color',
+        PARALLAX_LABEL_COLOR,
+        '--description',
+        'Managed by Parallax',
+      ],
+      { cwd: process.cwd() }
+    )
+
+    if (result.exitCode !== 0 && !/already exists/i.test(result.output)) {
+      throw new Error(`Could not create label "${label}": ${result.output.trim()}`)
+    }
+  }
+
   async updateLabels(
     event: TriggerEvent,
     labels: { add?: string[]; remove?: string[] }
   ): Promise<void> {
     const { owner, repo } = splitRef(event.ref)
     const number = parseIssueNumber(event.ref)
-    const args = ['issue', 'edit', String(number), '--repo', `${owner}/${repo}`]
 
-    for (const label of labels.add ?? []) {
+    const toAdd = labels.add ?? []
+    const toRemove = labels.remove ?? []
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      return
+    }
+
+    for (const label of toAdd) {
+      await this.ensureLabel(owner, repo, label)
+    }
+
+    const args = ['issue', 'edit', String(number), '--repo', `${owner}/${repo}`]
+    for (const label of toAdd) {
       args.push('--add-label', label)
     }
-    for (const label of labels.remove ?? []) {
+    for (const label of toRemove) {
       args.push('--remove-label', label)
-    }
-    if (args.length === 5) {
-      return
     }
     await this.gh(args)
   }
@@ -203,6 +280,10 @@ function reviewerLogins(pull: PullRequestSummary): string[] {
   return (pull.reviewRequests ?? [])
     .map((request) => request.login ?? request.slug ?? request.name)
     .filter((login): login is string => Boolean(login))
+}
+
+function logins(users?: Array<{ login?: string }>): string[] {
+  return (users ?? []).map((user) => user.login).filter((login): login is string => Boolean(login))
 }
 
 export function splitRef(ref: string): { owner: string; repo: string } {

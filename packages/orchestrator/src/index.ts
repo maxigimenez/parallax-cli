@@ -373,8 +373,16 @@ async function main(): Promise<void> {
         const events = await collectEvents(project, services)
         tally.collected += events.length
         tally.perProject.push(`${project.id} ${events.length}`)
+
         for (const event of events) {
-          void runDispatch(project, event, tally)
+          // Record what this item looks like now and attach what changed, so
+          // routes can match "label added" rather than merely "label present".
+          const changes = db.observe(event.projectId, `${event.type}:${event.ref}`, {
+            labels: event.labels,
+            assignees: event.assignees ?? [],
+            reviewers: event.requestedReviewers ?? [],
+          })
+          void runDispatch(project, { ...event, changes }, tally)
         }
       }
 
@@ -384,7 +392,9 @@ async function main(): Promise<void> {
       await sleep(0)
       logger.info(summarizeCycle(tally))
 
-      db.pruneDispatchLedger(Date.now() - 30 * 24 * 60 * 60 * 1_000)
+      const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1_000
+      db.pruneDispatchLedger(monthAgo)
+      db.pruneObservations(monthAgo)
     } catch (error: unknown) {
       logger.error(`Poll cycle error: ${errorMessage(error)}`)
     }

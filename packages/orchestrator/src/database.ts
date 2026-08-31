@@ -7,7 +7,14 @@ import {
   type RunRecord,
   type RunStatus,
   type RunUsage,
+  type TriggerChanges,
 } from '@parallax/common'
+
+/** Members of `next` that were not in `previous`, compared case-insensitively. */
+function added(previous: string[], next: string[]): string[] {
+  const before = new Set(previous.map((value) => value.toLowerCase()))
+  return next.filter((value) => !before.has(value.toLowerCase()))
+}
 
 export function resolveDbPath(): string {
   if (process.env.PARALLAX_DB_PATH) {
@@ -75,6 +82,20 @@ function migrate(db: DatabaseSync): void {
       routeId TEXT NOT NULL,
       triggerRef TEXT NOT NULL,
       createdAt INTEGER NOT NULL
+    );
+  `)
+
+  // What each item looked like last cycle, so "label added" can mean added
+  // rather than merely present.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS observations (
+      projectId  TEXT NOT NULL,
+      ref        TEXT NOT NULL,
+      labels     TEXT NOT NULL,
+      assignees  TEXT NOT NULL,
+      reviewers  TEXT NOT NULL,
+      observedAt INTEGER NOT NULL,
+      PRIMARY KEY (projectId, ref)
     );
   `)
 
@@ -303,6 +324,71 @@ export class ParallaxDatabase {
       source: row.source as RunLogEntry['source'],
       groupId: (row.groupId as string | null) ?? undefined,
     }))
+  }
+
+  // ── Observations ───────────────────────────────────────────
+
+  /**
+   * Records what an item looks like now and reports what changed.
+   *
+   * Returns undefined the first time an item is seen. That is deliberate: with
+   * no prior observation every label looks newly added, and a freshly created
+   * route would fire across an entire existing backlog. First sight seeds the
+   * baseline silently; only a genuine subsequent change produces transitions.
+   */
+  observe(
+    projectId: string,
+    ref: string,
+    current: { labels: string[]; assignees: string[]; reviewers: string[] },
+    now: number = Date.now()
+  ): TriggerChanges | undefined {
+    const row = this.db
+      .prepare(
+        'SELECT labels, assignees, reviewers FROM observations WHERE projectId = ? AND ref = ?'
+      )
+      .get(projectId, ref) as { labels: string; assignees: string; reviewers: string } | undefined
+
+    this.db
+      .prepare(
+        `INSERT INTO observations (projectId, ref, labels, assignees, reviewers, observedAt)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (projectId, ref) DO UPDATE SET
+           labels = excluded.labels,
+           assignees = excluded.assignees,
+           reviewers = excluded.reviewers,
+           observedAt = excluded.observedAt`
+      )
+      .run(
+        projectId,
+        ref,
+        JSON.stringify(current.labels),
+        JSON.stringify(current.assignees),
+        JSON.stringify(current.reviewers),
+        now
+      )
+
+    if (!row) {
+      return undefined
+    }
+
+    const previous = {
+      labels: JSON.parse(row.labels) as string[],
+      assignees: JSON.parse(row.assignees) as string[],
+      reviewers: JSON.parse(row.reviewers) as string[],
+    }
+
+    return {
+      labelsAdded: added(previous.labels, current.labels),
+      labelsRemoved: added(current.labels, previous.labels),
+      assigneesAdded: added(previous.assignees, current.assignees),
+      assigneesRemoved: added(current.assignees, previous.assignees),
+      reviewersAdded: added(previous.reviewers, current.reviewers),
+    }
+  }
+
+  pruneObservations(olderThan: number): number {
+    const result = this.db.prepare('DELETE FROM observations WHERE observedAt < ?').run(olderThan)
+    return Number(result.changes)
   }
 
   // ── Dispatch ledger ────────────────────────────────────────

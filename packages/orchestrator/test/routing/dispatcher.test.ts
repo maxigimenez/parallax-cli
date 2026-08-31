@@ -167,7 +167,8 @@ describe('Dispatcher.dispatch', () => {
 
     await (await makeDispatcher(server, { outcomes })).dispatch(event(), [withLabels])
 
-    expect(outcomes.labelCalls).toEqual([{ add: ['reviewed'], remove: ['feasibility'] }])
+    // The route's own label outcome, alongside the markers the guard applies.
+    expect(outcomes.labelCalls).toContainEqual({ add: ['reviewed'], remove: ['feasibility'] })
   })
 
   it('skips when nothing matches, without creating a run', async () => {
@@ -182,18 +183,32 @@ describe('Dispatcher.dispatch', () => {
     expect(db.listRuns()).toHaveLength(0)
   })
 
-  it('fires once for an unchanged trigger and again when it changes', async () => {
+  it('fires once per item by default, even when the item changes', async () => {
     server = await startFakeHermes({ statuses: ['completed'] })
     const dispatcher = await makeDispatcher(server)
 
     const first = await dispatcher.dispatch(event(), [route()])
     const second = await dispatcher.dispatch(event(), [route()])
+    // A changed revision must NOT re-fire: an agent acting on an item changes
+    // it, so re-firing on change is how a route loops.
     const third = await dispatcher.dispatch(event({ revision: 'rev-2' }), [route()])
 
     expect(first.outcome).toBe('dispatched')
     expect(second).toEqual({ outcome: 'skipped', reason: 'duplicate' })
-    expect(third.outcome).toBe('dispatched')
-    expect(db.listRuns()).toHaveLength(2)
+    expect(third).toEqual({ outcome: 'skipped', reason: 'duplicate' })
+    expect(db.listRuns()).toHaveLength(1)
+  })
+
+  it('fires again on a change when the route asks for per-change', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+    const repeat = route({ guard: { refire: 'per-change', markers: false } })
+
+    expect((await dispatcher.dispatch(event(), [repeat])).outcome).toBe('dispatched')
+    expect(await dispatcher.dispatch(event(), [repeat])).toMatchObject({ reason: 'duplicate' })
+    expect((await dispatcher.dispatch(event({ revision: 'rev-2' }), [repeat])).outcome).toBe(
+      'dispatched'
+    )
   })
 
   it('defers rather than running two agents against one profile', async () => {

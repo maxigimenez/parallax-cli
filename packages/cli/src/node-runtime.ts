@@ -48,14 +48,15 @@ export function currentRuntimeIsCapable(): boolean {
   // would then print on every single CLI invocation. Silence just this one
   // load rather than the process's warnings generally.
   const emit = process.emitWarning
-  process.emitWarning = (...args: Parameters<typeof process.emitWarning>) => {
-    const [warning, type] = args
-    const name = typeof type === 'string' ? type : (type as { type?: string })?.type
-    if (name === 'ExperimentalWarning' || String(warning).includes('SQLite is an experimental')) {
+  // process.emitWarning is heavily overloaded, so the stand-in is typed as the
+  // base callable and reinstated in `finally`.
+  process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
+    const type = typeof rest[0] === 'string' ? rest[0] : (rest[0] as { type?: string })?.type
+    if (type === 'ExperimentalWarning' || String(warning).includes('SQLite is an experimental')) {
       return
     }
-    emit.apply(process, args)
-  }
+    ;(emit as (...args: unknown[]) => void)(warning, ...rest)
+  }) as typeof process.emitWarning
 
   try {
     return typeof require('node:sqlite').DatabaseSync === 'function'

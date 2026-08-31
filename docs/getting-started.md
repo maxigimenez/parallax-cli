@@ -107,6 +107,19 @@ Neither is recoverable. Store them now.
 
 ## 4. Configure what should happen
 
+Three shapes of route cover most of what you will want:
+
+| You want | `trigger.type` | `match` |
+|---|---|---|
+| a ticket gets a label | `ticket` | `labels` or `labelsAdded` |
+| a PR is assigned to someone | `pr_event` | `assignees` or `assigneesAdded` |
+| an agent is asked to review a PR | `pr_review_requested` | target by `githubLogin` |
+
+Routes fire **once per item** by default and mark their work with `parallax:` labels,
+so an agent's own commits and comments cannot retrigger the route that started them.
+See [api.md](./api.md#not-running-twice-the-loop-guard).
+
+
 Using the **user key**, against your Railway URL. Full reference in [api.md](./api.md).
 
 Register the project the runner should watch:
@@ -262,6 +275,14 @@ parallax runner status              launchd state
 
 **An agent is missing from `parallax agents`.** Its key is wrong or the profile is
 unreachable. `parallax preflight` names it and shows the error.
+
+**A route fired once and never again.** That is the default. `guard.refire` is `once`,
+and the item now carries `parallax:done`. Remove that label to re-arm it, or set
+`"guard": { "refire": "per-change", "markers": true }` on the route.
+
+**A "label added" route never fires.** Transition matching needs a previous
+observation, so it never matches the first time Parallax sees an item. Add and remove
+the label once while the runner is up, and it will fire on the next add.
 
 **A labelled ticket produced no run.** Watch one poll cycle in the log — the runner
 prints a summary line every cycle:
