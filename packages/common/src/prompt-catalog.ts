@@ -43,20 +43,31 @@ export const PROMPT_CATALOG: PromptTemplate[] = [
   {
     id: 'pr-review',
     name: 'Pull request review',
-    description: 'Review a pull request you were requested on.',
+    description: 'Review a pull request you were requested on. Fetches its own diff and thread.',
+    // Parallax says which pull request and what to do; the agent has gh and
+    // gets the diff and the conversation itself. Inlining them here would put
+    // Parallax back in the business of fetching context the agent can reach.
     prompt: [
       'You have been requested as a reviewer on a pull request.',
-      'Review it as you would a colleague’s work: correctness first, then clarity.',
       '',
-      'Pull request: {{ticket.ref}} (#{{pr.number}})',
+      'Pull request: {{ticket.ref}}',
       'Title: {{ticket.title}}',
       'Link: {{ticket.url}}',
       '',
-      'Description:',
-      '{{ticket.body}}',
+      'Start by reading it yourself:',
+      '  gh pr view {{pr.number}} --repo {{repo.slug}} --json title,body,comments,reviews',
+      '  gh pr diff {{pr.number}} --repo {{repo.slug}}',
       '',
-      'Read the diff before commenting. Prefer a small number of substantive',
-      'findings over exhaustive nitpicking, and say plainly when it looks good.',
+      'If you have reviewed this pull request before, your earlier comments are in',
+      'that thread. Read what the author said in reply and pick up from there rather',
+      'than repeating findings that have already been addressed or answered.',
+      '',
+      'Review it as you would a colleague’s work: correctness first, then clarity.',
+      'Prefer a small number of substantive findings over exhaustive nitpicking, and',
+      'say plainly when it looks good.',
+      '',
+      'Leave your review on the pull request itself with `gh pr review`, as a formal',
+      'approval or request for changes rather than a bare comment.',
     ].join('\n'),
   },
   {

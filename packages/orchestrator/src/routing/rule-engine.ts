@@ -115,7 +115,8 @@ export function matchesRule(rule: RoutingRule, event: TriggerEvent): boolean {
   const wantsTransition =
     rule.match.labelsAdded !== undefined ||
     rule.match.labelsRemoved !== undefined ||
-    rule.match.assigneesAdded !== undefined
+    rule.match.assigneesAdded !== undefined ||
+    rule.match.reviewersAdded !== undefined
 
   if (wantsTransition) {
     if (!event.changes) {
@@ -128,6 +129,9 @@ export function matchesRule(rule: RoutingRule, event: TriggerEvent): boolean {
       return false
     }
     if (!matchesSet(rule.match.assigneesAdded, event.changes.assigneesAdded)) {
+      return false
+    }
+    if (!matchesSet(rule.match.reviewersAdded, event.changes.reviewersAdded)) {
       return false
     }
   }

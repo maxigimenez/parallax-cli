@@ -211,6 +211,15 @@ export interface RouteMatch {
   labelsAdded?: StringSetMatch
   labelsRemoved?: StringSetMatch
   assigneesAdded?: StringSetMatch
+  /**
+   * Reviewers newly requested since the last poll.
+   *
+   * The precise primitive for a review cycle: it fires when someone is *asked*
+   * to review, not while a request happens to be outstanding. An agent posting
+   * comments does not add a reviewer, so a route keyed on this cannot retrigger
+   * itself no matter what the agent does.
+   */
+  reviewersAdded?: StringSetMatch
   /** Only meaningful for pull requests. */
   isDraft?: boolean
   baseBranch?: StringSetMatch
@@ -254,6 +263,7 @@ export const PROMPT_VARIABLES = [
   'ticket.labels',
   'ticket.assignees',
   'project.id',
+  'repo.slug',
   'agent.profile',
   'agent.role',
   'pr.number',
@@ -262,6 +272,7 @@ export const PROMPT_VARIABLES = [
   'changes.labelsAdded',
   'changes.labelsRemoved',
   'changes.assigneesAdded',
+  'changes.reviewersAdded',
 ] as const
 
 export type PromptVariable = (typeof PROMPT_VARIABLES)[number]

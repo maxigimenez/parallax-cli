@@ -256,3 +256,86 @@ describe('observation store', () => {
     expect(db.observe('www', 'old', state([]))).toBeUndefined()
   })
 })
+
+describe('the review cycle: request, review, re-request, review again', () => {
+  const reviewRoute = rule({
+    id: 'rt_review',
+    trigger: { type: TRIGGER_TYPE.PR_REVIEW_REQUESTED, projectId: 'www' },
+    // Fires on the *act* of requesting review, not while a request is pending.
+    match: { reviewersAdded: { any: ['acme-reviewer'] } },
+    target: { agentRef: { githubLogin: 'acme-reviewer' } },
+    guard: { refire: 'per-change', markers: true },
+  })
+
+  const review = (overrides: Partial<TriggerEvent> = {}) =>
+    pr({
+      type: TRIGGER_TYPE.PR_REVIEW_REQUESTED,
+      requestedReviewers: ['acme-reviewer'],
+      ...overrides,
+    })
+
+  const changes = (over: Partial<NonNullable<TriggerEvent['changes']>> = {}) => ({
+    labelsAdded: [],
+    labelsRemoved: [],
+    assigneesAdded: [],
+    assigneesRemoved: [],
+    reviewersAdded: [],
+    ...over,
+  })
+
+  it('fires when the agent is first requested', () => {
+    const event = review({ changes: changes({ reviewersAdded: ['acme-reviewer'] }) })
+    expect(matchesRule(reviewRoute, event)).toBe(true)
+  })
+
+  it('does not fire again merely because the request is still outstanding', () => {
+    // Same PR, next poll: nothing was added, so nothing happens.
+    expect(matchesRule(reviewRoute, review({ changes: changes() }))).toBe(false)
+  })
+
+  it('does not fire when the author pushes commits or replies', () => {
+    // An author reply changes the PR but adds no reviewer, so the agent is not
+    // re-summoned by conversation alone.
+    const event = review({ revision: 'rev-2', changes: changes({ labelsAdded: ['discussion'] }) })
+    expect(matchesRule(reviewRoute, event)).toBe(false)
+  })
+
+  it('fires again when the agent is re-requested for a second round', () => {
+    const event = review({
+      revision: 'rev-3',
+      changes: changes({ reviewersAdded: ['acme-reviewer'] }),
+    })
+    expect(matchesRule(reviewRoute, event)).toBe(true)
+  })
+
+  it('gives each round its own dedupe key, so round two is not a duplicate', () => {
+    const first = review({ revision: 'rev-1' })
+    const second = review({ revision: 'rev-3' })
+    expect(dedupeKey(reviewRoute, first)).not.toBe(dedupeKey(reviewRoute, second))
+  })
+
+  it('ignores a request for a different reviewer', () => {
+    const event = review({
+      requestedReviewers: ['someone-else'],
+      changes: changes({ reviewersAdded: ['someone-else'] }),
+    })
+    expect(matchesRule(reviewRoute, event)).toBe(false)
+  })
+
+  it('still refuses to start while a round is in flight', () => {
+    const event = review({
+      labels: [PARALLAX_LABEL.IN_PROGRESS],
+      changes: changes({ reviewersAdded: ['acme-reviewer'] }),
+    })
+    expect(matchesRule(reviewRoute, event)).toBe(false)
+  })
+
+  it('is not blocked by parallax:done from the previous round', () => {
+    const event = review({
+      labels: [PARALLAX_LABEL.DONE],
+      revision: 'rev-3',
+      changes: changes({ reviewersAdded: ['acme-reviewer'] }),
+    })
+    expect(matchesRule(reviewRoute, event)).toBe(true)
+  })
+})

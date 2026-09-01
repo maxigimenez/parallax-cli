@@ -29,6 +29,9 @@ function resolveVariable(name: string, context: PromptContext): string | undefin
       return (event.assignees ?? []).join(', ')
     case 'project.id':
       return event.projectId
+    case 'repo.slug':
+      // GitHub refs are `owner/repo#number`; anything else has no repo to name.
+      return event.ref.match(/^([^/]+\/[^#]+)#\d+$/)?.[1] ?? ''
     case 'agent.profile':
       return context.agentProfile
     case 'agent.role':
@@ -45,6 +48,8 @@ function resolveVariable(name: string, context: PromptContext): string | undefin
       return (event.changes?.labelsRemoved ?? []).join(', ')
     case 'changes.assigneesAdded':
       return (event.changes?.assigneesAdded ?? []).join(', ')
+    case 'changes.reviewersAdded':
+      return (event.changes?.reviewersAdded ?? []).join(', ')
     default:
       return undefined
   }

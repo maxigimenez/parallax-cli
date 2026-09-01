@@ -155,7 +155,8 @@ DELETE /v1/routes/:id
     // transitions — what changed since the last poll
     "labelsAdded":    { "any": ["needs-review"] },
     "labelsRemoved":  { "any": ["blocked"] },
-    "assigneesAdded": { "any": ["acme-bot"] }
+    "assigneesAdded": { "any": ["acme-bot"] },
+    "reviewersAdded": { "any": ["acme-reviewer"] }
   },
 
   "target": {
@@ -246,6 +247,39 @@ pick the trigger type it means.
                  "timeoutSeconds": 900 }
 }
 ```
+
+### A review cycle
+
+Request review → the agent reviews → you reply and re-request → the agent reviews
+again. Match on `reviewersAdded`, which fires on the *act* of requesting, not while a
+request is outstanding:
+
+```jsonc
+{
+  "name": "Reviewer agent",
+  "guard":   { "refire": "per-change", "markers": true },
+  "trigger": { "type": "pr_review_requested", "provider": "github", "projectId": "www" },
+  "match":   { "reviewersAdded": { "any": ["acme-reviewer"] } },
+  "target":  { "agentRef": { "githubLogin": "acme-reviewer" } },
+  "execution": {
+    "prompt": "You have been requested as a reviewer on {{ticket.ref}}.\n\nRead it yourself:\n  gh pr view {{pr.number}} --repo {{repo.slug}} --json title,body,comments,reviews\n  gh pr diff {{pr.number}} --repo {{repo.slug}}\n\nIf you reviewed this before, your earlier comments are in that thread. Read the\nauthor's replies and pick up from there rather than repeating findings that have\nalready been addressed.\n\nLeave your review with `gh pr review`.",
+    "requireApproval": false,
+    "timeoutSeconds": 1800
+  }
+}
+```
+
+`refire: "per-change"` is required — the default `once` would fire one round and stop.
+That is safe here because `reviewersAdded` only matches when a reviewer is newly
+requested: the agent posting comments, or you pushing commits, adds no reviewer and so
+cannot re-summon it.
+
+**Parallax does not fetch the diff or the conversation.** The agent has `gh` and gets
+them itself, which is why the prompt tells it to. Inlining that context would put
+Parallax back in the business of fetching things the agent can already reach — the same
+boundary that keeps git, worktrees and pull requests on the Hermes side.
+
+`{{repo.slug}}` renders as `owner/repo`, so those commands are copy-pasteable.
 
 ### Transitions vs. state
 
