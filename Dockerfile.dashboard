@@ -4,8 +4,8 @@
 # deployed and scaled independently, and a shared image would rebuild and
 # restart the control plane every time a button moved.
 #
-# Railway picks this up through the dashboard service's Config File setting,
-# pointed at railway.dashboard.json. The build context is the repo root because
+# Railway is pointed at this file by .railway/railway.ts, which sets the dashboard
+# service's builder and dockerfilePath. The build context is the repo root because
 # this is a pnpm workspace and the lockfile lives there.
 #
 #   docker build -f Dockerfile.dashboard -t parallax-dashboard .

@@ -4,12 +4,12 @@
 from the repo root, because this is a pnpm workspace and `@parallax/common` is a
 workspace dependency.
 
-The `Dockerfile` lives at the **repo root** rather than beside the package it builds.
-That is deliberate: Railway auto-detects `./Dockerfile` and uses the Docker builder
-with no configuration at all. A Dockerfile tucked under `packages/cloud-api` only works if
-Railway actually reads `railway.json`, and when it does not — a service with its own
-build settings, or a root-directory override — it silently falls back to its default
-builder and fails with *"No start command detected"*.
+The `Dockerfile` lives at the **repo root** rather than beside the package it builds,
+so that the build context is the workspace root and `./Dockerfile` is what Railway
+would find even with no configuration at all. Which builder and which Dockerfile each
+service uses is stated explicitly in `.railway/railway.ts`; the root placement is the
+belt to that braces, and it is why a misconfigured service fails with *"No start
+command detected"* rather than building something plausible and wrong.
 
 ## What you need
 
@@ -90,42 +90,42 @@ railway add --service api
 Every `--service` below must match your service's real name. `railway status` lists
 them.
 
-`railway.json` at the repo root already declares everything:
+### Project configuration
 
-```json
-{
-  "build": {
-    "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile"
+Both services are declared in **`.railway/railway.ts`** — Railway's Infrastructure as
+Code. It replaced the per-service `railway.json` files: Config as Code is deprecated,
+services could no longer opt in from 2026-08-28, and it retires on 2026-12-01.
+
+```ts
+const api = service('api', {
+  build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile' },
+  deploy: {
+    startCommand: 'node dist/index.js',
+    preDeployCommand: ['node dist/migrate-cli.js'],
+    healthcheckPath: '/health',
+    restartPolicyType: 'ON_FAILURE',
   },
-  "deploy": {
-    "startCommand": "node dist/index.js",
-    "preDeployCommand": "node dist/migrate-cli.js",
-    "healthcheckPath": "/health",
-    "restartPolicyType": "ON_FAILURE"
-  }
-}
+  env: { DATABASE_URL: preserve() },
+})
 ```
 
-### If Railway ignores `railway.json`
-
-It is read from the service's root directory, so a service with a **Root Directory**
-set to anything other than the repo root will not see it — and you get *"No start
-command detected"* from Railpack instead of a Docker build.
-
-With the Dockerfile at the repo root this mostly cannot happen, but if it does, set it
-explicitly in the dashboard under **Settings → Build**:
-
-- Builder: `Dockerfile`
-- Dockerfile Path: `Dockerfile`
-- Root Directory: empty
-
-and under **Settings → Deploy**:
-
-- Pre-deploy Command: `node dist/migrate-cli.js`
-- Health Check Path: `/health`
-
 The image sets `WORKDIR /app/packages/cloud-api`, so both commands are relative to that.
+`preserve()` keeps a value already set on Railway rather than writing a credential into
+source.
+
+```bash
+railway config plan     # preview; changes nothing
+railway config apply    # reconcile the project with the file
+```
+
+**`railway config apply` and `railway up` are different verbs.** `apply` reconciles
+configuration — builders, commands, health checks. `up` uploads source and deploys.
+Changing `.railway/railway.ts` and running only `up` leaves the service building
+whatever it was last told to.
+
+A single file for the whole project is also what makes the classic failure
+unrepresentable: with no root `railway.json`, a newly created service cannot inherit
+another service's builder and silently deploy the wrong image.
 
 ## 2. Attach Postgres
 
@@ -230,16 +230,20 @@ deploy that fails mid-rollout should leave the old container able to serve.
 `packages/cloud-dashboard` deploys to the **same Railway project as a second service**,
 built from `Dockerfile.dashboard` rather than `Dockerfile`.
 
-Railway reads a service's config from `railway.json` by default, so the dashboard
-service must be pointed at its own file under **Settings → Config-as-code → Railway
-Config File**:
+Its builder and Dockerfile come from `.railway/railway.ts`, alongside the API's:
 
-```
-railway.dashboard.json
+```ts
+const dashboard = service('dashboard', {
+  build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile.dashboard' },
+  deploy: { startCommand: 'node server.mjs', healthcheckPath: '/health' },
+  env: { PARALLAX_API_URL: preserve() },
+})
 ```
 
-Miss that step and the dashboard service builds and deploys the control plane image,
-which starts, passes its health check, and serves the wrong thing.
+Run `railway config apply` after creating the service. Skip it and the service has no
+configuration of its own, which is how a dashboard service ends up deploying the
+control plane image — starting cleanly, passing its health check, and serving the
+wrong thing.
 
 Its only required variable is `PARALLAX_API_URL`, pointing at this service's public
 URL. It is read at runtime rather than baked into the bundle, so moving the API is a

@@ -68,7 +68,7 @@ so you can ship a branch before it merges. The service name defaults to `api`.
 > root.
 
 **Automatically**, on a push to `main` that touches `packages/cloud-api/**`,
-`packages/common/**`, `Dockerfile` or `railway.json`. Path-filtered rather than every
+`packages/common/**`, `Dockerfile` or `.railway/railway.ts`. Path-filtered rather than every
 merge, because redeploying the control plane interrupts a runner's long poll for no
 reason. Delete the `push:` block if you would rather every deploy be deliberate.
 
@@ -99,11 +99,16 @@ its config file.
 ### One-time setup
 
 1. Create a service named `dashboard` in the same project.
-2. **Settings → Config-as-code → Railway Config File**: `railway.dashboard.json`.
+2. Apply the project configuration, so the service builds `Dockerfile.dashboard`
+   rather than the control plane's:
 
-   Railway defaults to `railway.json`, which is the control plane's. Leave it and the
-   dashboard service builds and deploys the API image — a failure that looks like a
-   mystery rather than a misconfiguration.
+   ```bash
+   railway config plan && railway config apply
+   ```
+
+   Skip it and the service falls back to Railway's own detection — which is how a
+   dashboard service ends up deploying the API image, starting cleanly, and passing
+   its health check while serving the wrong thing.
 3. **Variables**: `PARALLAX_API_URL`, pointing at the API service's public URL. It is
    read at runtime, so changing it later is a restart rather than a rebuild.
 4. Generate a domain.
@@ -116,7 +121,10 @@ Full detail, including the local stack, is in [dashboard.md](./dashboard.md).
 
 Actions → *Deploy dashboard → Run workflow*, picking the branch; or automatically on a
 push to `main` touching `packages/cloud-dashboard/**`, `Dockerfile.dashboard` or
-`railway.dashboard.json`. By hand: `railway up --service dashboard`.
+`.railway/railway.ts`. By hand: `railway up --service dashboard`.
+
+`railway up` deploys source and does not reconcile configuration, so a change to
+`.railway/railway.ts` needs `railway config apply` as well.
 
 The health check passes on `{"status":"ok"}` and emits a **warning** — not a failure —
 when the response says `apiConfigured: false`. A dashboard that cannot reach an API

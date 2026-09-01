@@ -20,7 +20,7 @@ on:
     paths:
       - 'packages/cloud-dashboard/**'
       - 'Dockerfile.dashboard'
-      - 'railway.dashboard.json'
+      - '.railway/railway.ts'
       - '.github/workflows/deploy-dashboard.yml'
 
 concurrency:
@@ -54,8 +54,9 @@ jobs:
       - name: Install the Railway CLI
         run: npm install -g @railway/cli@4
 
-      # The service must have its Config File set to railway.dashboard.json, or
-      # Railway reads the root railway.json and deploys the API image here.
+      # Which Dockerfile this service builds comes from .railway/railway.ts.
+      # Run `railway config apply` after changing that file — `up` deploys the
+      # source, it does not reconcile the project's configuration.
       - name: Deploy
         run: railway up --service "$SERVICE" --environment "${{ inputs.environment || 'production' }}" --ci
 

@@ -101,12 +101,18 @@ The dashboard is a **second Railway service**, alongside `api`.
 ### One-time setup
 
 1. Create a service named `dashboard` in the same Railway project.
-2. Under **Settings → Config-as-code**, set the **Railway Config File** to
-   `railway.dashboard.json`.
+2. Apply the project configuration, which tells that service to build
+   `Dockerfile.dashboard` rather than the control plane's:
 
-   This step is load-bearing. Railway defaults to `railway.json`, which is the
-   control plane's — leave it and the dashboard service builds and deploys the API
-   image instead, and the failure looks like a mystery rather than a misconfiguration.
+   ```bash
+   railway config plan     # preview; changes nothing
+   railway config apply
+   ```
+
+   This step is load-bearing. A service with no configuration of its own falls back
+   to Railway's own detection, and previously to a root `railway.json` — which is how
+   a dashboard service ends up building and deploying the *API* image, starting
+   cleanly, and passing its health check while serving the wrong thing.
 3. Under **Variables**, set `PARALLAX_API_URL` to the API service's public URL.
 4. Generate a domain for the service.
 5. On the **api** service, add the dashboard's origin to `CORS_ORIGINS` if you have
@@ -116,7 +122,7 @@ The dashboard is a **second Railway service**, alongside `api`.
 
 Actions → **Deploy dashboard** → *Run workflow*, which lets you pick the branch; or
 automatically on a push to `main` touching `packages/cloud-dashboard/**`,
-`Dockerfile.dashboard` or `railway.dashboard.json`.
+`Dockerfile.dashboard` or `.railway/railway.ts`.
 
 By hand:
 
@@ -126,6 +132,10 @@ railway up --service dashboard
 
 The image is built from `Dockerfile.dashboard` at the repo root, with the root as
 build context because this is a pnpm workspace.
+
+> **`railway up` deploys source; it does not reconcile configuration.** After changing
+> `.railway/railway.ts`, run `railway config apply` — otherwise the service keeps
+> building whatever it was last told to.
 
 ## Why a server at all
 

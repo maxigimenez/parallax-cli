@@ -141,9 +141,15 @@ both must run for the supported range to mean anything. Its floor is 22.12 rathe
 because one suite imports the built package to catch circular imports the source alias
 hides.
 
-The two Railway services share a repo but not a config file. `railway.json` is the
-control plane's; the dashboard service must have its Railway Config File set to
-`railway.dashboard.json`, or it silently deploys the API image.
+Both Railway services are declared in `.railway/railway.ts` — Railway's Infrastructure
+as Code, which replaced the per-service `railway.json` files. Config as Code is
+deprecated: services could no longer opt in from 2026-08-28, and it retires on
+2026-12-01. One file for the whole project is also what makes the failure it replaced
+unrepresentable — with no root `railway.json`, a new service cannot inherit another's
+builder and silently deploy the wrong image.
+
+`railway config plan` previews; `railway config apply` applies after review. Neither
+deploys — `railway up` still does that.
 
 ## Key conventions
 

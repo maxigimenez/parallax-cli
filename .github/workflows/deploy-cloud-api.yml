@@ -23,7 +23,7 @@ on:
       - 'packages/cloud-api/**'
       - 'packages/common/**'
       - 'Dockerfile'
-      - 'railway.json'
+      - '.railway/railway.ts'
       - '.github/workflows/deploy-cloud-api.yml'
 
 concurrency:
