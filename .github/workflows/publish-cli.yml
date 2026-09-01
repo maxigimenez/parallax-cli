@@ -1,0 +1,100 @@
+name: Publish parallax-cli
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. 0.2.0). Leave blank to publish the current one.'
+        required: false
+      dry_run:
+        description: Pack and inspect without publishing
+        type: boolean
+        default: false
+
+  release:
+    types: [published]
+
+permissions:
+  id-token: write   # npm trusted publishing
+  contents: read
+
+concurrency:
+  group: publish-cli
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: npm
+
+    env:
+      NODE_OPTIONS: --experimental-sqlite
+      PARALLAX_DB_PATH: memory
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Publish from the newest supported runtime; the package itself works
+          # from 22.5 up, which CI proves separately.
+          node-version: 24.x
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Set the version
+        if: inputs.version != ''
+        run: |
+          pnpm version:set "${{ inputs.version }}"
+          # The internal @parallax/* packages are unpublished and linked by
+          # version, so they move in lockstep or the published CLI cannot
+          # resolve them. set-version.mjs is what keeps them aligned.
+          git --no-pager diff --stat
+
+      # Publishing something that does not build or pass its tests is the one
+      # mistake that reaches users directly.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Check the published entry point is executable
+        run: |
+          test -x packages/cli/dist/cli/src/index.js \
+            || { echo "::error::dist/cli/src/index.js is not executable; the global"\
+                      "command would fail with 'permission denied'."; exit 1; }
+          node packages/cli/dist/cli/src/index.js --version
+
+      - name: Pack and inspect
+        run: |
+          cd packages/cli
+          pnpm pack:tarball
+          echo "::group::Tarball contents"
+          tar -tzf parallax-cli-*.tgz | head -40
+          echo "::endgroup::"
+          # The internal packages are bundled, not fetched from npm, so their
+          # absence would only surface on a user's machine at install time.
+          for pkg in common orchestrator; do
+            tar -tzf parallax-cli-*.tgz | grep -q "node_modules/@parallax/$pkg/" \
+              || { echo "::error::@parallax/$pkg is missing from the tarball."; exit 1; }
+          done
+
+      - name: Publish
+        if: ${{ !inputs.dry_run }}
+        run: |
+          npm install -g npm@latest
+          pnpm --dir packages/cli publish:package
+
+      - name: Skipped
+        if: ${{ inputs.dry_run }}
+        run: echo "Dry run: packed and verified, nothing published."

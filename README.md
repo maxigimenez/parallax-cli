@@ -93,6 +93,7 @@ parallax run --agent product --prompt "Reply with the word ready."
 | [Routes](./docs/routes.md) | Every supported trigger, match, guard and outcome |
 | [Cloud API](./docs/api.md) | Orgs, keys, projects, routes, runs, Slack |
 | [Deploying to Railway](./docs/deploy-cloud.md) | Docker build, migrations, env vars |
+| [CI and releasing](./docs/releasing.md) | The three workflows, secrets, publishing |
 | [CLAUDE.md](./CLAUDE.md) | Architecture, for contributors |
 
 ## Requirements

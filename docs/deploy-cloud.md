@@ -151,6 +151,10 @@ TLS off entirely and is only appropriate locally.
 
 ## 3. Deploy
 
+Once the service exists, **[CI can deploy for you](./releasing.md#deploying-cloud-api)**
+— add a `RAILWAY_TOKEN` secret and run the *Deploy cloud-api* workflow. To do it by
+hand:
+
 ```bash
 railway up --service api
 railway domain --service api        # generate a public URL

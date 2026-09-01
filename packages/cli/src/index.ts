@@ -23,7 +23,7 @@ import {
   saveStoredConfig as saveStoredConfigToDisk,
 } from './config.js'
 import { MANIFEST_FILE } from './constants.js'
-import { ensureCapableRuntime, resolveRunnerNode, SQLITE_FLAG } from './node-runtime.js'
+import { ensureCapableRuntime, SQLITE_FLAG } from './node-runtime.js'
 import { runAgents } from './commands/agents.js'
 import { runCancel } from './commands/cancel.js'
 import { runInit } from './commands/init.js'

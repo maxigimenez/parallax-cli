@@ -23,19 +23,20 @@ describe('the built package', () => {
     expect(typeof built.isParallaxLabel).toBe('function')
   })
 
-  it.skipIf(!existsSync(dist))('validates a filled catalog route through the built code', async () => {
-    const built = (await import(pathToFileURL(dist).href)) as {
-      ROUTE_CATALOG: Array<{ placeholders: Array<{ token: string }> }>
-      fillRouteTemplate: (template: unknown, values: Record<string, string>) => object
-      validateRoutingRule: (route: unknown) => string | undefined
-    }
+  it.skipIf(!existsSync(dist))(
+    'validates a filled catalog route through the built code',
+    async () => {
+      const built = (await import(pathToFileURL(dist).href)) as {
+        ROUTE_CATALOG: Array<{ placeholders: Array<{ token: string }> }>
+        fillRouteTemplate: (template: unknown, values: Record<string, string>) => object
+        validateRoutingRule: (route: unknown) => string | undefined
+      }
 
-    for (const template of built.ROUTE_CATALOG) {
-      const values = Object.fromEntries(
-        template.placeholders.map((entry) => [entry.token, 'x'])
-      )
-      const route = { ...built.fillRouteTemplate(template, values), id: 'rt_x' }
-      expect(built.validateRoutingRule(route)).toBeUndefined()
+      for (const template of built.ROUTE_CATALOG) {
+        const values = Object.fromEntries(template.placeholders.map((entry) => [entry.token, 'x']))
+        const route = { ...built.fillRouteTemplate(template, values), id: 'rt_x' }
+        expect(built.validateRoutingRule(route)).toBeUndefined()
+      }
     }
-  })
+  )
 })

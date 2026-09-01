@@ -124,6 +124,17 @@ main loop.
 
 Migrations are plain `.sql` files applied in filename order, one transaction each.
 
+## CI and releasing
+
+Three workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test on Node 22 and
+24, build the image), `deploy-cloud-api.yml` (Railway), `publish-cli.yml` (npm).
+`docs/releasing.md` covers secrets and the manual fallbacks.
+
+The Node matrix is load-bearing: 22 needs `--experimental-sqlite` and 24 ignores it, so
+both must run for the supported range to mean anything. CI builds before testing
+because one suite imports the built package to catch circular imports the source alias
+hides.
+
 ## Key conventions
 
 - **Fail fast**: missing required config or malformed input throws immediately — no

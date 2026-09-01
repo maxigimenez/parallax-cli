@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck and test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor and the newest. Node 22 needs --experimental-sqlite and 24
+        # ignores it, so running both is what keeps the supported range honest
+        # rather than aspirational.
+        node: ['22.11.0', '24.x']
+
+    env:
+      # A no-op on 24; required on 22 for node:sqlite.
+      NODE_OPTIONS: --experimental-sqlite
+      PARALLAX_DB_PATH: memory
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: |
+          for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli; do
+            echo "::group::$pkg"
+            pnpm --filter "$pkg" exec tsc --noEmit
+            echo "::endgroup::"
+          done
+
+      # Before tests: one suite imports the built package specifically, to catch
+      # circular imports that only fail in the real ESM graph.
+      - name: Build
+        run: pnpm build
+
+      - name: Test
+        run: pnpm test
+
+  image:
+    name: Build the cloud-api image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Built for the architecture Railway deploys on, not the runner's, so a
+      # build that passes here is one that will pass there.
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: parallax-cloud-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Check the entry points resolve
+        run: |
+          docker run --rm parallax-cloud-api:ci node dist/org-cli.js | grep -q 'Usage:'
+          docker run --rm parallax-cloud-api:ci node dist/migrate-cli.js 2>&1 \
+            | grep -q 'DATABASE_URL is required'

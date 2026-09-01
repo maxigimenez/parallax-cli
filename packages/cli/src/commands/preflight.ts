@@ -4,22 +4,6 @@ import type { CliContext, VerifyCheck } from '../types.js'
 import { getJson } from '../api.js'
 import { findCapableNode } from '../node-runtime.js'
 
-const MIN_NODE = [23, 7, 0] as const
-
-function isSupportedNodeVersion(version: string): boolean {
-  const parts = version.replace(/^v/, '').split('.').map(Number)
-  for (let i = 0; i < MIN_NODE.length; i += 1) {
-    const actual = parts[i] ?? 0
-    if (actual > MIN_NODE[i]) {
-      return true
-    }
-    if (actual < MIN_NODE[i]) {
-      return false
-    }
-  }
-  return true
-}
-
 async function commandSucceeds(cmd: string, args: string[]): Promise<boolean> {
   return new Promise((resolve) => {
     const child = spawn(cmd, args, { stdio: 'ignore' })
