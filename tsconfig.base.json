@@ -14,8 +14,8 @@
       "@parallax/orchestrator": [
         "packages/orchestrator/src/index.ts"
       ],
-      "@parallax/cloud": [
-        "packages/cloud/src/index.ts"
+      "@parallax/cloud-api": [
+        "packages/cloud-api/src/index.ts"
       ]
     },
     "strict": true,

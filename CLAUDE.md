@@ -13,7 +13,7 @@ pnpm lint:fix         # auto-fix lint issues
 
 # run a single package's tests
 pnpm --filter @parallax/orchestrator test
-pnpm --filter @parallax/cloud test
+pnpm --filter @parallax/cloud-api test
 pnpm --filter parallax-cli test
 
 # local development — use this entrypoint for all manual testing
@@ -25,8 +25,8 @@ pnpm parallax runs
 pnpm parallax stop
 
 # cloud, against a local or Railway Postgres
-DATABASE_URL=... pnpm --filter @parallax/cloud dev
-DATABASE_URL=... pnpm --filter @parallax/cloud db:migrate
+DATABASE_URL=... pnpm --filter @parallax/cloud-api dev
+DATABASE_URL=... pnpm --filter @parallax/cloud-api db:migrate
 ```
 
 Node.js >= 23.7.0 and pnpm 10.x are required.
@@ -58,9 +58,11 @@ needs **no local clone** of any repository, and `ProjectConfig` has no `workspac
 - **`packages/orchestrator`** — the runner. Polls trigger sources, evaluates routes,
   dispatches to Hermes, mirrors runs to the cloud. Runs on the same machine as Hermes.
 - **`packages/cli`** — the published `parallax-cli` package, the only user entry point.
-- **`packages/cloud`** — the Railway-deployed control plane. Fastify + Postgres.
+- **`packages/cloud-api`** — the Railway-deployed control plane. Fastify + Postgres.
   Stores config, the agent registry, and run history; sends Slack notifications.
-- **`packages/dashboard`** — not built yet. Will consume the cloud user API.
+- **`packages/cloud-dashboard`** — not built yet. Will consume the cloud user API.
+  Named as a sibling of `cloud-api` because both are hosted; the runner also serves
+  an API, so an unqualified `api` would be ambiguous.
 
 ### Runtime state (`~/.parallax/`)
 
@@ -110,7 +112,7 @@ adding a template here; `test/routing/route-catalog.test.ts` checks every entry
 against `validateRoutingRule` and the prompt renderer, so a template can never
 ship in a shape the API would reject. `docs/routes.md` is the prose counterpart.
 
-### Cloud (`packages/cloud`)
+### Cloud (`packages/cloud-api`)
 
 Two API-key scopes, separated from day one: `prx_rnr_` for the runner
 (`/v1/runner/*`), `prx_usr_` for humans and the future dashboard (`/v1/*`). Presenting

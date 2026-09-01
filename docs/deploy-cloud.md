@@ -1,12 +1,12 @@
 # Deploying the control plane to Railway
 
-`packages/cloud` is a Fastify service over Postgres. It ships as a Docker image built
+`packages/cloud-api` is a Fastify service over Postgres. It ships as a Docker image built
 from the repo root, because this is a pnpm workspace and `@parallax/common` is a
 workspace dependency.
 
 The `Dockerfile` lives at the **repo root** rather than beside the package it builds.
 That is deliberate: Railway auto-detects `./Dockerfile` and uses the Docker builder
-with no configuration at all. A Dockerfile tucked under `packages/cloud` only works if
+with no configuration at all. A Dockerfile tucked under `packages/cloud-api` only works if
 Railway actually reads `railway.json`, and when it does not — a service with its own
 build settings, or a root-directory override — it silently falls back to its default
 builder and fails with *"No start command detected"*.
@@ -36,7 +36,7 @@ the service has something to serve the moment it comes up.
 
 **Link at the repo root, and stay there.** The Railway CLI scopes a link to the
 directory you ran it in, and deploys must happen from the root anyway (that is the
-Docker build context). Linking inside `packages/cloud` leaves the root unlinked, and
+Docker build context). Linking inside `packages/cloud-api` leaves the root unlinked, and
 `railway add` there fails with *"No linked project found"*.
 
 ```bash
@@ -44,7 +44,7 @@ cd /path/to/parallax-cli        # repo root — do everything from here
 
 pnpm install
 pnpm --filter @parallax/common build
-pnpm --filter @parallax/cloud build
+pnpm --filter @parallax/cloud-api build
 
 railway link                    # once, at the root; pick your project
 ```
@@ -56,14 +56,14 @@ their own paths, so running them from the root is fine:
 export DATABASE_URL="$(railway variables --service Postgres --kv \
   | grep '^DATABASE_PUBLIC_URL=' | cut -d= -f2-)"
 
-node packages/cloud/dist/migrate-cli.js                    # apply the schema
-node packages/cloud/dist/org-cli.js --name "Your Company"  # your two keys, once
+node packages/cloud-api/dist/migrate-cli.js                    # apply the schema
+node packages/cloud-api/dist/org-cli.js --name "Your Company"  # your two keys, once
 ```
 
 You can also run the whole service locally against that database:
 
 ```bash
-PORT=8080 node packages/cloud/dist/index.js
+PORT=8080 node packages/cloud-api/dist/index.js
 curl http://127.0.0.1:8080/health
 ```
 
@@ -125,7 +125,7 @@ and under **Settings → Deploy**:
 - Pre-deploy Command: `node dist/migrate-cli.js`
 - Health Check Path: `/health`
 
-The image sets `WORKDIR /app/packages/cloud`, so both commands are relative to that.
+The image sets `WORKDIR /app/packages/cloud-api`, so both commands are relative to that.
 
 ## 2. Attach Postgres
 
@@ -158,7 +158,7 @@ railway domain --service api        # generate a public URL
 
 The pre-deploy command applies migrations before the new container takes traffic, so a
 deploy is ordered and repeatable. Migrations are plain `.sql` files in
-`packages/cloud/src/migrations`, applied once each in filename order, one transaction
+`packages/cloud-api/src/migrations`, applied once each in filename order, one transaction
 per file. Running them from your laptop first (step 0) is harmless — they are recorded
 in `schema_migrations` and skipped on the next run.
 
@@ -214,7 +214,7 @@ docker build --platform linux/amd64 -t parallax-cloud .
 
 ## Adding a migration
 
-Add `packages/cloud/src/migrations/002_whatever.sql`. Nothing else — the migrator
+Add `packages/cloud-api/src/migrations/002_whatever.sql`. Nothing else — the migrator
 picks up any `.sql` file it has not already applied and records it in
 `schema_migrations`.
 

@@ -7,7 +7,7 @@ Three things are involved:
 
 | Piece | Where it runs | What it does |
 |---|---|---|
-| `@parallax/cloud` | Railway | Stores config, the agent registry, and run history. Sends Slack notifications. |
+| `@parallax/cloud-api` | Railway | Stores config, the agent registry, and run history. Sends Slack notifications. |
 | `parallax` runner | The Mac Mini, next to Hermes | Watches tickets/PRs, decides which agent to start, starts it, records what happened. |
 | Hermes | The Mac Mini | Runs the agents. Owns git, worktrees, credentials, and pull requests. |
 

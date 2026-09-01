@@ -111,7 +111,7 @@ packages/
   common/         shared types — run status, routing rules, config
   orchestrator/   the runner: triggers, routes, dispatch, outcomes
   cli/            the published parallax-cli package
-  cloud/          Railway control plane (Fastify + Postgres)
+  cloud-api/      Railway control plane (Fastify + Postgres)
 ```
 
 ```bash

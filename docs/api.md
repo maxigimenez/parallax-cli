@@ -42,7 +42,7 @@ Or from a local checkout, against the database's **public** URL — Railway's
 `DATABASE_URL` points at an internal host that only resolves inside the platform:
 
 ```bash
-pnpm --filter @parallax/common build && pnpm --filter @parallax/cloud build
+pnpm --filter @parallax/common build && pnpm --filter @parallax/cloud-api build
 cd packages/cloud
 DATABASE_URL="$(railway variables --service Postgres --kv | grep DATABASE_PUBLIC_URL | cut -d= -f2-)" \
   node dist/org-cli.js --name "Your Company"

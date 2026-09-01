@@ -1,5 +1,5 @@
 {
-  "name": "@parallax/cloud",
+  "name": "@parallax/cloud-api",
   "version": "0.2.0",
   "private": true,
   "type": "module",
