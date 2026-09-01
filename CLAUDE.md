@@ -102,6 +102,14 @@ Two invariants the dispatcher enforces:
    any work starts. `INSERT OR IGNORE` is the concurrency control. A failure before the
    agent was reached releases the claim so a fix can run.
 
+### Route catalog (`packages/common/src/route-catalog.ts`)
+
+The supported cases are declared once, as complete routes, and served from
+`GET /v1/route-templates` for the dashboard to offer. Adding a capability means
+adding a template here; `test/routing/route-catalog.test.ts` checks every entry
+against `validateRoutingRule` and the prompt renderer, so a template can never
+ship in a shape the API would reject. `docs/routes.md` is the prose counterpart.
+
 ### Cloud (`packages/cloud`)
 
 Two API-key scopes, separated from day one: `prx_rnr_` for the runner

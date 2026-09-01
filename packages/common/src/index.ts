@@ -465,6 +465,8 @@ export function isParallaxLabel(label: string): boolean {
 export const DEFAULT_ROUTE_GUARD: RouteGuard = { refire: 'once', markers: true }
 
 export * from './prompt-catalog.js'
+export * from './route-catalog.js'
+export * from './route-validation.js'
 
 // ─────────────────────────────────────────────────────────────
 // Utilities

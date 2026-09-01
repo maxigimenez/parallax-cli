@@ -117,7 +117,14 @@ Three shapes of route cover most of what you will want:
 
 Routes fire **once per item** by default and mark their work with `parallax:` labels,
 so an agent's own commits and comments cannot retrigger the route that started them.
-See [api.md](./api.md#not-running-twice-the-loop-guard).
+
+**[routes.md](./routes.md) is the full reference** — every trigger, every match clause,
+the loop guard, and a ready-made route for each supported case. You can also fetch
+those directly:
+
+```bash
+curl -sS $CLOUD/v1/route-templates -H "Authorization: Bearer $USER_KEY"
+```
 
 
 Using the **user key**, against your Railway URL. Full reference in [api.md](./api.md).

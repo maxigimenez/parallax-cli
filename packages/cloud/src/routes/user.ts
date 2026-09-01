@@ -4,6 +4,8 @@ import {
   PARALLAX_LABELS,
   PROMPT_CATALOG,
   PROMPT_VARIABLES,
+  ROUTE_CATALOG,
+  validateRoutingRule,
   type RoutingRule,
 } from '@parallax/common'
 import { authenticate, generateKey, newId, parseBearer, type AuthContext } from '../auth.js'
@@ -108,7 +110,7 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     const { orgId } = authOf(request)
     const route = request.body as RoutingRule
 
-    const problem = validateRoute(route)
+    const problem = validateRoutingRule(route)
     if (problem) {
       return reply.code(400).send({ error: problem })
     }
@@ -152,6 +154,19 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
   app.get('/v1/prompt-templates', async () => ({
     templates: PROMPT_CATALOG,
     variables: PROMPT_VARIABLES,
+  }))
+
+  /**
+   * Complete, ready-to-create routes for every supported case.
+   *
+   * Each carries `<PLACEHOLDER>` tokens a user fills in, distinct from the
+   * `{{variables}}` the runner substitutes at dispatch. Every entry is verified
+   * against this same API's validator in CI, so picking one and filling it in
+   * always produces a route the API accepts.
+   */
+  app.get('/v1/route-templates', async () => ({
+    templates: ROUTE_CATALOG,
+    defaultGuard: DEFAULT_ROUTE_GUARD,
   }))
 
   /** Labels Parallax manages itself, for a dashboard to render distinctly. */
@@ -327,48 +342,4 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     )
     return { ok: true }
   })
-}
-
-function validateRoute(route: RoutingRule): string | undefined {
-  if (!route || typeof route !== 'object') {
-    return 'A route object is required.'
-  }
-  if (!route.name) {
-    return 'name is required.'
-  }
-  if (!route.trigger?.type) {
-    return 'trigger.type is required.'
-  }
-  if (!route.trigger?.projectId) {
-    return 'trigger.projectId is required.'
-  }
-  if (!route.target?.agentRef) {
-    return 'target.agentRef is required.'
-  }
-  if (!route.target.agentRef.profile && !route.target.agentRef.githubLogin) {
-    return 'target.agentRef needs either a profile or a githubLogin.'
-  }
-  if (!route.execution?.prompt?.trim()) {
-    return 'execution.prompt is required.'
-  }
-  if (typeof route.execution.timeoutSeconds !== 'number') {
-    return 'execution.timeoutSeconds must be a number.'
-  }
-
-  if (route.guard) {
-    if (route.guard.refire !== 'once' && route.guard.refire !== 'per-change') {
-      return 'guard.refire must be "once" or "per-change".'
-    }
-    if (route.guard.markers !== undefined && typeof route.guard.markers !== 'boolean') {
-      return 'guard.markers must be a boolean.'
-    }
-  }
-
-  // per-change without markers is the one combination that can loop: the route
-  // re-fires on every change, and an agent working on the item is a change.
-  if (route.guard?.refire === 'per-change' && route.guard.markers === false) {
-    return 'guard.refire "per-change" requires guard.markers, or the route can retrigger itself.'
-  }
-
-  return undefined
 }

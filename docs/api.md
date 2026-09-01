@@ -117,6 +117,9 @@ route matches on `labels`, leave `filters.labels` unset and let the route decide
 The core abstraction: **when this happens, start that agent, then do this with the
 result.**
 
+Every supported case, with a ready-made route for each, is in
+**[routes.md](./routes.md)**. What follows is the wire format.
+
 ```http
 GET    /v1/routes
 POST   /v1/routes        create, or update by passing an existing id
@@ -205,11 +208,18 @@ that summary is what lands in the ticket comment and the Slack message. If your 
 already mentions `PARALLAX_SUMMARY`, yours is used as written.
 
 ```http
-GET /v1/prompt-templates
+GET /v1/route-templates      complete routes for every supported case
+GET /v1/prompt-templates     starter prompts and the placeholder list
+GET /v1/reserved-labels      the parallax:* labels and the default guard
 ```
 
-Returns starter prompts and the placeholder list, for prefilling an editor. Nothing
-dispatches by template id: changing the catalog never alters an existing route.
+These are what a dashboard builds its "new route" flow from. `route-templates` returns
+whole routes carrying `<PLACEHOLDER>` tokens for a user to fill in — distinct from the
+`{{variables}}` the runner substitutes at dispatch. Every template is verified in CI
+against this API's own validator and the prompt renderer, so one that is picked and
+filled always produces a route the API accepts.
+
+Nothing dispatches by template id: changing a catalog never alters an existing route.
 
 ### Pull request routes
 
@@ -434,7 +444,7 @@ behind NAT receives work without any inbound connection.
 ## Errors
 
 ```json
-{ "error": "execution.promptTemplate is required." }
+{ "error": "execution.prompt is required." }
 ```
 
 | Status | Means |

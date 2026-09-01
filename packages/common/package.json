@@ -17,6 +17,14 @@
     "./prompt-catalog": {
       "types": "./dist/prompt-catalog.d.ts",
       "import": "./dist/prompt-catalog.js"
+    },
+    "./route-catalog": {
+      "types": "./dist/route-catalog.d.ts",
+      "import": "./dist/route-catalog.js"
+    },
+    "./route-validation": {
+      "types": "./dist/route-validation.d.ts",
+      "import": "./dist/route-validation.js"
     }
   },
   "scripts": {

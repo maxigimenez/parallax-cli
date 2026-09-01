@@ -16,7 +16,8 @@ happened and tells your team about it.
   "trigger": { "type": "ticket", "provider": "linear", "projectId": "taplands" },
   "match":   { "labels": { "any": ["feasibility"] } },
   "target":  { "agentRef": { "profile": "product" } },
-  "execution": { "promptTemplate": "product-review", "timeoutSeconds": 1800 },
+  "execution": { "prompt": "Assess {{ticket.ref}}: {{ticket.title}}\n\n{{ticket.body}}",
+                 "timeoutSeconds": 1800 },
   "outcome": {
     "postComment": { "target": "ticket" },
     "labels": { "add": ["reviewed"], "remove": ["feasibility"] }
@@ -24,7 +25,12 @@ happened and tells your team about it.
 }
 ```
 
-That is the whole idea. Routes are data, so a new workflow is a row, not a code change.
+That is the whole idea. Routes are data, so a new workflow is a row, not a code change
+— and the prompt lives on the route, so rewording what an agent is asked to do never
+needs a release.
+
+Ready-made routes for every supported case, including multi-round pull request review,
+are in **[docs/routes.md](./docs/routes.md)** and served from `GET /v1/route-templates`.
 
 ## How it fits together
 
@@ -84,6 +90,7 @@ parallax run --agent product --prompt "Reply with the word ready."
 | | |
 |---|---|
 | [Getting started](./docs/getting-started.md) | Hermes setup, deploy, keys, first route |
+| [Routes](./docs/routes.md) | Every supported trigger, match, guard and outcome |
 | [Cloud API](./docs/api.md) | Orgs, keys, projects, routes, runs, Slack |
 | [Deploying to Railway](./docs/deploy-cloud.md) | Docker build, migrations, env vars |
 | [CLAUDE.md](./CLAUDE.md) | Architecture, for contributors |
@@ -92,7 +99,8 @@ parallax run --agent product --prompt "Reply with the word ready."
 
 - **Hermes Agent** with its API server enabled and `gateway.multiplex_profiles` on,
   and a distinct `API_SERVER_KEY` per profile
-- **Node.js >= 23.7**
+- **Node.js >= 22.5** — the CLI re-executes itself under a compatible interpreter if
+  the active one cannot load `node:sqlite`
 - **Postgres**, for the control plane
 - `gh`, authenticated, if any project pulls from GitHub
 
