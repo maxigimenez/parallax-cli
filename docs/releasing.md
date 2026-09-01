@@ -1,21 +1,26 @@
 # CI and releasing
 
-Three workflows. One runs on every change; two ship things.
+Four workflows. One runs on every change; three ship things.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24, build the cloud-api image |
+| [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24, build both images |
 | [`deploy-cloud-api.yml`](../.github/workflows/deploy-cloud-api.yml) | Manual, or `main` touching `cloud-api` | Deploys to Railway and waits for `/health` |
+| [`deploy-dashboard.yml`](../.github/workflows/deploy-dashboard.yml) | Manual, or `main` touching `cloud-dashboard` | Deploys to Railway and waits for `/health` |
 | [`publish-cli.yml`](../.github/workflows/publish-cli.yml) | Manual, or a published GitHub release | Verifies, packs, and publishes `parallax-cli` to npm |
 
 ---
 
 ## CI
 
-Runs the whole suite on **Node 22.11 and Node 24**. That matrix is not decoration: 22
+Runs the whole suite on **Node 22.12 and Node 24**. That matrix is not decoration: 22
 needs `--experimental-sqlite` for `node:sqlite` and 24 ignores it, so running both is
 what keeps the supported range honest rather than aspirational. `NODE_OPTIONS` carries
 the flag for the whole job.
+
+The floor is 22.12 rather than 22.11 because Vite 8, which builds the dashboard,
+declares `^20.19.0 || >=22.12.0`. Vite is a build tool and ships in nothing, so this
+constrains where the repo can be *built*, not where the runner can run.
 
 It builds **before** typechecking and testing, and the order matters twice over.
 `cloud-api` resolves `@parallax/common` through its built `.d.ts` rather than a path
@@ -29,9 +34,12 @@ A third job parses every workflow file. An invalid one produces a GitHub run wit
 jobs and an error that appears in no job log, which is a genuinely confusing way to
 discover a stray `:` in a `run:` line.
 
-A second job builds the Docker image for `linux/amd64`, the architecture Railway
-deploys on, and checks that both CLI entry points inside the image resolve. An image
-that builds here is one that builds there.
+Two more jobs build the Docker images for `linux/amd64`, the architecture Railway
+deploys on. An image that builds here is one that builds there. The cloud-api job
+checks that both CLI entry points inside the image resolve; the dashboard job starts
+the container and checks the three things that can only fail at runtime — the API URL
+reaching `/env.js` from the environment, the SPA falling back to `index.html` for a
+client-side route, and the health check Railway polls.
 
 ---
 
@@ -80,6 +88,40 @@ in which case the runner has to be updated too. Its fallback is deliberately qui
 ```bash
 grep "Could not fetch" ~/.parallax/runner.stdout.log
 ```
+
+---
+
+## Deploying the dashboard
+
+The dashboard is a **second Railway service**, and the one thing that must be right is
+its config file.
+
+### One-time setup
+
+1. Create a service named `dashboard` in the same project.
+2. **Settings → Config-as-code → Railway Config File**: `railway.dashboard.json`.
+
+   Railway defaults to `railway.json`, which is the control plane's. Leave it and the
+   dashboard service builds and deploys the API image — a failure that looks like a
+   mystery rather than a misconfiguration.
+3. **Variables**: `PARALLAX_API_URL`, pointing at the API service's public URL. It is
+   read at runtime, so changing it later is a restart rather than a rebuild.
+4. Generate a domain.
+5. Optionally add a repository *variable* `DASHBOARD_HEALTH_URL`, for the same reason
+   the API has one: `railway domain` output has changed shape between CLI versions.
+
+Full detail, including the local stack, is in [dashboard.md](./dashboard.md).
+
+### Deploying
+
+Actions → *Deploy dashboard → Run workflow*, picking the branch; or automatically on a
+push to `main` touching `packages/cloud-dashboard/**`, `Dockerfile.dashboard` or
+`railway.dashboard.json`. By hand: `railway up --service dashboard`.
+
+The health check passes on `{"status":"ok"}` and emits a **warning** — not a failure —
+when the response says `apiConfigured: false`. A dashboard that cannot reach an API
+serves a page that can do nothing, which is worth saying out loud, but it is fixed by
+editing a variable rather than by failing the deploy.
 
 ---
 
@@ -167,10 +209,14 @@ places or `npm publish` fails with a 415, or installs and then breaks at runtime
 
 | Name | Kind | Used by | Required |
 |---|---|---|---|
-| `RAILWAY_TOKEN` | secret | deploy-cloud-api | yes |
+| `RAILWAY_TOKEN` | secret | deploy-cloud-api, deploy-dashboard | yes |
 | `CLOUD_HEALTH_URL` | variable | deploy-cloud-api | no |
+| `DASHBOARD_HEALTH_URL` | variable | deploy-dashboard | no |
 | npm trusted publishing | npm-side config | publish-cli | yes |
 
-Both shipping workflows declare a GitHub **environment** (`production`, `npm`), so you
-can add required reviewers under **Settings → Environments** to gate either behind an
-approval.
+One `RAILWAY_TOKEN` covers both services: a project token reaches every service in the
+project, and `--service` picks which one.
+
+All three shipping workflows declare a GitHub **environment** (`production`, `npm`), so
+you can add required reviewers under **Settings → Environments** to gate any of them
+behind an approval.

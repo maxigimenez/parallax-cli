@@ -232,3 +232,27 @@ describe('validateRoutingRule', () => {
     expect(validateRoutingRule(route)).toMatch(/trigger.type must be one of/)
   })
 })
+
+describe('fillRouteTemplate escaping', () => {
+  /**
+   * Substitution happens inside a serialized JSON document, so a value carrying
+   * a quote or a backslash has to be escaped or the result no longer parses.
+   * The dashboard feeds arbitrary typed text through this, which is where such
+   * a value realistically comes from.
+   */
+  it('survives values that need JSON escaping', () => {
+    const template = findRouteTemplate('ticket-label-analysis')!
+    const filledRoute = fillRouteTemplate(template, {
+      ...ANSWERS,
+      '<LABEL>': 'needs "review"\\now',
+    })
+    expect(JSON.stringify(filledRoute)).toContain('needs \\"review\\"')
+    expect(validateRoutingRule({ ...filledRoute, id: 'rt_x' })).toBeUndefined()
+  })
+
+  it('leaves a token with no answer in place, so the API rejects the route', () => {
+    const template = findRouteTemplate('ticket-label-analysis')!
+    const filledRoute = fillRouteTemplate(template, {})
+    expect(JSON.stringify(filledRoute)).toContain('<PROJECT_ID>')
+  })
+})

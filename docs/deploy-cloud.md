@@ -225,6 +225,32 @@ picks up any `.sql` file it has not already applied and records it in
 Migrations only run forward. There is no down path, so write additive changes: a
 deploy that fails mid-rollout should leave the old container able to serve.
 
+## The dashboard service
+
+`packages/cloud-dashboard` deploys to the **same Railway project as a second service**,
+built from `Dockerfile.dashboard` rather than `Dockerfile`.
+
+Railway reads a service's config from `railway.json` by default, so the dashboard
+service must be pointed at its own file under **Settings → Config-as-code → Railway
+Config File**:
+
+```
+railway.dashboard.json
+```
+
+Miss that step and the dashboard service builds and deploys the control plane image,
+which starts, passes its health check, and serves the wrong thing.
+
+Its only required variable is `PARALLAX_API_URL`, pointing at this service's public
+URL. It is read at runtime rather than baked into the bundle, so moving the API is a
+variable change and a restart.
+
+If you have narrowed `CORS_ORIGINS` on this service from its default, add the
+dashboard's origin to it — otherwise every request the browser makes is blocked
+before it arrives, and the dashboard reports the API as unreachable.
+
+Full detail: [dashboard.md](./dashboard.md).
+
 ## Notes
 
 - **The runner never accepts inbound connections.** It long-polls

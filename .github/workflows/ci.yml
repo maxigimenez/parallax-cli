@@ -22,7 +22,12 @@ jobs:
         # The floor and the newest. Node 22 needs --experimental-sqlite and 24
         # ignores it, so running both is what keeps the supported range honest
         # rather than aspirational.
-        node: ['22.11.0', '24.x']
+        #
+        # The floor is 22.12 rather than 22.11 because Vite 8, which builds the
+        # dashboard, declares `^20.19.0 || >=22.12.0`. It is a build tool and
+        # ships in nothing, so this constrains where the repo can be built, not
+        # where the runner can run.
+        node: ['22.12.0', '24.x']
 
     env:
       # A no-op on 24; required on 22 for node:sqlite.
@@ -53,7 +58,7 @@ jobs:
 
       - name: Typecheck
         run: |
-          for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli; do
+          for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli @parallax/cloud-dashboard; do
             echo "::group::$pkg"
             pnpm --filter "$pkg" exec tsc --noEmit
             echo "::endgroup::"
@@ -121,3 +126,41 @@ jobs:
           docker run --rm parallax-cloud-api:ci node dist/org-cli.js | grep -q 'Usage:'
           docker run --rm parallax-cloud-api:ci node dist/migrate-cli.js 2>&1 \
             | grep -q 'DATABASE_URL is required'
+
+  dashboard-image:
+    name: Build the dashboard image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.dashboard
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: parallax-dashboard:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Starts it for real. The three things that only fail at runtime are the
+      # API URL being injected from the environment, the SPA falling back to
+      # index.html for a client-side route, and the health check Railway polls.
+      - name: Check the container actually serves
+        run: |
+          docker run -d --name dash -p 8080:8080 \
+            -e PARALLAX_API_URL=https://api.example.invalid parallax-dashboard:ci
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8080/health >/dev/null && break
+            sleep 1
+          done
+          curl -s http://127.0.0.1:8080/health | grep -q '"apiConfigured":true'
+          curl -s http://127.0.0.1:8080/env.js | grep -q 'api.example.invalid'
+          curl -sf -o /dev/null http://127.0.0.1:8080/runs/run_1
+          docker rm -f dash

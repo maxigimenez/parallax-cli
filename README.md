@@ -37,15 +37,16 @@ are in **[docs/routes.md](./docs/routes.md)** and served from `GET /v1/route-tem
 ```
 Mac Mini                                    Railway
 ┌──────────────────────────────┐      ┌──────────────────────┐
-│ Hermes gateway               │      │ parallax cloud       │
+│ Hermes gateway               │      │ api                  │
 │   :8642  /p/<profile>/v1/…   │      │   config · registry  │
 │   owns git, PRs, identity    │      │   run history        │
 │            ▲                 │      │   Slack              │
-│            │ POST /v1/runs   │      │                      │
-│ parallax runner              │─────►│                      │
-│   triggers → routes →        │ long │                      │
-│   dispatch → outcomes        │ poll └──────────────────────┘
-└──────────────────────────────┘
+│            │ POST /v1/runs   │      │          ▲           │
+│ parallax runner              │─────►│          │           │
+│   triggers → routes →        │ long │  ┌───────┴────────┐  │
+│   dispatch → outcomes        │ poll │  │ dashboard      │  │
+└──────────────────────────────┘      │  └────────────────┘  │
+                                      └──────────────────────┘
 ```
 
 **Parallax never runs an agent itself and never touches a repository.** It decides;
@@ -54,6 +55,14 @@ tracker and HTTP access to Hermes on the same machine.
 
 The runner only makes outbound connections, so the Mac Mini works behind NAT with no
 tunnel and no port forwarding.
+
+## The dashboard
+
+A web UI for the same thing: watch runs, create routes from templates, manage projects,
+keys and Slack. Sign in with a `prx_usr_` key. It deploys to Railway as a second
+service alongside the API.
+
+Full detail: **[docs/dashboard.md](./docs/dashboard.md)**
 
 ## Getting started
 

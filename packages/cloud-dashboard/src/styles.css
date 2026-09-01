@@ -1,0 +1,1029 @@
+/*
+ * Application layout only.
+ *
+ * Every colour, font, space and border here is a `--bits-*` token, so the page
+ * follows whichever theme is active and nothing needs editing if the palette
+ * moves. Component surfaces come from @16-bits-design/ui; what is defined below
+ * is the shell those components sit in — the frame, the sidebar, the tables and
+ * the states (loading, empty, error) the library does not ship.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * The wrapper ThemeProvider renders. Without an explicit height here the
+ * element between #root and the app has an auto height, and every percentage
+ * height below it resolves to nothing — which is what leaves a centred login
+ * card sitting at the top of the window instead of the middle.
+ *
+ * A column flex container rather than `height: 100%` so the single child
+ * stretches to the viewport when content is short and grows past it when it is
+ * not. `dvh` so mobile browser chrome does not crop the last row.
+ */
+.px-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.px-root > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+body {
+  margin: 0;
+  background: var(--bits-surface);
+  color: var(--bits-text);
+  font-family: var(--bits-font-body);
+  font-size: var(--bits-font-size-body);
+}
+
+a {
+  color: var(--bits-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--bits-primary-soft);
+}
+
+a:focus-visible,
+.px-focusable:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+/* Motion is decorative throughout; meaning never depends on it. */
+@keyframes px-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes px-scan {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes px-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Shell ──────────────────────────────────────────────────────────── */
+
+/*
+ * A definite height, not a percentage.
+ *
+ * The sidebar and the main column both scroll independently, which needs a
+ * height they can resolve `100%` against. Inheriting it through flex-grow does
+ * not give them one: the used height is right, but it is not a *definite* size,
+ * so percentage heights below fall back to auto and every column collapses to
+ * its content. Anchoring one element to the viewport fixes the whole chain.
+ */
+.px-shell {
+  display: flex;
+  height: 100dvh;
+  gap: var(--bits-space-2);
+  padding: var(--bits-space-2) var(--bits-space-2) var(--bits-space-2) 0;
+  background: var(--bits-surface);
+  overflow: hidden;
+}
+
+.px-sidebar {
+  width: 226px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.px-sidebar__brand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--bits-space-3);
+  margin: 10px var(--bits-space-2) 6px;
+  padding: var(--bits-space-3);
+  min-width: 0;
+}
+
+.px-sidebar__mark {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.px-sidebar__wordmark {
+  width: 113px;
+  height: 17px;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.px-sidebar__org {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-1);
+  min-width: 0;
+}
+
+.px-sidebar__nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.px-navgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.px-navgroup__label {
+  font-size: var(--bits-font-size-label);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+  padding: 0 6px;
+}
+
+.px-navgroup__items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.px-navitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: var(--bits-space-2) 9px;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid transparent;
+  color: var(--bits-text-soft);
+  font: inherit;
+  font-size: var(--bits-font-size-small);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s linear,
+    border-color 0.12s linear,
+    color 0.12s linear;
+}
+
+.px-navitem:hover {
+  background: var(--bits-raised);
+  color: var(--bits-text);
+}
+
+.px-navitem:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+.px-navitem[aria-current='page'] {
+  background: var(--bits-muted);
+  border-left-color: var(--bits-primary);
+  color: var(--bits-text);
+}
+
+.px-navitem__dot {
+  width: var(--bits-space-2);
+  height: var(--bits-space-2);
+  flex: none;
+  background: var(--bits-line-strong);
+}
+
+.px-navitem[aria-current='page'] .px-navitem__dot {
+  background: var(--bits-primary);
+}
+
+.px-navitem__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-navitem__count {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+}
+
+.px-sidebar__foot {
+  flex: none;
+  padding: 18px var(--bits-space-5) var(--bits-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-3);
+}
+
+.px-runnerline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+  min-width: 0;
+}
+
+.px-runnerline__dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: var(--bits-success);
+  animation: px-pulse 2s steps(2) infinite;
+}
+
+.px-runnerline__dot--stale {
+  background: var(--bits-danger);
+  animation: none;
+}
+
+.px-runnerline__dot--none {
+  background: var(--bits-line-strong);
+  animation: none;
+}
+
+.px-runnerline__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Main column ────────────────────────────────────────────────────── */
+
+.px-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-3);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.px-topbar {
+  flex: none;
+  padding: 14px var(--bits-space-1) 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bits-space-5);
+  flex-wrap: wrap;
+}
+
+.px-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.px-crumbs__link {
+  font-family: var(--bits-font-display);
+  font-size: var(--bits-font-size-h4);
+  line-height: 13px;
+  color: var(--bits-text-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.12s linear;
+}
+
+.px-crumbs__link:hover {
+  color: var(--bits-primary);
+}
+
+.px-crumbs__sep {
+  width: 3px;
+  height: 3px;
+  flex: none;
+  background: var(--bits-line-strong);
+}
+
+.px-crumbs__here {
+  font-family: var(--bits-font-display);
+  font-size: var(--bits-font-size-h4);
+  line-height: 13px;
+  color: var(--bits-text);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-caret {
+  width: 7px;
+  height: 13px;
+  flex: none;
+  background: var(--bits-primary);
+  animation: px-blink 1.1s steps(1) infinite;
+}
+
+.px-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Panel ──────────────────────────────────────────────────────────── */
+
+.px-panel {
+  flex: 1 0 auto;
+  border: var(--bits-border-width, 2px) solid var(--bits-line);
+  background: var(--bits-panel);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-bottom: var(--bits-space-2);
+}
+
+.px-panel__caption {
+  padding: var(--bits-space-4) 22px;
+  border-bottom: 2px solid var(--bits-line);
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: var(--bits-font-size-small);
+  color: var(--bits-text-soft);
+}
+
+.px-panel__caption::before {
+  content: '';
+  width: var(--bits-space-2);
+  height: var(--bits-space-2);
+  flex: none;
+  background: var(--bits-primary);
+}
+
+.px-panel__body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.px-section {
+  border: 2px solid var(--bits-line);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.px-section__head {
+  border-bottom: 2px solid var(--bits-line);
+  padding: var(--bits-space-4) var(--bits-space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bits-space-4);
+  flex-wrap: wrap;
+}
+
+.px-section__title {
+  font-size: var(--bits-font-size-small);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bits-text-soft);
+  margin: 0;
+  font-weight: inherit;
+  font-family: inherit;
+}
+
+.px-section__body {
+  padding: 18px var(--bits-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-4);
+  min-width: 0;
+}
+
+/* ── Stats ──────────────────────────────────────────────────────────── */
+
+/*
+ * The 2px gap over a line-coloured background draws the hairlines between
+ * tiles, so the grid needs no per-tile borders that would double up.
+ */
+.px-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 2px;
+  background: var(--bits-line);
+  border: 2px solid var(--bits-line);
+}
+
+.px-stat {
+  background: var(--bits-raised);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-3);
+  min-width: 0;
+}
+
+.px-stat__label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--bits-font-size-caption);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+}
+
+.px-stat__swatch {
+  width: 9px;
+  height: 9px;
+  flex: none;
+}
+
+.px-stat__value {
+  font-family: var(--bits-font-display);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.px-stat__note {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+}
+
+/* ── Table ──────────────────────────────────────────────────────────── */
+
+/*
+ * A real <table>, not a grid of divs: rows and headers must be announced as
+ * such, and a run list is genuinely tabular. `--px-cols` lets each screen set
+ * its own column proportions while the chrome stays identical.
+ */
+.px-tablewrap {
+  overflow-x: auto;
+}
+
+.px-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.px-table th {
+  padding: 10px 18px;
+  border-bottom: 2px solid var(--bits-line);
+  font-size: var(--bits-font-size-label);
+  font-weight: inherit;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+  white-space: nowrap;
+}
+
+.px-table td {
+  padding: var(--bits-space-3) 18px;
+  border-bottom: 2px solid var(--bits-raised);
+  vertical-align: middle;
+  min-width: 0;
+}
+
+.px-table tbody tr {
+  transition: background 0.12s linear;
+}
+
+.px-table tbody tr:hover {
+  background: var(--bits-raised);
+}
+
+.px-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.px-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.px-rowlink {
+  display: block;
+  color: inherit;
+  min-width: 0;
+}
+
+.px-rowlink:hover {
+  color: inherit;
+}
+
+.px-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.px-cell__primary {
+  font-size: var(--bits-font-size-body);
+  color: var(--bits-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-cell__secondary {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-agentcell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* ── Segmented filter ───────────────────────────────────────────────── */
+
+.px-segmented {
+  display: flex;
+  gap: 2px;
+  background: var(--bits-line);
+  border: 2px solid var(--bits-line);
+}
+
+.px-segmented__option {
+  padding: 7px var(--bits-space-3);
+  font: inherit;
+  font-size: var(--bits-font-size-caption);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 0;
+  background: var(--bits-raised);
+  color: var(--bits-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s linear,
+    color 0.12s linear;
+}
+
+.px-segmented__option:hover {
+  color: var(--bits-text);
+}
+
+.px-segmented__option:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+.px-segmented__option[aria-pressed='true'] {
+  background: var(--bits-primary);
+  color: var(--bits-ink);
+}
+
+/* ── States ─────────────────────────────────────────────────────────── */
+
+.px-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: var(--bits-space-3) var(--bits-space-4);
+  border: 2px solid var(--bits-line);
+  background: var(--bits-raised);
+  color: var(--bits-text-soft);
+  font-size: var(--bits-font-size-small);
+  line-height: 1.6;
+}
+
+.px-alert--danger {
+  border-color: var(--bits-danger);
+  color: var(--bits-danger-soft);
+}
+
+.px-alert--warning {
+  border-color: var(--bits-amber);
+}
+
+.px-alert__icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-ink);
+  background: var(--bits-primary);
+}
+
+.px-alert--danger .px-alert__icon {
+  background: var(--bits-danger);
+}
+
+.px-alert--warning .px-alert__icon {
+  background: var(--bits-amber);
+}
+
+.px-alert__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.px-empty {
+  padding: 44px var(--bits-space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--bits-space-3);
+  text-align: center;
+}
+
+.px-empty__mark {
+  display: flex;
+  gap: 3px;
+}
+
+.px-empty__mark span {
+  width: 10px;
+  height: 10px;
+  background: var(--bits-muted);
+}
+
+.px-empty__mark span:nth-child(2) {
+  background: var(--bits-line-strong);
+}
+
+/* A determinate-looking bar for an indeterminate wait would be a lie; this
+ * scans instead, and every use is paired with live-region text. */
+.px-loading {
+  padding: 40px var(--bits-space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--bits-space-4);
+}
+
+.px-loading__track {
+  width: 120px;
+  height: 6px;
+  background: var(--bits-muted);
+  overflow: hidden;
+  position: relative;
+}
+
+.px-loading__bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  background: var(--bits-primary);
+  animation: px-scan 1.1s steps(6) infinite;
+}
+
+/* ── Code and secrets ───────────────────────────────────────────────── */
+
+.px-code {
+  margin: 0;
+  padding: var(--bits-space-3) var(--bits-space-4);
+  border: 2px solid var(--bits-line);
+  background: var(--bits-surface);
+  color: var(--bits-text-soft);
+  font-family: var(--bits-font-body);
+  font-size: var(--bits-font-size-small);
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.px-secret {
+  display: flex;
+  align-items: center;
+  gap: var(--bits-space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.px-secret__value {
+  font-size: var(--bits-font-size-small);
+  color: var(--bits-text-soft);
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+/* ── Events timeline ────────────────────────────────────────────────── */
+
+.px-events {
+  display: flex;
+  flex-direction: column;
+  border-top: 2px solid var(--bits-line);
+}
+
+.px-event {
+  display: grid;
+  grid-template-columns: 90px 14px 1fr;
+  gap: var(--bits-space-3);
+  align-items: start;
+  padding: 10px 18px;
+  border-bottom: 2px solid var(--bits-raised);
+  min-width: 0;
+}
+
+.px-event__time {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.px-event__dot {
+  width: var(--bits-space-2);
+  height: var(--bits-space-2);
+  margin-top: 5px;
+  background: var(--bits-line-strong);
+}
+
+.px-event__dot--error {
+  background: var(--bits-danger);
+}
+
+.px-event__dot--warn {
+  background: var(--bits-amber);
+}
+
+.px-event__dot--success {
+  background: var(--bits-success);
+}
+
+.px-event__text {
+  min-width: 0;
+}
+
+.px-event__message {
+  font-size: var(--bits-font-size-small);
+  color: var(--bits-text-muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin: 4px 0 0;
+}
+
+/* ── Forms ──────────────────────────────────────────────────────────── */
+
+.px-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-4);
+  min-width: 0;
+}
+
+.px-form__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: var(--bits-space-4);
+  align-items: start;
+}
+
+.px-form__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.px-kv {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: var(--bits-space-2) var(--bits-space-4);
+  font-size: var(--bits-font-size-small);
+  min-width: 0;
+}
+
+.px-kv dt {
+  color: var(--bits-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: var(--bits-font-size-label);
+  padding-top: 2px;
+}
+
+.px-kv dd {
+  margin: 0;
+  color: var(--bits-text-soft);
+  overflow-wrap: anywhere;
+}
+
+/* ── Login ──────────────────────────────────────────────────────────── */
+
+/* Fills the viewport and centres the card on both axes. */
+.px-login {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--bits-space-5);
+  background: var(--bits-surface);
+  background-image:
+    repeating-linear-gradient(0deg, rgb(242 237 225 / 3%) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgb(242 237 225 / 3%) 0 1px, transparent 1px 8px);
+}
+
+.px-login__card {
+  width: min(100%, 378px);
+  border: 2px solid var(--bits-line);
+  background: var(--bits-panel);
+  display: flex;
+  flex-direction: column;
+}
+
+.px-login__rule {
+  height: var(--bits-space-1);
+  background: var(--bits-primary);
+}
+
+.px-login__body {
+  padding: 28px 28px var(--bits-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.px-login__brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.px-login__foot {
+  border-top: 2px solid var(--bits-line);
+  padding: 11px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bits-space-3);
+  font-size: var(--bits-font-size-caption);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+}
+
+.px-login__hint {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-2);
+  border-top: 2px solid var(--bits-line);
+  padding-top: 14px;
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────── */
+
+/*
+ * Below the breakpoint the shell stops being two columns: the sidebar becomes a
+ * band that scrolls horizontally above the content, which keeps every
+ * destination reachable without a drawer, a focus trap or a hamburger.
+ */
+@media (max-width: 860px) {
+  .px-shell {
+    flex-direction: column;
+    /* The page itself scrolls here, so the shell must grow past the viewport. */
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding: var(--bits-space-2);
+    gap: var(--bits-space-3);
+  }
+
+  .px-sidebar {
+    width: 100%;
+    height: auto;
+    border-bottom: 2px solid var(--bits-line);
+  }
+
+  /*
+   * Wraps rather than scrolling sideways. A horizontal scroller hides whole
+   * groups behind a gesture with no affordance — the second group was simply
+   * off-screen — and every destination here should be visible at once.
+   */
+  .px-sidebar__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--bits-space-3) var(--bits-space-4);
+    overflow: visible;
+    padding: var(--bits-space-2);
+  }
+
+  .px-navgroup__items {
+    flex-wrap: wrap;
+  }
+
+  .px-navgroup {
+    flex: none;
+  }
+
+  .px-navgroup__items {
+    flex-direction: row;
+  }
+
+  .px-navitem {
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+  }
+
+  .px-navitem[aria-current='page'] {
+    border-left-color: transparent;
+    border-bottom-color: var(--bits-primary);
+  }
+
+  .px-sidebar__foot {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: var(--bits-space-3) var(--bits-space-2);
+  }
+
+  .px-main {
+    height: auto;
+    overflow: visible;
+  }
+
+  .px-kv {
+    grid-template-columns: 1fr;
+    gap: 2px var(--bits-space-4);
+  }
+
+  .px-kv dd {
+    margin-bottom: var(--bits-space-2);
+  }
+
+  .px-event {
+    grid-template-columns: 14px 1fr;
+  }
+
+  .px-event__time {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Utilities ──────────────────────────────────────────────────────── */
+
+/*
+ * Text for assistive technology only. Used for table headers whose column holds
+ * icon-only actions, and for the live regions that announce a copy or a wait —
+ * the visual design already makes those obvious, but nothing announces them.
+ */
+.px-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -359,6 +359,17 @@ export function fillRouteTemplate(
   values: Record<string, string>
 ): Omit<RoutingRule, 'id'> {
   const serialized = JSON.stringify(template.route)
-  const filled = serialized.replace(/<[A-Z_]+>/g, (token) => values[token] ?? token)
+  const filled = serialized.replace(/<[A-Z_]+>/g, (token) => {
+    const value = values[token]
+    if (value === undefined) {
+      return token
+    }
+    // Substitution happens inside a JSON string literal, so the value is
+    // escaped the way JSON would escape it, minus the quotes the literal
+    // already carries. A value containing a quote or a backslash -- a prompt
+    // with a quoted phrase, a Windows-style path -- would otherwise produce a
+    // document that no longer parses.
+    return JSON.stringify(value).slice(1, -1)
+  })
   return JSON.parse(filled) as Omit<RoutingRule, 'id'>
 }

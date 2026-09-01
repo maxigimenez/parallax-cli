@@ -11,7 +11,7 @@ standing between an unattended daemon's credential and a human's.
 
 | Scope | Prefix | Used by | Reaches |
 |---|---|---|---|
-| `user` | `prx_usr_` | You, and later the dashboard | `/v1/*` management endpoints |
+| `user` | `prx_usr_` | You and the dashboard | `/v1/*` management endpoints |
 | `runner` | `prx_rnr_` | The runner on the Mac Mini | `/v1/runner/*` only |
 
 ```
@@ -63,6 +63,31 @@ Unauthenticated, because Railway's health check runs before any key exists.
 ```json
 { "status": "ok", "version": "0.2.0" }
 ```
+
+---
+
+## Identity
+
+```http
+GET /v1/me
+```
+
+Resolves the presented key to the organization behind it.
+
+```json
+{
+  "org": { "id": "org_abc123", "name": "Your Company", "createdAt": "2026-08-01T00:00:00.000Z" },
+  "key": { "id": "key_abc123", "name": "dashboard", "prefix": "prx_usr_9f2a41c8", "scope": "user" }
+}
+```
+
+This exists for the dashboard, where a key is the whole of sign-in: it has to be able
+to check one *before* storing it, and to show whose organization it opened. Any other
+endpoint would answer the "is this key valid" half, but none names the organization,
+and picking an arbitrary one to probe with would make an unrelated endpoint's failure
+look like a rejected key.
+
+A runner key here is a `401`, like anywhere else under `/v1/`.
 
 ---
 

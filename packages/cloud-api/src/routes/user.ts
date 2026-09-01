@@ -32,6 +32,40 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
 
   const authOf = (request: unknown): AuthContext => (request as { auth: AuthContext }).auth
 
+  // ── Identity ───────────────────────────────────────────────
+
+  /**
+   * Resolves the presented key to the org behind it.
+   *
+   * The dashboard needs this: a key is the whole of its login, so it has to be
+   * able to check one before storing it, and show whose org it opened. Every
+   * other endpoint would answer the "is this key valid" half, but none names
+   * the organization, and picking an arbitrary one to probe with would make an
+   * unrelated endpoint's failure look like a rejected key.
+   */
+  app.get('/v1/me', async (request) => {
+    const { orgId, keyId } = authOf(request)
+    const { rows } = await db.query(
+      `SELECT o.id, o.name, o.created_at, k.name AS key_name, k.prefix AS key_prefix
+       FROM organizations o JOIN api_keys k ON k.org_id = o.id
+       WHERE o.id = $1 AND k.id = $2`,
+      [orgId, keyId]
+    )
+    const row = rows[0] as
+      | { id: string; name: string; created_at: string; key_name: string; key_prefix: string }
+      | undefined
+
+    return {
+      org: { id: orgId, name: row?.name ?? orgId, createdAt: row?.created_at ?? null },
+      key: {
+        id: keyId,
+        name: row?.key_name ?? null,
+        prefix: row?.key_prefix ?? null,
+        scope: 'user',
+      },
+    }
+  })
+
   // ── Runners and agents ─────────────────────────────────────
 
   app.get('/v1/runners', async (request) => {

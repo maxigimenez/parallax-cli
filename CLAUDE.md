@@ -15,6 +15,7 @@ pnpm lint:fix         # auto-fix lint issues
 pnpm --filter @parallax/orchestrator test
 pnpm --filter @parallax/cloud-api test
 pnpm --filter parallax-cli test
+pnpm --filter @parallax/cloud-dashboard test
 
 # local development — use this entrypoint for all manual testing
 pnpm parallax preflight
@@ -27,6 +28,9 @@ pnpm parallax stop
 # cloud, against a local or Railway Postgres
 DATABASE_URL=... pnpm --filter @parallax/cloud-api dev
 DATABASE_URL=... pnpm --filter @parallax/cloud-api db:migrate
+
+# dashboard, against a local or deployed cloud-api
+PARALLAX_API_URL=http://127.0.0.1:8080 pnpm --filter @parallax/cloud-dashboard dev
 ```
 
 Node.js >= 23.7.0 and pnpm 10.x are required.
@@ -60,9 +64,10 @@ needs **no local clone** of any repository, and `ProjectConfig` has no `workspac
 - **`packages/cli`** — the published `parallax-cli` package, the only user entry point.
 - **`packages/cloud-api`** — the Railway-deployed control plane. Fastify + Postgres.
   Stores config, the agent registry, and run history; sends Slack notifications.
-- **`packages/cloud-dashboard`** — not built yet. Will consume the cloud user API.
-  Named as a sibling of `cloud-api` because both are hosted; the runner also serves
-  an API, so an unqualified `api` would be ambiguous.
+- **`packages/cloud-dashboard`** — the React app over the cloud user API. Vite +
+  React 19, built on `@16-bits-design/ui`. Named as a sibling of `cloud-api` because
+  both are hosted; the runner also serves an API, so an unqualified `api` would be
+  ambiguous. Deployed to Railway as its own service; see `docs/dashboard.md`.
 
 ### Runtime state (`~/.parallax/`)
 
@@ -126,14 +131,19 @@ Migrations are plain `.sql` files applied in filename order, one transaction eac
 
 ## CI and releasing
 
-Three workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test on Node 22 and
-24, build the image), `deploy-cloud-api.yml` (Railway), `publish-cli.yml` (npm).
-`docs/releasing.md` covers secrets and the manual fallbacks.
+Four workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test on Node 22 and
+24, build both images), `deploy-cloud-api.yml` and `deploy-dashboard.yml` (Railway),
+`publish-cli.yml` (npm). `docs/releasing.md` covers secrets and the manual fallbacks.
 
 The Node matrix is load-bearing: 22 needs `--experimental-sqlite` and 24 ignores it, so
-both must run for the supported range to mean anything. CI builds before testing
+both must run for the supported range to mean anything. Its floor is 22.12 rather than
+22.11 because Vite 8, which builds the dashboard, requires it. CI builds before testing
 because one suite imports the built package to catch circular imports the source alias
 hides.
+
+The two Railway services share a repo but not a config file. `railway.json` is the
+control plane's; the dashboard service must have its Railway Config File set to
+`railway.dashboard.json`, or it silently deploys the API image.
 
 ## Key conventions
 
@@ -144,6 +154,10 @@ hides.
 - **`pnpm parallax <command>`** is the canonical local testing entrypoint.
 - **Docs updates belong in the same commit** as behavior changes.
 - Tests live in `packages/<name>/test/` and mirror the `src/` structure.
+- The dashboard's screen tests run against payloads recorded from a live `cloud-api`
+  over real Postgres, in `test/fixtures/`. Hand-written ones agree with the source by
+  construction and miss what actually breaks a browser — `run_events.ts` arrives as a
+  string, because node-postgres will not narrow a bigint.
 - Prefer testing pure logic directly. `test/hermes/fake-hermes-server.ts` exists so the
   adapter's timeout, cancellation, and degradation paths are testable without a real
   Hermes; it can misbehave on demand.
