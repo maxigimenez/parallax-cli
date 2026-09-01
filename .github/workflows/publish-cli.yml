@@ -97,4 +97,5 @@ jobs:
 
       - name: Skipped
         if: ${{ inputs.dry_run }}
-        run: echo "Dry run: packed and verified, nothing published."
+        run: |
+          echo "Dry run: packed and verified, nothing published."

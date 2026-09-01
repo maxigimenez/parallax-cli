@@ -44,6 +44,13 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      # Build first, for two reasons: cloud-api resolves @parallax/common
+      # through its built .d.ts rather than a path alias, so a typecheck without
+      # dist cannot see it; and one test suite imports the built package to
+      # catch circular imports that only fail in the real ESM graph.
+      - name: Build
+        run: pnpm build
+
       - name: Typecheck
         run: |
           for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli; do
@@ -52,13 +59,39 @@ jobs:
             echo "::endgroup::"
           done
 
-      # Before tests: one suite imports the built package specifically, to catch
-      # circular imports that only fail in the real ESM graph.
-      - name: Build
-        run: pnpm build
-
       - name: Test
         run: pnpm test
+
+  workflows:
+    name: Validate the workflow files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # An invalid workflow shows up as a run with no jobs and an error that
+      # appears in no job log, which is a genuinely confusing way to find out.
+      - name: Parse every workflow
+        run: |
+          npm install --no-save js-yaml >/dev/null 2>&1
+          node -e "
+            const yaml = require('js-yaml'), fs = require('fs');
+            let bad = 0;
+            for (const f of fs.readdirSync('.github/workflows')) {
+              try {
+                const w = yaml.load(fs.readFileSync('.github/workflows/' + f, 'utf8'));
+                // Bare \`on\` is YAML 1.1 boolean true, so accept either key.
+                const on = w.on ?? w[true];
+                if (!on || !w.jobs) throw new Error('missing on: or jobs:');
+                console.log(f + ': ' + Object.keys(on).join(', '));
+              } catch (e) {
+                console.log('::error file=.github/workflows/' + f + '::' + e.message);
+                bad++;
+              }
+            }
+            process.exit(bad ? 1 : 0);
+          "
 
   image:
     name: Build the cloud-api image

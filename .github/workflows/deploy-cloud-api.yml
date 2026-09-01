@@ -1,9 +1,11 @@
 name: Deploy cloud-api
 
 on:
-  # Deploys are deliberately manual by default: a control plane that redeploys
-  # on every merge will interrupt a runner's long poll for no reason. Set
-  # `auto_deploy` below to a branch if you want that.
+  # Two ways in. Manual dispatch lets you pick the branch, so a change can be
+  # deployed before it merges. The push trigger is path-filtered rather than
+  # firing on every merge to main, because redeploying the control plane
+  # interrupts a runner's long poll for no reason. Delete the `push:` block
+  # below if you would rather every deploy be deliberate.
   workflow_dispatch:
     inputs:
       service:

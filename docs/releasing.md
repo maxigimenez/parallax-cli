@@ -17,10 +17,17 @@ needs `--experimental-sqlite` for `node:sqlite` and 24 ignores it, so running bo
 what keeps the supported range honest rather than aspirational. `NODE_OPTIONS` carries
 the flag for the whole job.
 
-It builds before testing, because one suite imports the **built** package rather than
-the source — every other test aliases `@parallax/common` to `src/`, which resolves
-module cycles differently from the real ESM graph. A circular import once passed the
-entire suite and only failed when the container started.
+It builds **before** typechecking and testing, and the order matters twice over.
+`cloud-api` resolves `@parallax/common` through its built `.d.ts` rather than a path
+alias, so a typecheck against a clean tree cannot see it at all. And one suite imports
+the built package rather than the source — every other test aliases
+`@parallax/common` to `src/`, which resolves module cycles differently from the real
+ESM graph. A circular import once passed the entire suite and only failed when the
+container started.
+
+A third job parses every workflow file. An invalid one produces a GitHub run with no
+jobs and an error that appears in no job log, which is a genuinely confusing way to
+discover a stray `:` in a `run:` line.
 
 A second job builds the Docker image for `linux/amd64`, the architecture Railway
 deploys on, and checks that both CLI entry points inside the image resolve. An image
@@ -41,9 +48,21 @@ that builds here is one that builds there.
 
 ### Deploying
 
-Manually, from the Actions tab — **Deploy cloud-api → Run workflow**, with the service
-name (default `api`). Or push to `main` touching `packages/cloud-api/**`,
-`packages/common/**`, `Dockerfile` or `railway.json`.
+There are two ways in.
+
+**Manually**, from the Actions tab — *Deploy cloud-api → Run workflow*. GitHub's
+**"Use workflow from"** dropdown picks the branch, and the deploy uses that checkout,
+so you can ship a branch before it merges. The service name defaults to `api`.
+
+> **The Run workflow button only appears once the workflow is on your default branch.**
+> GitHub reads `workflow_dispatch` from `main` regardless of which branch you want to
+> run. Until this merges, deploy by hand with `railway up --service api` from the repo
+> root.
+
+**Automatically**, on a push to `main` that touches `packages/cloud-api/**`,
+`packages/common/**`, `Dockerfile` or `railway.json`. Path-filtered rather than every
+merge, because redeploying the control plane interrupts a runner's long poll for no
+reason. Delete the `push:` block if you would rather every deploy be deliberate.
 
 The workflow deploys straight from the checkout, so no git remote needs connecting on
 the Railway side, and the repo root is the Docker build context.
@@ -51,9 +70,6 @@ the Railway side, and the repo root is the Docker build context.
 Deploys are serialized (`concurrency` without cancellation) because the pre-deploy step
 runs migrations, and two concurrent migration runs against one database is a way to
 lose an afternoon.
-
-**Path-filtered rather than every merge.** A control plane that redeploys on each merge
-interrupts a runner's long poll for no reason.
 
 ### After a deploy
 
@@ -87,7 +103,8 @@ On npmjs.com, under the package's **Settings → Trusted Publisher**, set:
 
 ### Publishing
 
-**Deploy cloud-api → Run workflow**, or publish a GitHub release.
+From the Actions tab — *Publish parallax-cli → Run workflow* — or by publishing a
+GitHub release.
 
 Inputs:
 
