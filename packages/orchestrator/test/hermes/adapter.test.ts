@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { RUN_LOG_KIND, RUN_STATUS, type Logger, type RunLogKind } from '@parallax/common'
 import { HermesClient } from '../../src/hermes/client.js'
 import { HermesAdapter, mapHermesStatus } from '../../src/hermes/adapter.js'
@@ -126,9 +126,16 @@ describe('HermesAdapter.run', () => {
     server = await startFakeHermes({ statuses: ['running'] })
     const { logger } = makeLogger()
     const controller = new AbortController()
-    setTimeout(() => controller.abort(), 30)
 
-    const outcome = await adapterFor(server, logger).run(JOB, controller.signal)
+    const pending = adapterFor(server, logger).run(JOB, controller.signal)
+
+    // Wait for Hermes to have accepted the run rather than guessing with a
+    // timer: aborting before that lands in a different branch, one where there
+    // is no run id to stop yet, and the assertion below would race.
+    await vi.waitFor(() => expect(server!.createdBodies).toHaveLength(1))
+    controller.abort()
+
+    const outcome = await pending
 
     expect(outcome.status).toBe(RUN_STATUS.CANCELED)
     expect(server.stopCalls).toEqual(['run_test_1'])
