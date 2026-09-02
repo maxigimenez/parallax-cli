@@ -97,12 +97,54 @@ async function writeBundledPackage(metadata) {
   await copyDirectory(path.join(metadata.sourceDir, 'dist'), path.join(targetDir, 'dist'))
 }
 
+/**
+ * Refuses to pack a tarball that would fail on a user's machine.
+ *
+ * Each bundled package is written a minimal manifest with no `dependencies`, so
+ * npm never learns that the orchestrator needs p-limit, fastify and the rest.
+ * The host package is the only place they can be declared, and if they are not,
+ * the install succeeds and the first `parallax start` dies with
+ * ERR_MODULE_NOT_FOUND. That shipped in 0.2.0.
+ *
+ * The same rule is asserted in `test/bundled-dependencies.test.ts`, which runs
+ * on every PR. This is the last gate before a tarball is written.
+ */
+function assertBundledDependenciesAreDeclared(cliPackageJson) {
+  const declared = cliPackageJson.dependencies ?? {}
+  const problems = []
+
+  for (const metadata of bundledPackages) {
+    const source = JSON.parse(readFileSync(path.join(metadata.sourceDir, 'package.json'), 'utf8'))
+    for (const [name, range] of Object.entries(source.dependencies ?? {})) {
+      if (name.startsWith('@parallax/')) {
+        continue
+      }
+      if (!declared[name]) {
+        problems.push(`  ${name}@${range} — needed by ${metadata.name}, missing from the cli`)
+      } else if (declared[name] !== range) {
+        problems.push(`  ${name} — cli declares ${declared[name]}, ${metadata.name} needs ${range}`)
+      }
+    }
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `packages/cli/package.json must declare every third-party dependency of the\n` +
+        `packages it bundles, because a bundled package ships without its own:\n\n` +
+        problems.join('\n') +
+        `\n\nAdd them to "dependencies" in packages/cli/package.json.`
+    )
+  }
+}
+
 async function main() {
   runPnpm(['--filter', '@parallax/common', 'build'])
   runPnpm(['--filter', '@parallax/orchestrator', 'build'])
   runPnpm(['--filter', 'parallax-cli', 'build'])
 
   const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, 'utf8'))
+  assertBundledDependenciesAreDeclared(cliPackageJson)
+
   const backup = {
     cliPackageJson,
     packages: {},

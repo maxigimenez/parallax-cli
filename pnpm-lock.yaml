@@ -53,15 +53,27 @@ importers:
       '@clack/prompts':
         specifier: 1.4.0
         version: 1.4.0
+      '@fastify/cors':
+        specifier: 11.2.0
+        version: 11.2.0
       '@parallax/common':
-        specifier: 0.2.0
+        specifier: 0.2.1
         version: link:../common
       '@parallax/orchestrator':
-        specifier: 0.2.0
+        specifier: 0.2.1
         version: link:../orchestrator
       chalk:
         specifier: '4'
         version: 4.1.2
+      fastify:
+        specifier: 5.7.4
+        version: 5.7.4
+      p-limit:
+        specifier: 6.1.0
+        version: 6.1.0
+      strip-ansi:
+        specifier: 7.1.2
+        version: 7.1.2
     devDependencies:
       '@types/node':
         specifier: 25.3.0

@@ -1,6 +1,6 @@
 {
   "name": "parallax-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Trigger Hermes agents from your tickets and pull requests.",
   "type": "module",
   "keywords": [
@@ -34,9 +34,13 @@
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",
-    "@parallax/common": "0.2.0",
-    "@parallax/orchestrator": "0.2.0",
-    "chalk": "4"
+    "@fastify/cors": "11.2.0",
+    "@parallax/common": "0.2.1",
+    "@parallax/orchestrator": "0.2.1",
+    "chalk": "4",
+    "fastify": "5.7.4",
+    "p-limit": "6.1.0",
+    "strip-ansi": "7.1.2"
   },
   "bundleDependencies": [
     "@parallax/common",
