@@ -1,234 +1,126 @@
 import fs from 'node:fs/promises'
-import fsSync from 'node:fs'
 import path from 'node:path'
 import { createRequire } from 'node:module'
-import { parseStartOptions } from '../args.js'
-import { buildDashboardUrl, resolveNetworkHostname } from '../network.js'
-import {
-  isProcessAlive,
-  readFileTail,
-  spawnDetached,
-  startSpinner,
-  stopProcessBestEffort,
-  waitForUrlHealth,
-} from '../process.js'
-import type { CliContext } from '../types.js'
+import chalk from 'chalk'
+import { spawnDetached, waitForUrlHealth } from '../process.js'
+import { RUNNER_STDERR_FILE, RUNNER_STDOUT_FILE } from '../constants.js'
+import { resolveRunnerNode, SQLITE_FLAG } from '../node-runtime.js'
+import type { CliContext, StartCommandOptions } from '../types.js'
 
-const requireFromCli = createRequire(import.meta.url)
+const require = createRequire(import.meta.url)
 
-function resolveOrchestratorEntryPoint(rootDir: string): string {
-  const packageCandidates = [
-    '@parallax/orchestrator/dist/orchestrator/src/index.js',
-    '@parallax/orchestrator/dist/index.js',
+/** Locates the built runner entry point across dev and installed layouts. */
+export function resolveRunnerEntryPoint(rootDir: string): string {
+  const candidates = [
+    () => require.resolve('@parallax/orchestrator/dist/orchestrator/src/index.js'),
+    () => require.resolve('@parallax/orchestrator/dist/index.js'),
+    () => require.resolve('@parallax/orchestrator'),
   ]
-  for (const candidate of packageCandidates) {
+  for (const candidate of candidates) {
     try {
-      return requireFromCli.resolve(candidate)
+      return candidate()
     } catch {
       continue
     }
   }
 
-  const localCandidates = [
-    path.resolve(rootDir, 'packages/orchestrator/dist/orchestrator/src/index.js'),
-    path.resolve(rootDir, 'packages/orchestrator/dist/index.js'),
-  ]
-  for (const candidate of localCandidates) {
-    if (fsSync.existsSync(candidate)) {
-      return candidate
-    }
-  }
-
-  throw new Error(
-    'Unable to resolve orchestrator runtime. Build dependencies first or reinstall parallax package.'
-  )
+  const fallback = path.resolve(rootDir, 'packages/orchestrator/dist/orchestrator/src/index.js')
+  return fallback
 }
 
-export async function runStart(args: string[], context: CliContext) {
-  const CYAN = '\x1b[36m'
-  const BLUE = '\x1b[34m'
-  const GREEN = '\x1b[32m'
-  const YELLOW = '\x1b[33m'
-  const DIM = '\x1b[2m'
-  const RESET = '\x1b[0m'
-
-  const options = parseStartOptions(args)
+export async function runStart(context: CliContext, options: StartCommandOptions): Promise<void> {
   const dataDir = context.defaultDataDir
-
   await fs.mkdir(dataDir, { recursive: true })
 
-  console.log('')
-  console.log(`${CYAN}⏳ Initializing Parallax...${RESET}`)
-  console.log(`${BLUE}📁 Data Dir:${RESET} ${DIM}${dataDir}${RESET}`)
-  console.log('')
-
-  const storedConfig = await context.loadStoredConfig()
-  if (storedConfig.projects.length === 0) {
-    console.error(`${YELLOW}No projects configured. Run 'parallax init' to get started.${RESET}`)
-    process.exit(1)
+  const config = await context.loadStoredConfig()
+  if (!config.hermes) {
+    throw new Error('No Hermes gateway configured. Run "parallax init" first.')
   }
-  const env = context.buildEnvConfig(dataDir, {
-    apiPort: options.apiPort,
-    uiPort: options.uiPort,
-    concurrency: options.concurrency,
-    networkAccess: options.networkAccess,
-  })
-  const workspaceDevMode = process.env.NODE_ENV === 'dev'
-  const orchestratorStdoutPath = path.join(dataDir, 'orchestrator.stdout.log')
-  const orchestratorStderrPath = path.join(dataDir, 'orchestrator.stderr.log')
-  const uiStdoutPath = path.join(dataDir, 'ui.stdout.log')
-  const uiStderrPath = path.join(dataDir, 'ui.stderr.log')
-  const spinner = startSpinner('Starting Parallax...')
 
-  let orchestratorPid = 0
-  let uiPid = 0
-
+  const manifestPath = path.join(dataDir, context.manifestFile)
   try {
-    const existingManifestPath = path.join(dataDir, context.manifestFile)
-    if (await context.ensureFileExists(existingManifestPath)) {
-      const existingState = await context.loadRunningState().catch(() => undefined)
-      const existingUiAlive =
-        existingState?.uiPid !== undefined ? isProcessAlive(existingState.uiPid) : false
-      if (existingState && (isProcessAlive(existingState.orchestratorPid) || existingUiAlive)) {
-        throw new Error(
-          `Parallax is already running on http://localhost:${existingState.uiPort}. Run 'parallax open' to view the dashboard, or 'parallax stop' to stop it.`
-        )
-      }
-
-      await fs.unlink(existingManifestPath).catch(() => undefined)
-    }
-
-    await Promise.all([
-      fs.writeFile(orchestratorStdoutPath, ''),
-      fs.writeFile(orchestratorStderrPath, ''),
-      fs.writeFile(uiStdoutPath, ''),
-      fs.writeFile(uiStderrPath, ''),
-    ])
-
-    if (workspaceDevMode) {
-      orchestratorPid = spawnDetached(
-        process.execPath,
-        ['--import', 'tsx', path.resolve(context.rootDir, 'packages/orchestrator/src/index.ts')],
-        context.rootDir,
-        env,
-        {
-          stdoutPath: orchestratorStdoutPath,
-          stderrPath: orchestratorStderrPath,
-        }
-      )
-
-      uiPid = spawnDetached(
-        'pnpm',
-        [
-          '--filter',
-          '@parallax/ui',
-          'start',
-          '--host',
-          options.networkAccess ? '0.0.0.0' : '127.0.0.1',
-          '--port',
-          String(options.uiPort),
-        ],
-        context.rootDir,
-        options.networkAccess
-          ? {
-              VITE_PARALLAX_API_PORT: String(options.apiPort),
-              PARALLAX_NETWORK_ACCESS: 'true',
-            }
-          : {
-              VITE_PARALLAX_API_BASE: `http://localhost:${options.apiPort}`,
-              PARALLAX_NETWORK_ACCESS: 'false',
-            },
-        {
-          stdoutPath: uiStdoutPath,
-          stderrPath: uiStderrPath,
-        }
-      )
-    } else {
-      orchestratorPid = spawnDetached(
-        process.execPath,
-        [resolveOrchestratorEntryPoint(context.rootDir)],
-        process.cwd(),
-        env,
-        {
-          stdoutPath: orchestratorStdoutPath,
-          stderrPath: orchestratorStderrPath,
-        }
-      )
-    }
-
-    if (orchestratorPid <= 0) {
-      throw new Error('Failed to spawn orchestrator process.')
-    }
-
-    if (workspaceDevMode && uiPid <= 0) {
-      throw new Error('Failed to spawn UI process.')
-    }
-
-    await waitForUrlHealth(`http://localhost:${options.apiPort}/tasks`, 'Orchestrator API')
-    await waitForUrlHealth(`http://localhost:${options.uiPort}`, 'Parallax UI')
-
-    await fs.writeFile(
-      path.join(dataDir, context.manifestFile),
-      JSON.stringify(
-        {
-          startedAt: Date.now(),
-          orchestratorPid,
-          uiPid: uiPid || undefined,
-          apiPort: options.apiPort,
-          uiPort: options.uiPort,
-          networkAccess: options.networkAccess,
-        },
-        null,
-        2
-      )
-    )
-
-    console.log('')
-    console.log('')
-    console.log(`${GREEN}✓ Parallax started in background.${RESET}`)
-    console.log(`${DIM}Orchestrator PID:${RESET} ${orchestratorPid}`)
-    console.log(`${DIM}Dashboard:${RESET} http://localhost:${options.uiPort}`)
-    if (options.networkAccess) {
-      console.log(
-        `${DIM}Network dashboard:${RESET} ${buildDashboardUrl(resolveNetworkHostname(), options.uiPort)}`
-      )
-      console.log(
-        `${YELLOW}Warning: network access is unauthenticated. Anyone on this trusted network can control Parallax and modify its configuration.${RESET}`
-      )
-    }
-    console.log(`${DIM}Projects:${RESET} ${storedConfig.projects.length}`)
-    console.log('')
-    console.log('')
-    console.log(`${YELLOW}💡 Run 'parallax open' to view the dashboard.${RESET}`)
-  } catch (error) {
-    const processAlive = orchestratorPid > 0 ? isProcessAlive(orchestratorPid) : false
-    await stopProcessBestEffort(orchestratorPid, 'orchestrator', true)
-    await stopProcessBestEffort(uiPid, 'ui', true)
+    const running = await context.loadRunningState()
+    process.kill(running.runnerPid, 0)
     throw new Error(
-      `${error instanceof Error ? error.message : String(error)}
-
-Startup diagnostics:
-- orchestrator PID: ${orchestratorPid || 'n/a'}
-- ui PID: ${uiPid || 'n/a'}
-- process alive at failure: ${processAlive ? 'yes' : 'no'}
-- stdout log: ${orchestratorStdoutPath}
-- stderr log: ${orchestratorStderrPath}
-- ui stdout log: ${uiStdoutPath}
-- ui stderr log: ${uiStderrPath}
-
-Recent stderr:
-${await readFileTail(orchestratorStderrPath, context.ensureFileExists)}
-
-Recent stdout:
-${await readFileTail(orchestratorStdoutPath, context.ensureFileExists)}
-
-Recent UI stderr:
-${await readFileTail(uiStderrPath, context.ensureFileExists)}
-
-Recent UI stdout:
-${await readFileTail(uiStdoutPath, context.ensureFileExists)}`
+      `Parallax is already running (pid ${running.runnerPid}, port ${running.apiPort}). Run "parallax stop" first.`
     )
-  } finally {
-    spinner?.stop()
+  } catch (error: unknown) {
+    // ESRCH means the recorded pid is gone, so the manifest is stale.
+    const code = (error as { code?: string }).code
+    if (code === 'ESRCH') {
+      await fs.rm(manifestPath, { force: true })
+    } else if (error instanceof Error && error.message.includes('already running')) {
+      throw error
+    }
   }
+
+  const env = context.buildEnvConfig(dataDir, options)
+  const entry = resolveRunnerEntryPoint(context.rootDir)
+
+  // An absolute interpreter path, so the daemon keeps working after a version
+  // switch rather than inheriting whatever `node` happens to mean later.
+  const runtime = resolveRunnerNode(dataDir)
+
+  if (options.foreground) {
+    // Inherit stdio so logs go straight to the terminal; used by launchd too.
+    const { spawn } = await import('node:child_process')
+    const child = spawn(runtime.binary, [SQLITE_FLAG, entry], {
+      cwd: context.rootDir,
+      env: { ...process.env, ...env },
+      stdio: 'inherit',
+    })
+    await new Promise<void>((resolve) => child.on('close', () => resolve()))
+    return
+  }
+
+  const stdout = path.join(dataDir, RUNNER_STDOUT_FILE)
+  const stderr = path.join(dataDir, RUNNER_STDERR_FILE)
+  await Promise.all([fs.writeFile(stdout, ''), fs.writeFile(stderr, '')])
+
+  const pid = spawnDetached(runtime.binary, [SQLITE_FLAG, entry], context.rootDir, env, {
+    stdoutPath: stdout,
+    stderrPath: stderr,
+  })
+
+  const apiBase = `http://localhost:${options.apiPort}`
+  try {
+    await waitForUrlHealth(`${apiBase}/runtime/health`, 'runner API')
+  } catch (error: unknown) {
+    try {
+      process.kill(pid)
+    } catch {
+      // Already gone.
+    }
+    // The runner's own stderr says far more than "it did not start".
+    const tail = await fs.readFile(stderr, 'utf8').catch(() => '')
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n\n${tail
+        .split('\n')
+        .slice(-30)
+        .join('\n')}`
+    )
+  }
+
+  await fs.writeFile(
+    manifestPath,
+    JSON.stringify(
+      {
+        startedAt: Date.now(),
+        runnerPid: pid,
+        apiPort: options.apiPort,
+        networkAccess: options.networkAccess,
+      },
+      null,
+      2
+    )
+  )
+
+  console.log(chalk.green(`Parallax runner started (pid ${pid}) on ${apiBase}`))
+  if (options.networkAccess) {
+    console.log(
+      chalk.yellow('Network access is on: the unauthenticated runner API is exposed to your LAN.')
+    )
+  }
+  console.log(chalk.dim('  parallax status    see what it is doing'))
+  console.log(chalk.dim('  parallax logs      follow run output'))
 }

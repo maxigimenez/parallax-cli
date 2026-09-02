@@ -2,49 +2,53 @@
 import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
+import chalk from 'chalk'
 import { DEFAULT_API_PORT } from '@parallax/common'
 import {
-  hasFlag,
   parseCancelOptions,
+  parseEmptyOptions,
   parseLogsOptions,
-  parsePreflightOptions,
-  parsePrReviewOptions,
-  parseRetryOptions,
+  parseRunOptions,
+  parseRunnerOptions,
+  parseRunsOptions,
   parseStartOptions,
-  parseStatusOptions,
-  parseTasksOptions,
-  parseStopOptions as parseStopOptionsInternal,
   resolvePath,
 } from './args.js'
 import {
   ensureFileExists,
   loadRunningState as loadRunningStateFromDisk,
   loadStoredConfig as loadStoredConfigFromDisk,
-  parseRunningState,
   resolveCliRoot,
   saveStoredConfig as saveStoredConfigToDisk,
 } from './config.js'
+import { MANIFEST_FILE } from './constants.js'
+import { ensureCapableRuntime, SQLITE_FLAG } from './node-runtime.js'
+import { runAgents } from './commands/agents.js'
 import { runCancel } from './commands/cancel.js'
 import { runInit } from './commands/init.js'
 import { runLogs } from './commands/logs.js'
-import { runOpen } from './commands/open.js'
 import { runPreflight } from './commands/preflight.js'
-import { runPrReview } from './commands/pr-review.js'
-import { runRetry } from './commands/retry.js'
+import { runProjects } from './commands/projects.js'
+import { runReload } from './commands/reload.js'
+import { runRestart } from './commands/restart.js'
+import { runRoutes } from './commands/routes.js'
+import { runRunner } from './commands/runner.js'
+import { runRuns } from './commands/runs.js'
+import { runSmokeTest } from './commands/run.js'
 import { runStart } from './commands/start.js'
 import { runStatus } from './commands/status.js'
 import { runStop } from './commands/stop.js'
-import { runTasks } from './commands/tasks.js'
 import type { CliContext } from './types.js'
 import { printUsage } from './usage.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const DEFAULT_DATA_DIR = path.join(os.homedir(), '.parallax')
+const DEFAULT_DATA_DIR = process.env.PARALLAX_DATA_DIR
+  ? path.resolve(process.env.PARALLAX_DATA_DIR)
+  : path.join(os.homedir(), '.parallax')
 const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
-const MANIFEST_FILE = 'running.json'
 const ROOT_DIR = resolveCliRoot(__dirname)
 
 function resolvePackageVersion(rootDir: string): string {
@@ -54,167 +58,129 @@ function resolvePackageVersion(rootDir: string): string {
     path.resolve(__dirname, '../package.json'),
     path.resolve(__dirname, '../../package.json'),
   ]
-
   for (const candidate of candidates) {
     if (!fs.existsSync(candidate)) {
       continue
     }
-
-    const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as {
-      version?: string
-      name?: string
-    }
-    if (
-      typeof parsed.version === 'string' &&
-      (parsed.name === 'parallax-cli' || candidate.endsWith('/packages/cli/package.json'))
-    ) {
-      return parsed.version
+    try {
+      const parsed = JSON.parse(fs.readFileSync(candidate, 'utf8')) as { version?: string }
+      if (parsed.version) {
+        return parsed.version
+      }
+    } catch {
+      continue
     }
   }
-
-  throw new Error('Unable to resolve CLI version from package.json.')
+  return '0.0.0'
 }
 
-const CLI_VERSION = resolvePackageVersion(ROOT_DIR)
+const PACKAGE_VERSION = resolvePackageVersion(ROOT_DIR)
 
-async function resolveDefaultApiBase(): Promise<string> {
-  const manifest = await loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE)
-  return `http://localhost:${manifest.apiPort}`
+// Before anything else: if this interpreter cannot load node:sqlite, hand off to
+// one that can. Doing it here means every command benefits, and a version switch
+// after install produces a re-exec rather than a failure deep in the database.
+try {
+  ensureCapableRuntime(DEFAULT_DATA_DIR, __filename)
+} catch (error: unknown) {
+  console.error(chalk.red(error instanceof Error ? error.message : String(error)))
+  process.exit(1)
 }
 
-function buildEnvConfig(
-  dataDir: string,
-  runtime: { apiPort: number; uiPort: number; concurrency: number; networkAccess: boolean }
-) {
-  const existingNodeOptions = process.env.NODE_OPTIONS?.trim()
-  const sqliteWarningSuppression = '--disable-warning=ExperimentalWarning'
-  const nodeOptions = existingNodeOptions
-    ? `${existingNodeOptions} ${sqliteWarningSuppression}`
-    : sqliteWarningSuppression
-
-  return {
-    NODE_OPTIONS: nodeOptions,
-    PARALLAX_DATA_DIR: dataDir,
-    PARALLAX_DB_PATH: path.join(dataDir, 'parallax.db'),
-    PARALLAX_SERVER_API_PORT: String(runtime.apiPort),
-    PARALLAX_SERVER_UI_PORT: String(runtime.uiPort),
-    PARALLAX_CONCURRENCY: String(runtime.concurrency),
-    PARALLAX_NETWORK_ACCESS: String(runtime.networkAccess),
-  }
-}
-
-const cliContext: CliContext = {
+const context: CliContext = {
   defaultApiBase: DEFAULT_API_BASE,
   defaultDataDir: DEFAULT_DATA_DIR,
   manifestFile: MANIFEST_FILE,
   rootDir: ROOT_DIR,
-  cliVersion: CLI_VERSION,
-  packageVersion: CLI_VERSION,
+  cliVersion: PACKAGE_VERSION,
+  packageVersion: PACKAGE_VERSION,
   resolvePath,
   ensureFileExists,
   loadRunningState: () => loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE),
   loadStoredConfig: () => loadStoredConfigFromDisk(DEFAULT_DATA_DIR),
   saveStoredConfig: (config) => saveStoredConfigToDisk(DEFAULT_DATA_DIR, config),
-  resolveDefaultApiBase,
-  buildEnvConfig,
-}
 
-async function cli() {
-  const args = process.argv.slice(2)
-
-  if (args.length === 0 || hasFlag(args, 'help') || hasFlag(args, 'h')) {
-    printUsage()
-    return
-  }
-
-  if (hasFlag(args, 'version') || hasFlag(args, 'v')) {
-    console.log(CLI_VERSION)
-    return
-  }
-
-  const command = args[0]
-  const commandArgs = args.slice(1)
-
-  try {
-    switch (command) {
-      case 'init':
-        await runInit(commandArgs, cliContext)
-        return
-      case 'start':
-        await runStart(commandArgs, cliContext)
-        return
-      case 'status':
-        await runStatus(commandArgs, cliContext)
-        return
-      case 'open':
-        await runOpen(commandArgs, cliContext)
-        return
-      case 'preflight':
-        await runPreflight(commandArgs)
-        return
-      case 'pr-review':
-        await runPrReview(commandArgs, cliContext)
-        return
-      case 'stop':
-        await runStop(commandArgs, cliContext)
-        return
-      case 'retry':
-        await runRetry(commandArgs, cliContext)
-        return
-      case 'cancel':
-        await runCancel(commandArgs, cliContext)
-        return
-      case 'logs':
-        await runLogs(commandArgs, cliContext)
-        return
-      case 'tasks':
-        await runTasks(commandArgs, cliContext)
-        return
-      default:
-        console.error(`Unknown command: ${command}\n`)
-        printUsage()
-        process.exit(1)
+  // Commands that talk to a running runner read the port it actually bound,
+  // rather than assuming the default -- otherwise a non-default --api-port
+  // silently breaks every read command.
+  resolveDefaultApiBase: async () => {
+    try {
+      const running = await loadRunningStateFromDisk(DEFAULT_DATA_DIR, MANIFEST_FILE)
+      return `http://localhost:${running.apiPort}`
+    } catch {
+      return DEFAULT_API_BASE
     }
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`)
-    process.exit(1)
+  },
+
+  buildEnvConfig: (dataDir, runtime) => ({
+    // node:sqlite needs the flag on Node 22 and ignores it from 23 on, so one
+    // invocation covers every supported runtime; the warning is suppressed
+    // because it fires on every boot and says nothing actionable.
+    NODE_OPTIONS:
+      `${process.env.NODE_OPTIONS ?? ''} ${SQLITE_FLAG} --disable-warning=ExperimentalWarning`.trim(),
+    PARALLAX_DATA_DIR: dataDir,
+    PARALLAX_DB_PATH: path.join(dataDir, 'parallax.db'),
+    PARALLAX_SERVER_API_PORT: String(runtime.apiPort),
+    PARALLAX_CONCURRENCY: String(runtime.concurrency),
+    PARALLAX_NETWORK_ACCESS: String(runtime.networkAccess),
+    PARALLAX_VERSION: PACKAGE_VERSION,
+  }),
+}
+
+async function dispatch(command: string | undefined, args: string[]): Promise<void> {
+  switch (command) {
+    case 'init':
+      return runInit(context)
+    case 'preflight':
+      return runPreflight(context)
+    case 'start':
+      return runStart(context, parseStartOptions(args))
+    case 'stop':
+      parseEmptyOptions(args, 'stop')
+      return runStop(context)
+    case 'restart':
+      return runRestart(context, parseStartOptions(args))
+    case 'status':
+      parseEmptyOptions(args, 'status')
+      return runStatus(context)
+    case 'runner':
+      return runRunner(context, parseRunnerOptions(args))
+    case 'projects':
+      parseEmptyOptions(args, 'projects')
+      return runProjects(context)
+    case 'reload':
+      parseEmptyOptions(args, 'reload')
+      return runReload(context)
+    case 'agents':
+      parseEmptyOptions(args, 'agents')
+      return runAgents(context)
+    case 'routes':
+      parseEmptyOptions(args, 'routes')
+      return runRoutes(context)
+    case 'runs':
+      return runRuns(context, parseRunsOptions(args))
+    case 'logs':
+      return runLogs(context, parseLogsOptions(args))
+    case 'cancel':
+      return runCancel(context, parseCancelOptions(args))
+    case 'run':
+      return runSmokeTest(context, parseRunOptions(args))
+    case 'version':
+    case '--version':
+    case '-v':
+      console.log(PACKAGE_VERSION)
+      return
+    case undefined:
+    case 'help':
+    case '--help':
+    case '-h':
+      printUsage(PACKAGE_VERSION)
+      return
+    default:
+      throw new Error(`Unknown command "${command}". Run "parallax help".`)
   }
 }
 
-export {
-  parseCancelOptions,
-  parseLogsOptions,
-  parsePreflightOptions,
-  parsePrReviewOptions,
-  parseRetryOptions,
-  parseStartOptions,
-  parseStatusOptions,
-  parseTasksOptions,
-  parseRunningState,
-  resolveDefaultApiBase,
-  resolvePath,
-}
-
-export function parseStopOptions(args: string[]) {
-  return parseStopOptionsInternal(args)
-}
-
-function isDirectExecution() {
-  if (process.argv[1] === undefined) {
-    return false
-  }
-
-  try {
-    const invokedPath = fs.realpathSync(process.argv[1])
-    const modulePath = fs.realpathSync(fileURLToPath(import.meta.url))
-    return invokedPath === modulePath
-  } catch {
-    return import.meta.url === pathToFileURL(process.argv[1]).href
-  }
-}
-
-const isExecutedDirectly = isDirectExecution()
-
-if (isExecutedDirectly) {
-  void cli()
-}
+dispatch(process.argv[2], process.argv.slice(3)).catch((error: unknown) => {
+  console.error(chalk.red(error instanceof Error ? error.message : String(error)))
+  process.exitCode = 1
+})

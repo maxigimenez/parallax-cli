@@ -1,17 +1,24 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { StoredConfig } from '@parallax/common'
+import { CONFIG_VERSION, type StoredConfig } from '@parallax/common'
 
 const CONFIG_FILE = 'config.json'
 
 export function emptyStoredConfig(): StoredConfig {
   return {
-    version: 1,
+    version: CONFIG_VERSION,
+    cloud: null,
+    hermes: null,
     projects: [],
-    slack: null,
     secrets: {},
     updatedAt: 0,
   }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
 }
 
 export async function readConfigStore(dataDir: string): Promise<StoredConfig> {
@@ -36,23 +43,35 @@ export async function readConfigStore(dataDir: string): Promise<StoredConfig> {
     )
   }
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  const obj = record(parsed)
+  if (!obj) {
     throw new Error(`Invalid config at ${configPath}: must be an object.`)
   }
 
-  const obj = parsed as Record<string, unknown>
+  const version = typeof obj.version === 'number' ? obj.version : 1
+
+  // Parallax v1 configured one CLI agent per project against a local clone.
+  // None of that maps onto Hermes profiles and routing rules, so rather than
+  // guess at a migration we say plainly what to re-run.
+  if (version < CONFIG_VERSION) {
+    throw new Error(
+      `Config at ${configPath} is version ${version}; this build requires version ${CONFIG_VERSION}. ` +
+        `The v1 format (per-project CLI agents and local clones) has no equivalent here. ` +
+        `Move it aside and run "parallax init" to reconfigure against Hermes.`
+    )
+  }
+  if (version > CONFIG_VERSION) {
+    throw new Error(
+      `Config at ${configPath} is version ${version}, newer than this build supports (${CONFIG_VERSION}). Upgrade parallax-cli.`
+    )
+  }
 
   return {
-    version: typeof obj.version === 'number' ? obj.version : 1,
+    version,
+    cloud: record(obj.cloud) as StoredConfig['cloud'],
+    hermes: record(obj.hermes) as StoredConfig['hermes'],
     projects: Array.isArray(obj.projects) ? (obj.projects as StoredConfig['projects']) : [],
-    slack:
-      obj.slack && typeof obj.slack === 'object' && !Array.isArray(obj.slack)
-        ? (obj.slack as StoredConfig['slack'])
-        : null,
-    secrets:
-      obj.secrets && typeof obj.secrets === 'object' && !Array.isArray(obj.secrets)
-        ? (obj.secrets as Record<string, string>)
-        : {},
+    secrets: (record(obj.secrets) as Record<string, string>) ?? {},
     updatedAt: typeof obj.updatedAt === 'number' ? obj.updatedAt : 0,
   }
 }
@@ -61,6 +80,9 @@ export async function writeConfigStore(dataDir: string, config: StoredConfig): P
   await fs.mkdir(dataDir, { recursive: true })
   const configPath = path.join(dataDir, CONFIG_FILE)
   const tmpPath = `${configPath}.tmp`
-  await fs.writeFile(tmpPath, JSON.stringify({ ...config, updatedAt: Date.now() }, null, 2))
+  await fs.writeFile(
+    tmpPath,
+    JSON.stringify({ ...config, version: CONFIG_VERSION, updatedAt: Date.now() }, null, 2)
+  )
   await fs.rename(tmpPath, configPath)
 }

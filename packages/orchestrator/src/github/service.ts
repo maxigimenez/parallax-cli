@@ -1,197 +1,295 @@
-import { PULL_PROVIDER, TASK_STATUS, Task, ProjectConfig } from '@parallax/common'
-import { HostExecutor } from '@parallax/common/executor'
-import { createTaskId } from '../task-id.js'
-import { parseGitHubIssueNumber, requireGitHubRepoDetails } from './repository.js'
+import {
+  COMMENT_TARGET,
+  TICKET_PROVIDER,
+  TRIGGER_TYPE,
+  type CommentTarget,
+  type ProjectConfig,
+  type TriggerEvent,
+} from '@parallax/common'
+import type { LocalExecutor } from '@parallax/common/executor'
+import type { TrackerWriter, TriggerSource } from '../triggers/types.js'
 
-export type TaskWithLabels = Task & { labels: string[] }
+export function requireRepo(project: ProjectConfig): { owner: string; repo: string } {
+  if (project.provider !== TICKET_PROVIDER.GITHUB) {
+    throw new Error(`Project "${project.id}" is not configured to pull from GitHub.`)
+  }
+  const { owner, repo } = project.filters
+  if (!owner || !repo) {
+    throw new Error(`GitHub project "${project.id}" requires filters.owner and filters.repo.`)
+  }
+  return { owner, repo }
+}
 
-interface GitHubIssueSummary {
+export function parseIssueNumber(ref: string): number {
+  const match = ref.match(/#(\d+)$/)
+  if (!match) {
+    throw new Error(`Unable to parse an issue or PR number from "${ref}".`)
+  }
+  return Number.parseInt(match[1], 10)
+}
+
+interface IssueSummary {
   number: number
   title: string
   body?: string | null
+  url?: string
+  state?: string
+  updatedAt?: string
   labels?: Array<{ name: string }>
+  assignees?: Array<{ login?: string }>
 }
 
-export class GitHubService {
-  constructor(private executor: HostExecutor) {}
+interface PullRequestSummary extends IssueSummary {
+  reviewRequests?: Array<{ login?: string; name?: string; slug?: string }>
+  assignees?: Array<{ login?: string }>
+  isDraft?: boolean
+  baseRefName?: string
+}
 
-  private buildIssueListCommand(project: ProjectConfig): string[] {
-    const { owner, repo } = requireGitHubRepoDetails(project)
-    const { state = 'open', labels } = project.pullFrom.filters
+/** Orange, matching Parallax's own colour, so managed labels read as a set. */
+const PARALLAX_LABEL_COLOR = 'f97316'
 
-    const command = [
-      'gh',
+export class GitHubService implements TriggerSource, TrackerWriter {
+  readonly name = 'github'
+
+  constructor(private readonly executor: LocalExecutor) {}
+
+  private async gh(args: string[]): Promise<string> {
+    const result = await this.executor.executeCommand(['gh', ...args], { cwd: process.cwd() })
+
+    if (result.exitCode === 127) {
+      throw new Error('GitHub CLI not found. Install it and run "gh auth login".')
+    }
+    if (result.exitCode !== 0) {
+      throw new Error(`gh ${args[0]} ${args[1] ?? ''} failed: ${result.output.trim()}`)
+    }
+    return result.output
+  }
+
+  // ── Trigger source ─────────────────────────────────────────
+
+  async collect(project: ProjectConfig): Promise<TriggerEvent[]> {
+    if (project.provider !== TICKET_PROVIDER.GITHUB) {
+      return []
+    }
+    const [issues, pullRequests] = await Promise.all([
+      this.collectIssues(project),
+      this.collectPullRequests(project),
+    ])
+    return [...issues, ...pullRequests]
+  }
+
+  private async collectIssues(project: ProjectConfig): Promise<TriggerEvent[]> {
+    const { owner, repo } = requireRepo(project)
+    const { state = 'open', labels } = project.filters
+
+    const args = [
       'issue',
       'list',
       '--repo',
       `${owner}/${repo}`,
       '--json',
-      'number,title,body,labels',
+      'number,title,body,url,state,updatedAt,labels,assignees',
       '--limit',
       '100',
+      '--state',
+      state,
     ]
-
-    if (state) {
-      command.push('--state', state)
+    // gh ANDs repeated --label, which is the narrowing behaviour we want here:
+    // this filter is a coarse pre-filter, and routes do the real matching.
+    for (const label of labels ?? []) {
+      args.push('--label', label)
     }
 
-    if (labels?.length) {
-      for (const label of labels) {
-        command.push('--label', label)
-      }
-    }
-
-    return command
-  }
-
-  async fetchNewIssues(project: ProjectConfig): Promise<TaskWithLabels[]> {
-    if (project.pullFrom.provider !== PULL_PROVIDER.GITHUB) {
-      return []
-    }
-
-    const { owner, repo } = requireGitHubRepoDetails(project)
-    const result = await this.executor.executeCommand(this.buildIssueListCommand(project), {
-      cwd: project.workspaceDir,
-    })
-
-    if (result.exitCode === 127) {
-      throw new Error('GitHub CLI not found. Please install and authenticate gh.')
-    }
-
-    if (result.exitCode !== 0) {
-      throw new Error(`GitHub CLI failed while listing issues: ${result.output}`)
-    }
-
-    const issues = JSON.parse(result.output || '[]') as GitHubIssueSummary[]
+    const issues = JSON.parse((await this.gh(args)) || '[]') as IssueSummary[]
 
     return issues.map((issue) => ({
-      id: createTaskId(project.id, `${owner}/${repo}#${issue.number}`),
-      externalId: `${owner}/${repo}#${issue.number}`,
-      title: issue.title,
-      description: issue.body ?? '',
-      status: TASK_STATUS.PENDING,
+      type: TRIGGER_TYPE.TICKET,
       projectId: project.id,
-      labels: issue.labels?.map((l) => l.name) ?? [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      provider: TICKET_PROVIDER.GITHUB,
+      ref: `${owner}/${repo}#${issue.number}`,
+      // updatedAt is GitHub's own "has this changed" signal, which makes it the
+      // natural revision: relabel or edit a ticket and the route fires again;
+      // leave it alone and every later poll is a no-op.
+      revision: issue.updatedAt ?? '',
+      title: issue.title,
+      body: issue.body ?? '',
+      url: issue.url,
+      state: issue.state,
+      labels: issue.labels?.map((label) => label.name) ?? [],
+      assignees: logins(issue.assignees),
     }))
   }
 
-  async markAsInProgress(
-    externalId: string,
-    project: ProjectConfig,
-    existingCommentId?: string | null,
-    body?: string
-  ): Promise<string | undefined> {
-    if (project.pullFrom.provider !== PULL_PROVIDER.GITHUB) {
+  /**
+   * Every open pull request, as both a general `pr_event` and — when someone is
+   * actually awaiting review — a `pr_review_requested`.
+   *
+   * The general event is emitted unconditionally. Previously PRs were only
+   * looked at when a reviewer had been requested, so a route keyed on a label
+   * or an assignee never saw the pull request at all.
+   */
+  private async collectPullRequests(project: ProjectConfig): Promise<TriggerEvent[]> {
+    const { owner, repo } = requireRepo(project)
+
+    const pulls = JSON.parse(
+      (await this.gh([
+        'pr',
+        'list',
+        '--repo',
+        `${owner}/${repo}`,
+        '--json',
+        'number,title,body,url,state,updatedAt,labels,assignees,reviewRequests,isDraft,baseRefName',
+        '--limit',
+        '100',
+        '--state',
+        'open',
+      ])) || '[]'
+    ) as PullRequestSummary[]
+
+    const events: TriggerEvent[] = []
+
+    for (const pull of pulls) {
+      const reviewers = reviewerLogins(pull)
+      const base = {
+        projectId: project.id,
+        provider: TICKET_PROVIDER.GITHUB,
+        ref: `${owner}/${repo}#${pull.number}`,
+        title: pull.title,
+        body: pull.body ?? '',
+        url: pull.url,
+        state: pull.state,
+        labels: pull.labels?.map((label) => label.name) ?? [],
+        assignees: logins(pull.assignees),
+        prNumber: pull.number,
+        requestedReviewers: reviewers,
+        isDraft: pull.isDraft,
+        baseBranch: pull.baseRefName,
+      }
+
+      events.push({
+        ...base,
+        type: TRIGGER_TYPE.PR_EVENT,
+        // Assignee and reviewer sets are not reliably reflected in updatedAt,
+        // so they are folded in: adding someone must count as a change.
+        revision: [
+          pull.updatedAt ?? '',
+          base.assignees.slice().sort().join(','),
+          reviewers.slice().sort().join(','),
+          base.labels.slice().sort().join(','),
+        ].join('|'),
+      })
+
+      if (reviewers.length > 0) {
+        events.push({
+          ...base,
+          type: TRIGGER_TYPE.PR_REVIEW_REQUESTED,
+          revision: `${pull.updatedAt ?? ''}|${reviewers.slice().sort().join(',')}`,
+        })
+      }
+    }
+
+    return events
+  }
+
+  /** Fetches a PR's diff, for feeding a reviewer agent that needs the change itself. */
+  async getPullRequestDiff(project: ProjectConfig, prNumber: number): Promise<string> {
+    const { owner, repo } = requireRepo(project)
+    return this.gh(['pr', 'diff', String(prNumber), '--repo', `${owner}/${repo}`])
+  }
+
+  // ── Tracker writer ─────────────────────────────────────────
+
+  async postComment(_target: CommentTarget, event: TriggerEvent, body: string): Promise<void> {
+    const { owner, repo } = splitRef(event.ref)
+    const number = parseIssueNumber(event.ref)
+
+    // Issues and PRs share the issues comment endpoint on GitHub, so both
+    // comment targets resolve to the same call.
+    await this.gh([
+      'api',
+      `repos/${owner}/${repo}/issues/${number}/comments`,
+      '-X',
+      'POST',
+      '-F',
+      `body=${body}`,
+    ])
+  }
+
+  /**
+   * Creates a label if the repository does not have it.
+   *
+   * `gh issue edit --add-label` fails outright on an unknown label, so the
+   * `parallax:` markers would never apply to a repository that has not seen
+   * them before -- and the loop guard that depends on them would quietly not
+   * work. Already-exists is the expected case and is not an error.
+   */
+  private async ensureLabel(owner: string, repo: string, label: string): Promise<void> {
+    const result = await this.executor.executeCommand(
+      [
+        'gh',
+        'label',
+        'create',
+        label,
+        '--repo',
+        `${owner}/${repo}`,
+        '--color',
+        PARALLAX_LABEL_COLOR,
+        '--description',
+        'Managed by Parallax',
+      ],
+      { cwd: process.cwd() }
+    )
+
+    if (result.exitCode !== 0 && !/already exists/i.test(result.output)) {
+      throw new Error(`Could not create label "${label}": ${result.output.trim()}`)
+    }
+  }
+
+  async updateLabels(
+    event: TriggerEvent,
+    labels: { add?: string[]; remove?: string[] }
+  ): Promise<void> {
+    const { owner, repo } = splitRef(event.ref)
+    const number = parseIssueNumber(event.ref)
+
+    const toAdd = labels.add ?? []
+    const toRemove = labels.remove ?? []
+    if (toAdd.length === 0 && toRemove.length === 0) {
       return
     }
 
-    const { owner, repo } = requireGitHubRepoDetails(project)
-    const issueNumber = parseGitHubIssueNumber(externalId)
-    const commentBody = body ?? '🤖 Parallax has picked up this task and is generating a plan.'
-
-    await this.assignIssue(issueNumber, owner, repo, project)
-
-    if (existingCommentId) {
-      await this.updateComment(owner, repo, existingCommentId, commentBody, project)
-      return existingCommentId
+    for (const label of toAdd) {
+      await this.ensureLabel(owner, repo, label)
     }
 
-    return this.postComment(issueNumber, owner, repo, commentBody, project)
+    const args = ['issue', 'edit', String(number), '--repo', `${owner}/${repo}`]
+    for (const label of toAdd) {
+      args.push('--add-label', label)
+    }
+    for (const label of toRemove) {
+      args.push('--remove-label', label)
+    }
+    await this.gh(args)
   }
+}
 
-  async updateComment(
-    owner: string,
-    repo: string,
-    commentId: string,
-    body: string,
-    project: ProjectConfig
-  ): Promise<void> {
-    const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'api',
-        `repos/${owner}/${repo}/issues/comments/${commentId}`,
-        '-X',
-        'PATCH',
-        '-F',
-        `body=${body}`,
-      ],
-      { cwd: project.workspaceDir }
-    )
+export const COMMENT_TARGETS_HANDLED: CommentTarget[] = [COMMENT_TARGET.TICKET, COMMENT_TARGET.PR]
 
-    if (result.exitCode === 127) {
-      throw new Error('GitHub CLI not found. Please install and authenticate gh.')
-    }
+function reviewerLogins(pull: PullRequestSummary): string[] {
+  return (pull.reviewRequests ?? [])
+    .map((request) => request.login ?? request.slug ?? request.name)
+    .filter((login): login is string => Boolean(login))
+}
 
-    if (result.exitCode !== 0) {
-      throw new Error(`GitHub CLI failed while updating comment: ${result.output}`)
-    }
+function logins(users?: Array<{ login?: string }>): string[] {
+  return (users ?? []).map((user) => user.login).filter((login): login is string => Boolean(login))
+}
+
+export function splitRef(ref: string): { owner: string; repo: string } {
+  const match = ref.match(/^([^/]+)\/([^#]+)#\d+$/)
+  if (!match) {
+    throw new Error(`Malformed GitHub ref "${ref}"; expected owner/repo#number.`)
   }
-
-  private async postComment(
-    issueNumber: number,
-    owner: string,
-    repo: string,
-    body: string,
-    project: ProjectConfig
-  ): Promise<string | undefined> {
-    const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'api',
-        `repos/${owner}/${repo}/issues/${issueNumber}/comments`,
-        '-X',
-        'POST',
-        '-F',
-        `body=${body}`,
-      ],
-      { cwd: project.workspaceDir }
-    )
-
-    if (result.exitCode === 127) {
-      throw new Error('GitHub CLI not found. Please install and authenticate gh.')
-    }
-
-    if (result.exitCode !== 0) {
-      throw new Error(`GitHub CLI failed while commenting on issue: ${result.output}`)
-    }
-
-    try {
-      const parsed = JSON.parse(result.output || '{}') as { id?: number }
-      return parsed.id !== undefined ? String(parsed.id) : undefined
-    } catch {
-      return undefined
-    }
-  }
-
-  private async assignIssue(
-    issueNumber: number,
-    owner: string,
-    repo: string,
-    project: ProjectConfig
-  ): Promise<void> {
-    const result = await this.executor.executeCommand(
-      [
-        'gh',
-        'issue',
-        'edit',
-        String(issueNumber),
-        '--repo',
-        `${owner}/${repo}`,
-        '--add-assignee',
-        '@me',
-      ],
-      { cwd: project.workspaceDir }
-    )
-
-    if (result.exitCode === 127) {
-      throw new Error('GitHub CLI not found. Please install and authenticate gh.')
-    }
-
-    if (result.exitCode !== 0) {
-      throw new Error(`GitHub CLI failed while assigning issue: ${result.output}`)
-    }
-  }
+  return { owner: match[1], repo: match[2] }
 }

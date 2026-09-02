@@ -1,0 +1,99 @@
+name: Deploy dashboard
+
+on:
+  # Same two ways in as the control plane. Manual dispatch picks the branch, so
+  # a change can be deployed before it merges; the push trigger is path-filtered
+  # rather than firing on every merge to main.
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Railway service name
+        required: true
+        default: dashboard
+      environment:
+        description: Railway environment
+        required: false
+        default: production
+
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cloud-dashboard/**'
+      - 'Dockerfile.dashboard'
+      - '.railway/railway.ts'
+      - '.github/workflows/deploy-dashboard.yml'
+
+concurrency:
+  # Serialized for the same reason as the API: two deploys racing on one
+  # service leaves the winner ambiguous.
+  group: deploy-dashboard
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      SERVICE: ${{ inputs.service || 'dashboard' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require a Railway token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set. Create a project token in"\
+                 "Railway (Project Settings -> Tokens) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Install the Railway CLI
+        run: npm install -g @railway/cli@4
+
+      # Which Dockerfile this service builds comes from .railway/railway.ts.
+      # Run `railway config apply` after changing that file — `up` deploys the
+      # source, it does not reconcile the project's configuration.
+      - name: Deploy
+        run: railway up --service "$SERVICE" --environment "${{ inputs.environment || 'production' }}" --ci
+
+      - name: Wait for health
+        run: |
+          DOMAIN="${{ vars.DASHBOARD_HEALTH_URL }}"
+          if [ -z "$DOMAIN" ]; then
+            DOMAIN=$(railway domain --service "$SERVICE" 2>/dev/null \
+              | grep -oE '[a-z0-9.-]+\.up\.railway\.app' | head -1)
+          fi
+
+          if [ -z "$DOMAIN" ]; then
+            echo "::warning::Could not resolve the service domain; skipping the health check."
+            exit 0
+          fi
+
+          URL="$DOMAIN"
+          case "$URL" in https://*) ;; *) URL="https://$DOMAIN" ;; esac
+          echo "Checking $URL/health"
+          for attempt in $(seq 1 30); do
+            body=$(curl -sS "$URL/health" || true)
+            case "$body" in
+              *'"status":"ok"'*)
+                echo "Healthy after ${attempt} attempt(s): $body"
+                # A dashboard that cannot reach an API serves a page that can do
+                # nothing, so this is called out rather than passed silently.
+                case "$body" in
+                  *'"apiConfigured":false'*)
+                    echo "::warning::The dashboard is up but PARALLAX_API_URL is unset."\
+                         "Set it on the service, or sign-in will fail."
+                    ;;
+                esac
+                exit 0
+                ;;
+            esac
+            sleep 10
+          done
+
+          echo "::error::/health did not report ok within 5 minutes (last: ${body:-no response})."
+          exit 1

@@ -5,11 +5,18 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "paths": {
-      "@parallax/common": ["packages/common/src/index.ts"],
-      "@parallax/common/executor": ["packages/common/src/executor.ts"],
-      "@parallax/orchestrator": ["packages/orchestrator/src/index.ts"],
-      "@parallax/slack": ["packages/slack/src/index.ts"],
-      "@parallax/ui": ["packages/ui/src/main.tsx"]
+      "@parallax/common": [
+        "packages/common/src/index.ts"
+      ],
+      "@parallax/common/executor": [
+        "packages/common/src/executor.ts"
+      ],
+      "@parallax/orchestrator": [
+        "packages/orchestrator/src/index.ts"
+      ],
+      "@parallax/cloud-api": [
+        "packages/cloud-api/src/index.ts"
+      ]
     },
     "strict": true,
     "esModuleInterop": true,

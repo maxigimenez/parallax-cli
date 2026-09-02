@@ -1,543 +1,140 @@
-import cors from '@fastify/cors'
 import Fastify, { type FastifyInstance } from 'fastify'
-import { AppConfig, StoredConfig, TASK_STATUS, TaskPlanState } from '@parallax/common'
-import { dbService } from '../database.js'
-import { resetTaskRuntimeState } from '../logger.js'
-import { GitService } from '../git-service.js'
-import { taskLifecycle } from '../task-lifecycle.js'
-import { emitConfigUpdated } from '../logging/socket-publisher.js'
-import { isPlanAwaitingApproval, normalizePlanState } from '../workflow/task-state.js'
-import { readOrchestratorErrors } from './diagnostics.js'
-import { splitUnifiedDiffByFile } from './api/diff-utils.js'
-import {
-  parseNonNegativeInteger,
-  parseOptionalTaskId,
-  parsePositiveInteger,
-  parseRetryMode,
-  type RetryMode,
-} from './api/request-parsers.js'
-import { serializeTaskForApi } from './api/task-response.js'
-import { readConfigStore, writeConfigStore } from '../config-store.js'
-import { validateProject, validateSlack } from '../config-validation.js'
+import cors from '@fastify/cors'
+import type {
+  AgentDescriptor,
+  AppConfig,
+  ProjectConfig,
+  RoutingRule,
+  RunStatus,
+} from '@parallax/common'
+import type { ParallaxDatabase } from '../database.js'
+import { readRunnerErrors } from './diagnostics.js'
 import { isAllowedBrowserOrigin } from './network-access.js'
 
-type TaskDiffFile = {
-  path: string
-  status: 'A' | 'M' | 'D' | 'R'
-}
-
-type ApiServerDependencies = {
+export interface ApiServerDeps {
   getConfig: () => AppConfig
-  reloadRuntime: () => Promise<AppConfig>
-  triggerPullRequestReview: (taskId: string) => Promise<{ reviewTaskId: string; prNumber: number }>
-  gitService: GitService
-  activeTasks: Set<string>
-  canceledTasks: Set<string>
-  activeWorktrees: Map<string, string>
+  getProjects: () => ProjectConfig[]
+  getAgents: () => AgentDescriptor[]
+  getRoutes: () => RoutingRule[]
+  reload: () => Promise<AppConfig>
+  cancelRun: (runId: string) => Promise<boolean>
+  db: ParallaxDatabase
   dataDir: string
-  networkAccess?: boolean
 }
 
-function sanitizeConfigForApi(config: AppConfig): AppConfig {
-  if (!config.slack) {
-    return config
+function parsePositiveInt(raw: unknown, label: string, fallback: number): number {
+  if (raw === undefined) {
+    return fallback
   }
-  return {
-    ...config,
-    slack: { ...config.slack, botToken: '***', appToken: '***' },
+  const parsed = Number.parseInt(String(raw), 10)
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${label} must be a positive integer.`)
   }
+  return parsed
 }
 
-function resolveTaskProject(config: AppConfig, projectId: string) {
-  const project = config.projects.find((candidate) => candidate.id === projectId)
-  if (!project) {
-    throw new Error(`Project ${projectId} not found in config`)
-  }
+/**
+ * The runner's local API.
+ *
+ * Intentionally read-mostly. Configuration lives in the cloud now, so this
+ * surface exists for the CLI on the same machine: check health, watch runs,
+ * tail logs, cancel something. It is unauthenticated and binds to loopback
+ * unless network access is explicitly enabled.
+ */
+export async function createApiServer(deps: ApiServerDeps): Promise<FastifyInstance> {
+  const app = Fastify({ logger: false })
+  const networkAccess = deps.getConfig().server.networkAccess
 
-  return project
-}
-
-function isTerminalTaskStatus(status: string) {
-  return (
-    status === TASK_STATUS.COMPLETED ||
-    status === TASK_STATUS.FAILED ||
-    status === TASK_STATUS.CANCELED
-  )
-}
-
-export async function createApiServer(
-  dependencies: ApiServerDependencies
-): Promise<FastifyInstance> {
-  const fastify = Fastify({ logger: false })
-  const {
-    getConfig,
-    reloadRuntime,
-    triggerPullRequestReview,
-    gitService,
-    activeTasks,
-    canceledTasks,
-    activeWorktrees,
-    dataDir,
-    networkAccess = false,
-  } = dependencies
-
-  async function mutateConfig(updater: (cfg: StoredConfig) => StoredConfig): Promise<AppConfig> {
-    const current = await readConfigStore(dataDir)
-    const updated = updater(current)
-    await writeConfigStore(dataDir, updated)
-    const newConfig = await reloadRuntime()
-    emitConfigUpdated()
-    return newConfig
-  }
-
-  await fastify.register(cors, {
-    delegator: (request, callback) => {
-      const origin = request.headers.origin
-      const requestHost = request.headers.host
+  await app.register(cors, {
+    delegator: (req, callback) => {
+      const origin = req.headers.origin
       callback(null, {
-        origin: isAllowedBrowserOrigin(origin, requestHost, networkAccess)
-          ? origin || false
-          : false,
-        methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        origin: !origin || isAllowedBrowserOrigin(origin, req.headers.host, networkAccess),
       })
     },
   })
 
-  fastify.get('/runtime/health', async () => ({
-    status: 'ok',
-    activeTasks: activeTasks.size,
-  }))
-
-  fastify.get('/tasks', async () => dbService.listTasks().map((task) => serializeTaskForApi(task)))
-
-  fastify.get('/tasks/pending-plans', async () =>
-    dbService
-      .listTasks()
-      .filter(
-        (task) =>
-          task.status === TASK_STATUS.PENDING && isPlanAwaitingApproval(normalizePlanState(task))
-      )
-      .map((task) => serializeTaskForApi(task))
-  )
-
-  fastify.get('/config', async () => sanitizeConfigForApi(getConfig()))
-
-  fastify.get('/runtime/errors', async (_request, reply) => {
-    try {
-      return await readOrchestratorErrors()
-    } catch (error) {
-      return reply
-        .status(500)
-        .send({ error: error instanceof Error ? error.message : String(error) })
+  app.get('/runtime/health', async () => {
+    const config = deps.getConfig()
+    return {
+      status: 'ok',
+      version: process.env.PARALLAX_VERSION ?? 'dev',
+      projects: deps.getProjects().length,
+      agents: deps.getAgents().length,
+      routes: deps.getRoutes().length,
+      cloud: config.cloud ? 'configured' : 'none',
+      hermes: config.hermes?.baseUrl ?? null,
     }
   })
 
-  fastify.post('/runtime/reload', async (_request, reply) => {
+  app.get('/runtime/errors', async () => readRunnerErrors(deps.dataDir))
+
+  app.post('/runtime/reload', async (_request, reply) => {
     try {
-      const config = await reloadRuntime()
-      emitConfigUpdated()
-      return { ok: true, projectCount: config.projects.length }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
+      await deps.reload()
+      return { ok: true, projects: deps.getProjects().length, routes: deps.getRoutes().length }
+    } catch (error: unknown) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
-  fastify.get('/logs', async (request, reply) => {
-    const { since, taskId, limit } = request.query as {
-      since?: string
-      taskId?: string
-      limit?: string
-    }
+  app.get('/projects', async () => ({ projects: deps.getProjects() }))
 
+  app.get('/agents', async () => ({ agents: deps.getAgents() }))
+
+  app.get('/routes', async () => ({ routes: deps.getRoutes() }))
+
+  app.get('/runs', async (request, reply) => {
+    const query = request.query as Record<string, string | undefined>
     try {
       return {
-        logs: dbService.listTaskLogs({
-          since: parseNonNegativeInteger(since, 'since', 0),
-          taskExternalId: parseOptionalTaskId(taskId),
-          limit: parsePositiveInteger(limit, 'limit', 200),
+        runs: deps.db.listRuns({
+          limit: parsePositiveInt(query.limit, 'limit', 100),
+          projectId: query.projectId,
+          status: query.status as RunStatus | undefined,
         }),
       }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
+    } catch (error: unknown) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
-  fastify.get('/tasks/:taskId/diff/files', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
+  app.get('/runs/:runId', async (request, reply) => {
+    const { runId } = request.params as { runId: string }
+    const run = deps.db.getRun(runId)
+    if (!run) {
+      return reply.code(404).send({ error: `Run "${runId}" not found.` })
     }
+    return { run }
+  })
 
-    let project
+  app.get('/runs/:runId/events', async (request, reply) => {
+    const { runId } = request.params as { runId: string }
+    const query = request.query as Record<string, string | undefined>
+
+    if (!deps.db.getRun(runId)) {
+      return reply.code(404).send({ error: `Run "${runId}" not found.` })
+    }
     try {
-      project = resolveTaskProject(getConfig(), task.projectId)
-    } catch (error) {
-      return reply
-        .status(404)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-
-    const liveWorktree = activeWorktrees.get(task.id)
-    if (liveWorktree) {
-      return { files: await gitService.getWorktreeChangedFiles(liveWorktree) }
-    }
-
-    if (!task.prNumber && !task.branchName) {
-      return { files: [] as TaskDiffFile[] }
-    }
-
-    const parsed = splitUnifiedDiffByFile(await gitService.getTaskUnifiedDiff(project, task))
-    return {
-      files: Array.from(parsed.entries()).map(([path, meta]) => ({
-        path,
-        status: meta.status,
-      })),
-    }
-  })
-
-  fastify.get('/tasks/:taskId/diff', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const { file } = request.query as { file?: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    let project
-    try {
-      project = resolveTaskProject(getConfig(), task.projectId)
-    } catch (error) {
-      return reply
-        .status(404)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-
-    const liveWorktree = activeWorktrees.get(task.id)
-    if (liveWorktree && file) {
-      return { patch: await gitService.getWorktreeFileDiff(liveWorktree, file) }
-    }
-
-    if (!task.prNumber && !task.branchName) {
-      return { patch: '' }
-    }
-
-    const unifiedDiff = await gitService.getTaskUnifiedDiff(project, task)
-    if (!file) {
-      return { patch: unifiedDiff }
-    }
-
-    const selected = splitUnifiedDiffByFile(unifiedDiff).get(file)
-    if (!selected) {
-      return reply.status(404).send({ error: `Diff for file ${file} not found` })
-    }
-
-    return { patch: selected.patch, status: selected.status }
-  })
-
-  fastify.post('/tasks/:taskId/approve', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const { approver, planMarkdown } = (request.body ?? {}) as {
-      approver?: string
-      planMarkdown?: string
-    }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    if (!isPlanAwaitingApproval(normalizePlanState(task))) {
-      return reply.status(409).send({ error: 'Task is not awaiting plan approval.' })
-    }
-
-    if (planMarkdown !== undefined) {
-      if (planMarkdown.length > 500_000) {
-        return reply.status(400).send({ error: 'planMarkdown exceeds maximum allowed length.' })
+      return {
+        events: deps.db.listRunEvents(runId, {
+          since: query.since ? Number.parseInt(query.since, 10) : undefined,
+          limit: parsePositiveInt(query.limit, 'limit', 500),
+        }),
       }
-      const trimmed = planMarkdown.trim()
-      if (!trimmed) {
-        return reply.status(400).send({ error: 'planMarkdown cannot be empty when provided.' })
-      }
-
-      dbService.updateTaskPlanOutput(task.id, { planMarkdown: trimmed })
-    }
-
-    dbService.approveTaskPlan(task.id, approver)
-    taskLifecycle.queue(task.id, 'Plan approved. Queued for execution.')
-    return { ok: true }
-  })
-
-  fastify.post('/tasks/:taskId/reject', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    if (!isPlanAwaitingApproval(normalizePlanState(task))) {
-      return reply.status(409).send({ error: 'Task is not awaiting plan approval.' })
-    }
-
-    dbService.rejectTaskPlan(task.id)
-    dbService.updateTaskPlanOutput(task.id, {
-      planState: TaskPlanState.PLAN_REJECTED,
-      planResult: 'Plan rejected.',
-    })
-    taskLifecycle.fail(task.id, 'Plan rejected by operator.', TaskPlanState.PLAN_REJECTED)
-    return { ok: true }
-  })
-
-  fastify.post('/tasks/:taskId/retry', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const { mode: rawMode } = (request.body ?? {}) as { mode?: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    if (activeTasks.has(task.id)) {
-      return reply.status(409).send({ error: 'Task is already running.' })
-    }
-
-    let mode: RetryMode
-    try {
-      mode = parseRetryMode(rawMode)
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-
-    if (mode === 'execution') {
-      const planState = normalizePlanState(task)
-      if (planState !== TaskPlanState.PLAN_APPROVED && planState !== TaskPlanState.NOT_REQUIRED) {
-        return reply.status(409).send({
-          error: 'Execution retry requires an approved plan. Use mode=full to regenerate plan.',
-        })
-      }
-
-      dbService.resetExecutionAttempts(task.id)
-    } else {
-      dbService.resetTaskForFullRetry(task.id)
-      dbService.clearTaskPullRequestInfo(task.id)
-    }
-
-    dbService.clearTaskLogs(task.id)
-    dbService.updateTaskStatus(task.id, TASK_STATUS.PENDING)
-    canceledTasks.delete(task.id)
-    resetTaskRuntimeState(task.id)
-    taskLifecycle.queue(
-      task.id,
-      mode === 'execution' ? 'Queued for manual execution retry' : 'Queued for manual full retry'
-    )
-    return { ok: true, mode }
-  })
-
-  fastify.post('/tasks/:taskId/cancel', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    if (isTerminalTaskStatus(task.status)) {
-      return reply.status(409).send({ error: 'Task is not cancellable.' })
-    }
-
-    canceledTasks.add(task.id)
-    taskLifecycle.cancel(
-      task.id,
-      activeTasks.has(task.id) ? 'Cancellation requested' : 'Task canceled'
-    )
-    return { ok: true }
-  })
-
-  fastify.post('/tasks/:taskId/pr-review', async (request, reply) => {
-    const { taskId } = request.params as { taskId: string }
-    const task = dbService.getTaskByLookup(taskId)
-    if (!task) {
-      return reply.status(404).send({ error: 'Task not found' })
-    }
-
-    if (!task.prNumber || task.prNumber < 1) {
-      return reply.status(409).send({
-        error: `Task ${task.id} does not have a related open PR.`,
-      })
-    }
-
-    if (activeTasks.has(task.id)) {
-      return reply.status(409).send({ error: 'Task is already running.' })
-    }
-
-    try {
-      const queued = await triggerPullRequestReview(task.id)
-      return reply.status(202).send({
-        ok: true,
-        sourceTaskId: task.id,
-        reviewTaskId: queued.reviewTaskId,
-        prNumber: queued.prNumber,
-      })
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
+    } catch (error: unknown) {
+      return reply.code(400).send({ error: error instanceof Error ? error.message : String(error) })
     }
   })
 
-  // --- Projects CRUD ---
-
-  fastify.get('/projects', async () => ({ projects: getConfig().projects }))
-
-  fastify.post('/projects', async (request, reply) => {
-    try {
-      const body = request.body as Record<string, unknown>
-      const existing = getConfig()
-      const project = validateProject(body)
-      if (existing.projects.some((p) => p.id === project.id)) {
-        return reply.status(409).send({ error: `Project "${project.id}" already exists.` })
-      }
-      await mutateConfig((cfg) => ({ ...cfg, projects: [...cfg.projects, project] }))
-      return { ok: true, project }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
+  app.post('/runs/:runId/cancel', async (request, reply) => {
+    const { runId } = request.params as { runId: string }
+    const canceled = await deps.cancelRun(runId)
+    if (!canceled) {
+      return reply.code(404).send({ error: `Run "${runId}" not found.` })
     }
+    return { ok: true, runId }
   })
 
-  fastify.put('/projects/:projectId', async (request, reply) => {
-    try {
-      const { projectId } = request.params as { projectId: string }
-      const body = request.body as Record<string, unknown>
-      const existing = getConfig()
-      if (!existing.projects.some((p) => p.id === projectId)) {
-        return reply.status(404).send({ error: `Project "${projectId}" not found.` })
-      }
-      const project = validateProject({ ...body, id: projectId })
-      await mutateConfig((cfg) => ({
-        ...cfg,
-        projects: cfg.projects.map((p) => (p.id === projectId ? project : p)),
-      }))
-      return { ok: true, project }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-  })
-
-  fastify.delete('/projects/:projectId', async (request, reply) => {
-    const { projectId } = request.params as { projectId: string }
-    if (!getConfig().projects.some((p) => p.id === projectId)) {
-      return reply.status(404).send({ error: `Project "${projectId}" not found.` })
-    }
-    const inFlight = dbService
-      .listTasks()
-      .filter(
-        (t: { id: string; projectId: string }) => t.projectId === projectId && activeTasks.has(t.id)
-      )
-    if (inFlight.length > 0) {
-      return reply.status(409).send({
-        error: `Project "${projectId}" has ${inFlight.length} active task(s). Cancel them first.`,
-      })
-    }
-    await mutateConfig((cfg) => ({
-      ...cfg,
-      projects: cfg.projects.filter((p) => p.id !== projectId),
-    }))
-    return { ok: true }
-  })
-
-  // --- Slack integration ---
-
-  fastify.get('/integrations/slack', async () => {
-    const slack = getConfig().slack
-    if (!slack) {
-      return { configured: false }
-    }
-    return { configured: true, channel: slack.channel }
-  })
-
-  fastify.put('/integrations/slack', async (request, reply) => {
-    try {
-      const body = request.body as Record<string, unknown>
-      const existing = getConfig().slack
-      // Allow omitting tokens when updating an existing connection (keep current values)
-      const merged =
-        existing && (!body.botToken || !body.appToken)
-          ? {
-              botToken: body.botToken || existing.botToken,
-              appToken: body.appToken || existing.appToken,
-              channel: body.channel,
-            }
-          : body
-      const slack = validateSlack(merged)
-      await mutateConfig((cfg) => ({ ...cfg, slack }))
-      return { ok: true }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-  })
-
-  fastify.delete('/integrations/slack', async () => {
-    await mutateConfig((cfg) => ({ ...cfg, slack: null }))
-    return { ok: true }
-  })
-
-  // --- Secrets ---
-
-  fastify.get('/secrets', async () => {
-    const stored = await readConfigStore(dataDir)
-    const masked = Object.fromEntries(Object.keys(stored.secrets).map((k) => [k, '***']))
-    return { secrets: masked }
-  })
-
-  fastify.patch('/secrets/:key', async (request, reply) => {
-    try {
-      const { key } = request.params as { key: string }
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-        return reply.status(400).send({
-          error:
-            'Secret key must be a valid environment variable name (letters, digits, underscores; cannot start with a digit).',
-        })
-      }
-      const body = request.body as Record<string, unknown>
-      if (typeof body.value !== 'string') {
-        return reply.status(400).send({ error: 'value must be a string.' })
-      }
-      if (!body.value) {
-        return reply.status(400).send({ error: 'value must not be empty.' })
-      }
-      await mutateConfig((cfg) => ({
-        ...cfg,
-        secrets: { ...cfg.secrets, [key]: body.value as string },
-      }))
-      return { ok: true }
-    } catch (error) {
-      return reply
-        .status(400)
-        .send({ error: error instanceof Error ? error.message : String(error) })
-    }
-  })
-
-  fastify.delete('/secrets/:key', async (request, reply) => {
-    const { key } = request.params as { key: string }
-    const stored = await readConfigStore(dataDir)
-    if (!(key in stored.secrets)) {
-      return reply.status(404).send({ error: `Secret "${key}" not found.` })
-    }
-    await mutateConfig((cfg) => {
-      const { [key]: _removed, ...rest } = cfg.secrets
-      return { ...cfg, secrets: rest }
-    })
-    return { ok: true }
-  })
-
-  return fastify
+  return app
 }

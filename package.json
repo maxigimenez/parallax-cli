@@ -1,6 +1,6 @@
 {
   "name": "parallax",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,10 +9,14 @@
     "lint": "pnpm --filter './packages/*' -r lint && pnpm exec eslint eslint.config.js",
     "lint:fix": "pnpm --filter './packages/*' -r lint:fix && pnpm exec eslint eslint.config.js --fix",
     "parallax": "NODE_ENV=dev pnpm --filter parallax-cli start",
-    "clean": "rm -rf packages/orchestrator/parallax.db packages/orchestrator/workspaces",
+    "clean": "rm -rf packages/*/dist",
     "version:set": "node scripts/set-version.mjs",
     "release:pack": "pnpm --filter parallax-cli pack:tarball",
-    "release:publish": "pnpm --dir packages/cli publish:package"
+    "release:publish": "pnpm --dir packages/cli publish:package",
+    "railway:plan": "railway config plan",
+    "railway:apply": "railway config apply",
+    "railway:deploy:api": "railway up --service api",
+    "railway:deploy:dashboard": "railway up --service dashboard"
   },
   "devDependencies": {
     "@eslint/js": "9.32.0",
@@ -23,6 +27,7 @@
     "eslint-plugin-react": "7.37.5",
     "globals": "17.3.0",
     "prettier": "3.8.1",
+    "railway": "3.11.0",
     "tsx": "4.19.2",
     "typescript": "5.7.3",
     "typescript-eslint": "8.56.1",

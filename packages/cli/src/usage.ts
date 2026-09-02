@@ -1,29 +1,45 @@
-export function printUsage(): void {
-  console.log(`Usage:
-  parallax --version
-  parallax --help
-  parallax init
-  parallax start [--server-api-port <port>] [--server-ui-port <port>] [--concurrency <count>] [--network-access]
-  parallax stop
-  parallax status
-  parallax tasks
-  parallax open
-  parallax preflight
-  parallax pr-review <task-id>
-  parallax retry <task-id>
-  parallax cancel <task-id>
-  parallax logs [--task <id>]
+import chalk from 'chalk'
 
-Commands:
-  init       Set up Parallax for the first time (interactive wizard).
-  start      Start orchestrator + UI in background.
-  stop       Force-stop the running Parallax processes.
-  status     Show orchestrator state and configured projects.
-  tasks      List the last 20 tasks with their status, AI adapter, and model.
-  open       Open the dashboard in your browser.
-  preflight  Validate local prerequisites and auth.
-  pr-review  [experimental] Apply open human PR review comments to the task's existing open PR.
-  retry      Queue a task for manual retry.
-  cancel     Cancel a pending or running task.
-  logs       Tail new task logs from the running Parallax API.`)
+const BRAND = chalk.hex('#f97316')
+
+export function printUsage(version: string): void {
+  console.log(
+    [
+      '',
+      `  ${BRAND('parallax')} ${chalk.dim(version)}`,
+      chalk.dim('  Triggers Hermes agents from your tickets and pull requests.'),
+      '',
+      chalk.bold('  Setup'),
+      '    init                        connect this machine to the cloud and to Hermes',
+      '    preflight                   check everything this runner needs',
+      '',
+      chalk.bold('  Running'),
+      '    start [--foreground]        start the runner',
+      '    stop                        stop it',
+      '    restart                     stop and start again',
+      '    status                      is it up, and what does it see',
+      '    reload                      re-pull projects, routes and agents now',
+      '    runner install|uninstall|status',
+      chalk.dim('                                keep it running across reboots (launchd)'),
+      '',
+      chalk.bold('  Inspecting'),
+      '    projects                    ticket sources it is polling',
+      '    agents                      Hermes profiles this runner discovered',
+      '    routes                      routing rules it is dispatching on',
+      '    runs [--status] [--limit]   recent runs',
+      '    logs [--run <id>] [--follow]',
+      '    cancel <run-id>             stop a run, on this side and on Hermes',
+      '',
+      chalk.bold('  Debugging'),
+      '    run --agent <profile> --prompt "..."',
+      chalk.dim('                                send one prompt straight to Hermes'),
+      '',
+      chalk.bold('  Flags for start'),
+      '    --api-port <n>              default 9371',
+      '    --concurrency <n>           default 2, max 16',
+      '    --network-access            expose the runner API to your LAN',
+      '    --foreground                run in this terminal instead of detaching',
+      '',
+    ].join('\n')
+  )
 }

@@ -1,25 +1,24 @@
 {
   "name": "parallax-cli",
-  "version": "0.1.0",
-  "description": "Local-first AI orchestration CLI for software tasks, plans, approvals, and pull requests.",
+  "version": "0.2.0",
+  "description": "Trigger Hermes agents from your tickets and pull requests.",
   "type": "module",
   "keywords": [
     "ai",
     "cli",
-    "developer-tools",
-    "automation",
-    "coding-agent",
+    "agents",
+    "hermes",
+    "orchestrator",
     "linear",
     "github",
-    "pull-request",
-    "orchestrator",
+    "automation",
     "parallax"
   ],
   "bin": {
     "parallax": "dist/cli/src/index.js"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc",
+    "build": "rm -rf dist && tsc && chmod +x dist/cli/src/index.js",
     "lint": "eslint src test scripts vitest.config.ts",
     "lint:fix": "eslint src test scripts vitest.config.ts --fix",
     "prepack": "node ./scripts/prepare-package.mjs",
@@ -31,32 +30,17 @@
     "test": "vitest run"
   },
   "engines": {
-    "node": ">=23.7.0"
+    "node": ">=22.5.0"
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",
-    "@fastify/cors": "11.2.0",
-    "@parallax/common": "0.1.0",
-    "@parallax/orchestrator": "0.1.0",
-    "@parallax/slack": "0.1.0",
-    "@parallax/ui": "0.1.0",
-    "@slack/bolt": "^4.0.0",
-    "@slack/web-api": "^7.0.0",
-    "chalk": "4",
-    "fastify": "5.7.4",
-    "log-update": "7.1.0",
-    "p-limit": "6.1.0",
-    "simple-git": "3.32.3",
-    "socket.io": "4.8.3",
-    "strip-ansi": "7.1.2",
-    "terminal-size": "4.0.1",
-    "uuid": "11.0.0"
+    "@parallax/common": "0.2.0",
+    "@parallax/orchestrator": "0.2.0",
+    "chalk": "4"
   },
   "bundleDependencies": [
     "@parallax/common",
-    "@parallax/orchestrator",
-    "@parallax/slack",
-    "@parallax/ui"
+    "@parallax/orchestrator"
   ],
   "devDependencies": {
     "@types/node": "25.3.0",

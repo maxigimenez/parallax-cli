@@ -1,373 +1,293 @@
 import * as p from '@clack/prompts'
 import chalk from 'chalk'
-import fs from 'node:fs'
-import path from 'node:path'
-import type { ProjectConfig, SlackConfig } from '@parallax/common'
+import { CONFIG_VERSION, type HermesProfileConfig, type StoredConfig } from '@parallax/common'
 import type { CliContext } from '../types.js'
-import { getModelOptions } from '../agent-models.js'
-import { detectGitHubRemote } from '../git-detect.js'
+import { getJson } from '../api.js'
+import {
+  defaultHermesBaseUrl,
+  discoverLocalHermes,
+  resolveHermesHome,
+  type LocalHermesProfile,
+} from '../hermes-local.js'
 
-const orange = chalk.hex('#f97316')
-
-function isCancel(value: unknown): value is symbol {
-  return typeof value === 'symbol'
-}
+const BRAND = chalk.hex('#f97316')
 
 function assertNotCancel<T>(value: T | symbol): T {
-  if (isCancel(value)) {
+  if (p.isCancel(value)) {
     p.cancel('Setup cancelled.')
     process.exit(0)
   }
   return value as T
 }
 
-function printWelcomeBanner(version: string) {
-  console.log('')
-  console.log(`  ${orange.bold('parallax')}${orange('_')}  ${chalk.dim(`v${version}`)}`)
-  console.log(`  ${chalk.dim('Local-first AI orchestration runtime')}`)
-  console.log('')
+function requiredText(message: string, initialValue?: string, placeholder?: string) {
+  return p.text({
+    message,
+    initialValue,
+    placeholder,
+    validate: (value) => (value?.trim() ? undefined : 'Required.'),
+  })
 }
 
-function validateWorkspaceDir(v: string | undefined): string | undefined {
-  const resolved = v?.trim() || process.cwd()
-  if (!path.isAbsolute(resolved)) {
-    return 'Path must be absolute.'
-  }
+/**
+ * Verifies a Hermes profile before we write its key to disk.
+ *
+ * Catching a wrong key here is far cheaper than catching it as a 401 buried in
+ * the runner log an hour later, and `/v1/capabilities` is the cheapest call that
+ * proves both reachability and that this key works on this profile's prefix.
+ */
+async function probeProfile(
+  baseUrl: string,
+  profile: string,
+  apiKey: string
+): Promise<{ ok: boolean; detail: string }> {
+  const prefix = profile === 'default' ? '' : `/p/${profile}`
   try {
-    const stat = fs.statSync(resolved)
-    if (!stat.isDirectory()) {
-      return 'Path must be a directory.'
-    }
-  } catch {
-    return 'Directory not found.'
-  }
-  if (!fs.existsSync(path.join(resolved, '.git'))) {
-    return 'Not a git repository (no .git directory found).'
+    const capabilities = await getJson<{ model?: string; platform?: string }>(
+      `${baseUrl.replace(/\/+$/, '')}${prefix}/v1/capabilities`,
+      { authorization: `Bearer ${apiKey}` }
+    )
+    return { ok: true, detail: capabilities.model ?? capabilities.platform ?? 'reachable' }
+  } catch (error: unknown) {
+    return { ok: false, detail: error instanceof Error ? error.message : String(error) }
   }
 }
 
-async function promptModel(
-  provider: ProjectConfig['agent']['provider']
-): Promise<string | undefined> {
-  const options = getModelOptions(provider)
-  const choice = assertNotCancel(
-    await p.select({
-      message: 'Model',
-      options: [
-        { value: '', label: 'Provider default' },
-        ...options.map((o) => ({ value: o.value, label: o.label, hint: o.hint })),
-        { value: '__custom__', label: 'Custom…' },
-      ],
-    })
-  ) as string
+export async function runInit(context: CliContext): Promise<void> {
+  p.intro(BRAND(' Parallax — connect this machine to your agents '))
 
-  if (choice === '') {
-    return undefined
-  }
-  if (choice !== '__custom__') {
-    return choice
-  }
+  const existing = await context.loadStoredConfig()
 
-  const custom = assertNotCancel(
-    await p.text({
-      message: 'Custom model identifier',
-      validate: (v) => (!v?.trim() ? 'Required.' : undefined),
-    })
-  ) as string
-  return custom.trim()
-}
-
-export async function runInit(_args: string[], context: CliContext) {
-  printWelcomeBanner(context.cliVersion)
-
-  const storedConfig = await context.loadStoredConfig()
-  const isFirstRun = storedConfig.projects.length === 0
-
-  if (!isFirstRun) {
-    p.intro(`${orange('◆')} ${chalk.bold('Add another project')}`)
-
-    const action = assertNotCancel(
-      await p.select({
-        message: `Found ${storedConfig.projects.length} existing project(s). What would you like to do?`,
-        options: [
-          { value: 'add', label: 'Add another project' },
-          { value: 'open', label: 'Open dashboard' },
-          { value: 'exit', label: 'Exit' },
-        ],
-      })
+  // ── Cloud ────────────────────────────────────────────────
+  p.log.step('Parallax cloud')
+  const cloudBaseUrl = assertNotCancel(
+    await requiredText(
+      'Cloud API base URL',
+      existing.cloud?.baseUrl ?? '',
+      'https://parallax-cloud.up.railway.app'
     )
+  ).trim()
 
-    if (action === 'open') {
-      let url = `http://localhost:9372`
-      try {
-        const state = await context.loadRunningState()
-        url = `http://localhost:${state.uiPort}`
-      } catch {
-        // orchestrator not running, use default port
-      }
-      p.note(url, 'Dashboard URL')
-      p.outro("Open the URL above in your browser, or run 'parallax open'.")
-      return
-    }
-
-    if (action === 'exit') {
-      p.outro('Bye.')
-      return
-    }
-  } else {
-    p.intro(`${orange('◆')} ${chalk.bold("Welcome — let's get you set up")}`)
-    p.note(
-      [
-        'This wizard sets up your first project. You can add more',
-        'projects, integrations (Slack, Linear, etc.), and secrets',
-        `from the dashboard at any time — or by running ${chalk.cyan('parallax init')} again.`,
-      ].join('\n'),
-      'First project setup'
-    )
-  }
-
-  // --- Project setup ---
-
-  const projectId = assertNotCancel(
-    await p.text({
-      message: 'Project ID',
-      placeholder: 'my-app',
-      validate: (v) => {
-        if (!v?.trim()) {
-          return 'Project ID is required.'
-        }
-        if (/\s/.test(v)) {
-          return 'Project ID must not contain spaces.'
-        }
-        if (storedConfig.projects.some((proj) => proj.id === v.trim())) {
-          return `Project ID "${v.trim()}" already exists.`
-        }
-      },
+  const cloudApiKey = assertNotCancel(
+    await p.password({
+      message: 'Runner API key (prx_rnr_…)',
+      validate: (value) =>
+        value?.startsWith('prx_rnr_')
+          ? undefined
+          : 'Expected a runner key. Create one with the cloud org:create command.',
     })
   )
 
-  const workspaceDir = assertNotCancel(
-    await p.path({
-      message: 'Local git repository (use Tab to navigate, Enter to accept)',
-      directory: true,
-      initialValue: process.cwd(),
-      validate: validateWorkspaceDir,
-    })
-  ) as string
+  const runnerName = assertNotCancel(
+    await requiredText('Name for this runner', existing.cloud?.runnerName ?? 'cerebro')
+  ).trim()
 
-  const detected = detectGitHubRemote(workspaceDir.trim())
+  // ── Hermes ───────────────────────────────────────────────
+  p.log.step('Hermes gateway')
 
-  const provider = assertNotCancel(
-    await p.select({
-      message: 'Where should Parallax pull tasks from?',
-      options: [
-        {
-          value: 'github',
-          label: 'GitHub Issues',
-          hint: detected ? `detected: ${detected.owner}/${detected.repo}` : undefined,
-        },
-        { value: 'linear', label: 'Linear' },
-      ],
-    })
-  ) as 'github' | 'linear'
+  const install = await discoverLocalHermes()
 
-  let filters: ProjectConfig['pullFrom']['filters'] = {}
-  let needsLinearKey = false
-
-  if (provider === 'github') {
-    const owner = assertNotCancel(
-      await p.text({
-        message: 'GitHub owner or org',
-        initialValue: detected?.owner,
-        validate: (v) => (!v?.trim() ? 'Required.' : undefined),
-      })
-    )
-    const repo = assertNotCancel(
-      await p.text({
-        message: 'GitHub repository name',
-        initialValue: detected?.repo,
-        validate: (v) => (!v?.trim() ? 'Required.' : undefined),
-      })
-    )
-    const labelFilter = assertNotCancel(
-      await p.text({ message: 'Filter by label (optional, e.g. ai-ready)', placeholder: '' })
-    )
-    filters = {
-      owner: owner.trim(),
-      repo: repo.trim(),
-      state: 'open',
-      labels: labelFilter.trim() ? [labelFilter.trim()] : undefined,
+  if (install) {
+    p.log.info(`Found a Hermes install at ${install.home}`)
+    if (!install.apiServerEnabled) {
+      p.log.warn(
+        `API_SERVER_ENABLED is not set in ${install.home}/.env — the gateway will not serve an API.`
+      )
     }
   } else {
-    const team = assertNotCancel(
-      await p.text({
-        message: 'Linear team ID or key',
-        validate: (v) => (!v?.trim() ? 'Required.' : undefined),
-      })
+    p.log.warn(
+      `No Hermes install at ${resolveHermesHome()}. You can still configure profiles by hand.`
     )
-    const labelFilter = assertNotCancel(
-      await p.text({ message: 'Filter by label (optional)', placeholder: '' })
+  }
+
+  const hermesBaseUrl = assertNotCancel(
+    await requiredText(
+      'Hermes API server base URL',
+      existing.hermes?.baseUrl ?? defaultHermesBaseUrl(install)
     )
-    filters = {
-      team: team.trim(),
-      labels: labelFilter.trim() ? [labelFilter.trim()] : undefined,
+  ).trim()
+
+  const previous = new Map(
+    (existing.hermes?.profiles ?? []).map((profile) => [profile.name, profile])
+  )
+
+  /** Confirms one profile and collects the bits Parallax needs beyond the key. */
+  async function configureProfile(
+    name: string,
+    discovered?: LocalHermesProfile
+  ): Promise<HermesProfileConfig | undefined> {
+    const remembered = previous.get(name)
+
+    // Prefer what is on disk: it is the key the gateway is actually serving.
+    let apiKey = discovered?.apiKey ?? remembered?.apiKey
+    if (apiKey) {
+      p.log.info(
+        `Using the API_SERVER_KEY from ${discovered?.apiKey ? discovered.envPath : 'your existing Parallax config'}`
+      )
+    } else {
+      apiKey = assertNotCancel(
+        await p.password({
+          message: `API_SERVER_KEY for "${name}"`,
+          validate: (value) => (value?.trim() ? undefined : 'Required.'),
+        })
+      )
     }
-    needsLinearKey = !storedConfig.secrets['LINEAR_API_KEY']
-  }
 
-  const agentProvider = assertNotCancel(
-    await p.select({
-      message: 'Which AI agent should work on this project?',
-      options: [
-        { value: 'claude-code', label: 'Claude Code' },
-        { value: 'codex', label: 'OpenAI Codex' },
-        { value: 'gemini', label: 'Google Gemini' },
-      ],
-    })
-  ) as ProjectConfig['agent']['provider']
+    const spinner = p.spinner()
+    spinner.start(`Checking ${name}`)
+    const probe = await probeProfile(hermesBaseUrl, name, apiKey)
+    spinner.stop(probe.ok ? `${name}: ${probe.detail}` : `${name}: unreachable`)
 
-  const modelOverride = await promptModel(agentProvider)
+    if (!probe.ok) {
+      p.log.error(probe.detail)
+      const keep = assertNotCancel(
+        await p.confirm({ message: `Add "${name}" anyway?`, initialValue: false })
+      )
+      if (!keep) {
+        return undefined
+      }
+    }
 
-  // --- Secrets ---
-
-  let linearApiKey: string | undefined
-
-  if (needsLinearKey) {
-    linearApiKey = assertNotCancel(
-      await p.password({
-        message: 'Linear API key',
-        validate: (v) => (!v?.trim() ? 'Required for Linear integration.' : undefined),
+    const role = assertNotCancel(
+      await p.text({
+        message: `Role for "${name}" (optional)`,
+        initialValue: remembered?.role ?? '',
+        placeholder: 'product, reviewer…',
       })
-    ) as string
+    ).trim()
+
+    const githubLogin = assertNotCancel(
+      await p.text({
+        message: `GitHub login for "${name}" (optional)`,
+        initialValue: remembered?.githubLogin ?? '',
+        placeholder: 'Needed only for PR-review routes',
+      })
+    ).trim()
+
+    const avatarUrl = assertNotCancel(
+      await p.text({
+        message: `Avatar image URL for "${name}" (optional)`,
+        initialValue: remembered?.avatarUrl ?? '',
+        placeholder: 'Shown beside this agent’s Slack notifications',
+      })
+    ).trim()
+
+    return {
+      name,
+      apiKey,
+      enabled: true,
+      ...(role ? { role } : {}),
+      ...(githubLogin ? { githubLogin } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
+    }
   }
 
-  // --- Slack (offered once if not already configured) ---
+  const profiles: HermesProfileConfig[] = []
 
-  let slackConfig: SlackConfig | undefined
+  if (install && install.profiles.length > 0) {
+    p.log.step(`Found ${install.profiles.length} profile(s)`)
 
-  if (!storedConfig.slack) {
-    const wantSlack = assertNotCancel(
-      await p.confirm({ message: 'Set up Slack notifications?', initialValue: false })
-    )
+    for (const discovered of install.profiles) {
+      const label = discovered.apiKey
+        ? `Add "${discovered.name}"?`
+        : `Add "${discovered.name}"? (no API_SERVER_KEY found in its .env)`
 
-    if (wantSlack) {
-      const botToken = assertNotCancel(
-        await p.password({
-          message: 'Bot token',
-          validate: (v) => {
-            if (!v?.trim()) {
-              return 'Required.'
-            }
-            if (!v.trim().startsWith('xoxb-')) {
-              return 'Must start with xoxb-'
-            }
-          },
-        })
+      const include = assertNotCancel(
+        await p.confirm({ message: label, initialValue: Boolean(discovered.apiKey) })
       )
-      const appToken = assertNotCancel(
-        await p.password({
-          message: 'App token',
-          validate: (v) => {
-            if (!v?.trim()) {
-              return 'Required.'
-            }
-            if (!v.trim().startsWith('xapp-')) {
-              return 'Must start with xapp-'
-            }
-          },
-        })
-      )
-      const channel = assertNotCancel(
-        await p.text({
-          message: 'Slack channel',
-          placeholder: '#eng-ai',
-          validate: (v) => (!v?.trim() ? 'Required.' : undefined),
-        })
-      )
-      slackConfig = {
-        botToken: botToken.trim(),
-        appToken: appToken.trim(),
-        channel: channel.trim(),
+      if (!include) {
+        continue
+      }
+
+      const profile = await configureProfile(discovered.name, discovered)
+      if (profile) {
+        profiles.push(profile)
       }
     }
   }
 
-  // --- Build new project ---
+  // Always allow adding one by hand: a profile can live on another host, and
+  // discovery finding nothing must not be a dead end.
+  for (;;) {
+    const prompt =
+      profiles.length === 0
+        ? 'No profiles added yet. Add one by name?'
+        : 'Add another profile by name?'
+    const more = assertNotCancel(
+      await p.confirm({ message: prompt, initialValue: profiles.length === 0 })
+    )
+    if (!more) {
+      break
+    }
 
-  const newProject: ProjectConfig = {
-    id: projectId.trim(),
-    workspaceDir: workspaceDir.trim() || process.cwd(),
-    pullFrom: { provider, filters },
-    agent: {
-      provider: agentProvider,
-      model: modelOverride,
-    },
+    const name = assertNotCancel(await requiredText('Profile name')).trim()
+    if (profiles.some((profile) => profile.name === name)) {
+      p.log.warn(`"${name}" was already added.`)
+      continue
+    }
+
+    const profile = await configureProfile(name)
+    if (profile) {
+      profiles.push(profile)
+    }
   }
 
-  // --- Confirmation ---
-
-  p.note(
-    [
-      `ID:         ${newProject.id}`,
-      `Workspace:  ${newProject.workspaceDir}`,
-      `Provider:   ${provider}`,
-      `Agent:      ${agentProvider}${newProject.agent.model ? ` (${newProject.agent.model})` : ''}`,
-      slackConfig ? `Slack:      ${slackConfig.channel}` : '',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    'Summary'
-  )
-
-  const confirmed = assertNotCancel(await p.confirm({ message: 'Save this configuration?' }))
-
-  if (!confirmed) {
-    p.cancel('Setup cancelled.')
+  if (profiles.length === 0) {
+    p.cancel('No Hermes profiles configured; there would be nothing to dispatch to.')
     return
   }
 
-  // --- Write ---
-
-  const updatedConfig = {
-    ...storedConfig,
-    projects: [...storedConfig.projects, newProject],
-    slack: slackConfig ?? storedConfig.slack,
-    secrets: linearApiKey
-      ? { ...storedConfig.secrets, LINEAR_API_KEY: linearApiKey }
-      : storedConfig.secrets,
+  // ── Secrets ──────────────────────────────────────────────
+  const secrets = { ...existing.secrets }
+  const needsLinear = assertNotCancel(
+    await p.confirm({ message: 'Will any project pull from Linear?', initialValue: false })
+  )
+  if (needsLinear && !secrets.LINEAR_API_KEY) {
+    secrets.LINEAR_API_KEY = assertNotCancel(
+      await p.password({
+        message: 'Linear API key',
+        validate: (value) => (value?.trim() ? undefined : 'Required.'),
+      })
+    )
   }
 
-  await context.saveStoredConfig(updatedConfig)
-
-  // Reload orchestrator if running
-  let alreadyRunning = false
-  try {
-    const state = await context.loadRunningState()
-    const reloadRes = await fetch(`http://localhost:${state.apiPort}/runtime/reload`, {
-      method: 'POST',
-    })
-    if (reloadRes.ok) {
-      alreadyRunning = true
-    } else {
-      console.warn(
-        `Warning: orchestrator reload returned ${reloadRes.status}. You may need to restart Parallax.`
-      )
-    }
-  } catch {
-    // not running, ignore
+  const config: StoredConfig = {
+    version: CONFIG_VERSION,
+    cloud: { baseUrl: cloudBaseUrl.replace(/\/+$/, ''), apiKey: cloudApiKey, runnerName },
+    hermes: { baseUrl: hermesBaseUrl.replace(/\/+$/, ''), profiles },
+    // Projects and routes are cloud-side configuration; the runner pulls them.
+    projects: existing.projects,
+    secrets,
+    updatedAt: Date.now(),
   }
 
-  const nextSteps = alreadyRunning
-    ? [
-        `${chalk.dim('•')} Project added. Parallax is already running.`,
-        `${chalk.dim('•')} Run ${chalk.cyan('parallax open')} to view the dashboard.`,
-      ]
-    : [
-        `${chalk.dim('•')} Run ${chalk.cyan('parallax start')} to launch the orchestrator.`,
-        `${chalk.dim('•')} Run ${chalk.cyan('parallax open')} to view the dashboard.`,
-        `${chalk.dim('•')} Manage projects, integrations and secrets from the dashboard.`,
-      ]
+  p.note(
+    [
+      `Cloud:    ${config.cloud!.baseUrl}  (runner "${runnerName}")`,
+      `Hermes:   ${config.hermes!.baseUrl}`,
+      `Profiles: ${profiles.map((profile) => profile.name).join(', ')}`,
+    ].join('\n'),
+    'Configuration'
+  )
 
-  p.note(nextSteps.join('\n'), 'Next steps')
-  p.outro(orange('Setup complete.'))
+  const confirmed = assertNotCancel(
+    await p.confirm({ message: 'Save to ~/.parallax/config.json?', initialValue: true })
+  )
+  if (!confirmed) {
+    p.cancel('Nothing was written.')
+    return
+  }
+
+  await context.saveStoredConfig(config)
+
+  p.outro(
+    [
+      BRAND('Saved.'),
+      '',
+      'Next:',
+      '  parallax preflight        check this machine can reach everything',
+      '  parallax start            run the orchestrator',
+      '  parallax runner install   keep it running across reboots',
+    ].join('\n')
+  )
 }

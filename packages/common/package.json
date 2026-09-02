@@ -1,6 +1,6 @@
 {
   "name": "@parallax/common",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -13,6 +13,18 @@
     "./executor": {
       "types": "./dist/executor.d.ts",
       "import": "./dist/executor.js"
+    },
+    "./prompt-catalog": {
+      "types": "./dist/prompt-catalog.d.ts",
+      "import": "./dist/prompt-catalog.js"
+    },
+    "./route-catalog": {
+      "types": "./dist/route-catalog.d.ts",
+      "import": "./dist/route-catalog.js"
+    },
+    "./route-validation": {
+      "types": "./dist/route-validation.d.ts",
+      "import": "./dist/route-validation.js"
     }
   },
   "scripts": {

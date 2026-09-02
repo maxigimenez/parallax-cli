@@ -1,0 +1,95 @@
+name: Deploy cloud-api
+
+on:
+  # Two ways in. Manual dispatch lets you pick the branch, so a change can be
+  # deployed before it merges. The push trigger is path-filtered rather than
+  # firing on every merge to main, because redeploying the control plane
+  # interrupts a runner's long poll for no reason. Delete the `push:` block
+  # below if you would rather every deploy be deliberate.
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Railway service name
+        required: true
+        default: api
+      environment:
+        description: Railway environment
+        required: false
+        default: production
+
+  push:
+    branches: [main]
+    paths:
+      - 'packages/cloud-api/**'
+      - 'packages/common/**'
+      - 'Dockerfile'
+      - '.railway/railway.ts'
+      - '.github/workflows/deploy-cloud-api.yml'
+
+concurrency:
+  # Never two deploys at once: the pre-deploy step runs migrations.
+  group: deploy-cloud-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      SERVICE: ${{ inputs.service || 'api' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require a Railway token
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "::error::RAILWAY_TOKEN is not set. Create a project token in"\
+                 "Railway (Project Settings -> Tokens) and add it as a repository secret."
+            exit 1
+          fi
+
+      - name: Install the Railway CLI
+        run: npm install -g @railway/cli@4
+
+      # Deploys from the checkout, so no git remote needs to be connected on the
+      # Railway side. The root is the Docker build context.
+      - name: Deploy
+        run: railway up --service "$SERVICE" --environment "${{ inputs.environment || 'production' }}" --ci
+
+      - name: Wait for health
+        run: |
+          # `railway domain` output has changed shape between CLI versions, so
+          # the hostname is scraped rather than parsed from a flag that may not
+          # exist. An explicit CLOUD_HEALTH_URL wins over both.
+          DOMAIN="${{ vars.CLOUD_HEALTH_URL }}"
+          if [ -z "$DOMAIN" ]; then
+            DOMAIN=$(railway domain --service "$SERVICE" 2>/dev/null \
+              | grep -oE '[a-z0-9.-]+\.up\.railway\.app' | head -1)
+          fi
+
+          if [ -z "$DOMAIN" ]; then
+            echo "::warning::Could not resolve the service domain; skipping the health check."
+            exit 0
+          fi
+
+          URL="$DOMAIN"
+          case "$URL" in https://*) ;; *) URL="https://$DOMAIN" ;; esac
+          echo "Checking $URL/health"
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "$URL/health" || true)
+            if [ "$code" = "200" ]; then
+              echo "Healthy after ${attempt} attempt(s)."
+              exit 0
+            fi
+            sleep 10
+          done
+
+          # The deploy itself may have succeeded and the check raced it, so this
+          # fails loudly rather than silently passing.
+          echo "::error::/health did not return 200 within 5 minutes (last: $code)."
+          exit 1

@@ -1,40 +1,61 @@
-import { PULL_PROVIDER, TASK_STATUS, ProjectConfig } from '@parallax/common'
-import { createTaskId } from '../task-id.js'
-import type { TaskWithLabels } from '../github/service.js'
+import {
+  TICKET_PROVIDER,
+  TRIGGER_TYPE,
+  type CommentTarget,
+  type ProjectConfig,
+  type TriggerEvent,
+} from '@parallax/common'
+import type { TrackerWriter, TriggerSource } from '../triggers/types.js'
 
 type GraphqlResponse<T> = {
   data?: T
   errors?: Array<{ message?: string }>
 }
 
-type IssueNode = {
+interface IssueNode {
   id: string
   identifier: string
   title: string
   description?: string | null
+  url?: string
+  updatedAt?: string
+  state?: { name?: string }
   labels?: { nodes: Array<{ name: string }> }
 }
 
-type WorkflowStateNode = {
-  id: string
-}
+const ISSUES_QUERY = `
+  query Issues($filter: IssueFilter) {
+    issues(filter: $filter, first: 100) {
+      nodes {
+        id
+        identifier
+        title
+        description
+        url
+        updatedAt
+        state { name }
+        labels { nodes { name } }
+      }
+    }
+  }
+`
 
-export class LinearService {
-  private readonly apiKey: string
-  private readonly endpoint: string
+export class LinearService implements TriggerSource, TrackerWriter {
+  readonly name = 'linear'
 
-  constructor(apiKey: string, endpoint: string = 'https://api.linear.app/graphql') {
-    this.apiKey = apiKey
-    this.endpoint = endpoint
+  constructor(
+    private readonly apiKey: string,
+    private readonly endpoint: string = 'https://api.linear.app/graphql'
+  ) {
+    if (!apiKey) {
+      throw new Error('LINEAR_API_KEY is required for Linear projects.')
+    }
   }
 
   private async request<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
     const response = await fetch(this.endpoint, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: this.apiKey,
-      },
+      headers: { 'content-type': 'application/json', authorization: this.apiKey },
       body: JSON.stringify({ query, variables }),
     })
 
@@ -43,192 +64,165 @@ export class LinearService {
     }
 
     const body = (await response.json()) as GraphqlResponse<T>
-    if (body.errors && body.errors.length > 0) {
-      const message = body.errors.map((err) => err.message ?? 'unknown').join('; ')
-      throw new Error(`Linear API GraphQL error: ${message}`)
+    if (body.errors?.length) {
+      throw new Error(
+        `Linear API GraphQL error: ${body.errors.map((error) => error.message ?? 'unknown').join('; ')}`
+      )
     }
-
     if (!body.data) {
       throw new Error('Linear API returned empty data.')
     }
-
     return body.data
   }
 
-  async fetchNewIssues(project: ProjectConfig): Promise<TaskWithLabels[]> {
-    if (project.pullFrom.provider !== PULL_PROVIDER.LINEAR) {
+  // ── Trigger source ─────────────────────────────────────────
+
+  async collect(project: ProjectConfig): Promise<TriggerEvent[]> {
+    if (project.provider !== TICKET_PROVIDER.LINEAR) {
       return []
     }
 
-    const { filters } = project.pullFrom
+    const { team, state, labels, project: projectName } = project.filters
     const filter: Record<string, unknown> = {}
+    if (team) {
+      filter.team = { key: { eq: team } }
+    }
+    if (state) {
+      filter.state = { name: { eq: state } }
+    }
+    if (labels?.length) {
+      filter.labels = { name: { in: labels } }
+    }
+    if (projectName) {
+      filter.project = { name: { eq: projectName } }
+    }
 
-    if (filters.team) {
-      filter.team = { key: { eq: filters.team } }
-    }
-    if (filters.state) {
-      filter.state = { name: { eq: filters.state } }
-    }
-    if (filters.labels?.length) {
-      filter.labels = { name: { in: filters.labels } }
-    }
-    if (filters.project) {
-      filter.project = { name: { eq: filters.project } }
-    }
-
-    const data = await this.request<{ issues: { nodes: IssueNode[] } }>(
-      `
-        query Issues($filter: IssueFilter) {
-          issues(filter: $filter) {
-            nodes {
-              id
-              identifier
-              title
-              description
-              labels {
-                nodes {
-                  name
-                }
-              }
-            }
-          }
-        }
-      `,
-      { filter }
-    )
+    const data = await this.request<{ issues: { nodes: IssueNode[] } }>(ISSUES_QUERY, { filter })
 
     return data.issues.nodes.map((issue) => ({
-      id: createTaskId(project.id, issue.identifier),
-      externalId: issue.identifier,
-      title: issue.title,
-      description: issue.description ?? '',
-      status: TASK_STATUS.PENDING,
+      type: TRIGGER_TYPE.TICKET,
       projectId: project.id,
-      labels: issue.labels?.nodes.map((l) => l.name) ?? [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      provider: TICKET_PROVIDER.LINEAR,
+      ref: issue.identifier,
+      // Linear's updatedAt moves on label and state changes, which is exactly
+      // the set of edits that should re-trigger a route.
+      revision: issue.updatedAt ?? '',
+      title: issue.title,
+      body: issue.description ?? '',
+      url: issue.url,
+      state: issue.state?.name,
+      labels: issue.labels?.nodes.map((label) => label.name) ?? [],
     }))
   }
 
-  async markAsInProgress(
-    externalId: string,
-    existingCommentId?: string | null,
-    body?: string
-  ): Promise<string | undefined> {
-    const [teamKey, issueNumber] = externalId.split('-')
-    const issueNumberParsed = Number.parseInt(issueNumber, 10)
-    if (!teamKey || !Number.isFinite(issueNumberParsed)) {
-      return
+  // ── Tracker writer ─────────────────────────────────────────
+
+  private async findIssueId(identifier: string): Promise<string> {
+    const data = await this.request<{ issue: { id: string } | null }>(
+      `query Issue($id: String!) { issue(id: $id) { id } }`,
+      { id: identifier }
+    )
+    if (!data.issue) {
+      throw new Error(`Linear issue "${identifier}" not found.`)
     }
-
-    const commentBody = body ?? '🤖 Parallax has picked up this task and is generating a plan.'
-
-    if (existingCommentId) {
-      await this.updateComment(existingCommentId, commentBody)
-      return existingCommentId
-    }
-
-    const issueData = await this.request<{ issues: { nodes: IssueNode[] } }>(
-      `
-        query IssueByExternalId($teamKey: String!, $issueNumber: Float!) {
-          issues(
-            filter: {
-              team: { key: { eq: $teamKey } }
-              number: { eq: $issueNumber }
-            }
-          ) {
-            nodes {
-              id
-              identifier
-              title
-              description
-            }
-          }
-        }
-      `,
-      { teamKey, issueNumber: issueNumberParsed }
-    )
-    const issue = issueData.issues.nodes[0]
-    if (!issue) {
-      return
-    }
-
-    const viewerData = await this.request<{ viewer: { id: string } }>(
-      `
-        query Viewer {
-          viewer {
-            id
-          }
-        }
-      `
-    )
-
-    const workflowData = await this.request<{ workflowStates: { nodes: WorkflowStateNode[] } }>(
-      `
-        query WorkflowStates($teamKey: String!) {
-          workflowStates(
-            filter: {
-              team: { key: { eq: $teamKey } }
-              name: { eq: "In Progress" }
-            }
-          ) {
-            nodes {
-              id
-            }
-          }
-        }
-      `,
-      { teamKey }
-    )
-
-    const inProgressState = workflowData.workflowStates.nodes[0]
-    if (!inProgressState) {
-      return
-    }
-
-    await this.request(
-      `
-        mutation UpdateIssue($id: String!, $assigneeId: String, $stateId: String) {
-          issueUpdate(
-            id: $id
-            input: { assigneeId: $assigneeId, stateId: $stateId }
-          ) {
-            success
-          }
-        }
-      `,
-      { id: issue.id, assigneeId: viewerData.viewer.id, stateId: inProgressState.id }
-    )
-
-    const commentData = await this.request<{
-      commentCreate: { success: boolean; comment?: { id: string } }
-    }>(
-      `
-        mutation CreateComment($issueId: String!, $body: String!) {
-          commentCreate(input: { issueId: $issueId, body: $body }) {
-            success
-            comment {
-              id
-            }
-          }
-        }
-      `,
-      { issueId: issue.id, body: commentBody }
-    )
-
-    return commentData.commentCreate.comment?.id
+    return data.issue.id
   }
 
-  async updateComment(commentId: string, body: string): Promise<void> {
+  async postComment(_target: CommentTarget, event: TriggerEvent, body: string): Promise<void> {
+    const issueId = await this.findIssueId(event.ref)
     await this.request(
-      `
-        mutation UpdateComment($id: String!, $body: String!) {
-          commentUpdate(id: $id, input: { body: $body }) {
-            success
-          }
-        }
-      `,
-      { id: commentId, body }
+      `mutation Comment($issueId: String!, $body: String!) {
+         commentCreate(input: { issueId: $issueId, body: $body }) { success }
+       }`,
+      { issueId, body }
+    )
+  }
+
+  /** Creates a label on the issue's team and returns its id. */
+  private async ensureTeamLabel(identifier: string, name: string): Promise<string> {
+    const team = await this.request<{ issue: { team: { id: string } } | null }>(
+      `query IssueTeam($id: String!) { issue(id: $id) { team { id } } }`,
+      { id: identifier }
+    )
+    if (!team.issue) {
+      throw new Error(`Linear issue "${identifier}" not found.`)
+    }
+
+    const created = await this.request<{
+      issueLabelCreate: { success: boolean; issueLabel: { id: string } | null }
+    }>(
+      `mutation CreateLabel($teamId: String!, $name: String!, $color: String!) {
+         issueLabelCreate(input: { teamId: $teamId, name: $name, color: $color }) {
+           success
+           issueLabel { id }
+         }
+       }`,
+      { teamId: team.issue.team.id, name, color: '#f97316' }
+    )
+
+    const id = created.issueLabelCreate.issueLabel?.id
+    if (!id) {
+      throw new Error(`Could not create Linear label "${name}".`)
+    }
+    return id
+  }
+
+  async updateLabels(
+    event: TriggerEvent,
+    labels: { add?: string[]; remove?: string[] }
+  ): Promise<void> {
+    if (!labels.add?.length && !labels.remove?.length) {
+      return
+    }
+
+    const issueId = await this.findIssueId(event.ref)
+
+    // Linear's API takes the full label set rather than a delta, so the current
+    // set has to be read and recomputed. Names are resolved to ids against the
+    // issue's team, since label ids are team-scoped.
+    const data = await this.request<{
+      issue: {
+        labels: { nodes: Array<{ id: string; name: string }> }
+        team: { labels: { nodes: Array<{ id: string; name: string }> } }
+      } | null
+    }>(
+      `query IssueLabels($id: String!) {
+         issue(id: $id) {
+           labels { nodes { id name } }
+           team { labels { nodes { id name } } }
+         }
+       }`,
+      { id: event.ref }
+    )
+
+    if (!data.issue) {
+      throw new Error(`Linear issue "${event.ref}" not found.`)
+    }
+
+    const byName = new Map(
+      data.issue.team.labels.nodes.map((label) => [label.name.toLowerCase(), label.id])
+    )
+    const remove = new Set(
+      (labels.remove ?? []).map((name) => byName.get(name.toLowerCase())).filter(Boolean)
+    )
+
+    const next = new Set(data.issue.labels.nodes.map((label) => label.id))
+    for (const id of remove) {
+      next.delete(id as string)
+    }
+    for (const name of labels.add ?? []) {
+      // Create it rather than fail: the parallax:* markers are applied
+      // automatically, so requiring someone to pre-create them by hand would
+      // make the loop guard silently ineffective on a new team.
+      const id = byName.get(name.toLowerCase()) ?? (await this.ensureTeamLabel(event.ref, name))
+      next.add(id)
+    }
+
+    await this.request(
+      `mutation SetLabels($issueId: String!, $labelIds: [String!]!) {
+         issueUpdate(id: $issueId, input: { labelIds: $labelIds }) { success }
+       }`,
+      { issueId, labelIds: [...next] }
     )
   }
 }

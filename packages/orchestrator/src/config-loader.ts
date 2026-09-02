@@ -1,6 +1,11 @@
 import path from 'node:path'
 import os from 'node:os'
-import { AppConfig, DEFAULT_API_PORT, DEFAULT_UI_PORT, ServerConfig } from '@parallax/common'
+import {
+  DEFAULT_API_PORT,
+  DEFAULT_CONCURRENCY,
+  type AppConfig,
+  type ServerConfig,
+} from '@parallax/common'
 import { readConfigStore } from './config-store.js'
 import { validateStoredConfig } from './config-validation.js'
 
@@ -13,7 +18,7 @@ export function resolveDataDir(): string {
 function parseRuntimeConcurrency(): number {
   const raw = process.env.PARALLAX_CONCURRENCY
   if (raw === undefined) {
-    return 2
+    return DEFAULT_CONCURRENCY
   }
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 16) {
@@ -39,14 +44,7 @@ function parseRuntimeServerConfig(): ServerConfig {
     'PARALLAX_SERVER_API_PORT',
     DEFAULT_API_PORT
   )
-  const uiPort = parseRuntimePort(
-    process.env.PARALLAX_SERVER_UI_PORT,
-    'PARALLAX_SERVER_UI_PORT',
-    DEFAULT_UI_PORT
-  )
-  if (apiPort === uiPort) {
-    throw new Error('PARALLAX_SERVER_API_PORT and PARALLAX_SERVER_UI_PORT must be different.')
-  }
+
   const rawNetworkAccess = process.env.PARALLAX_NETWORK_ACCESS
   if (
     rawNetworkAccess !== undefined &&
@@ -55,26 +53,30 @@ function parseRuntimeServerConfig(): ServerConfig {
   ) {
     throw new Error('PARALLAX_NETWORK_ACCESS must be "true" or "false".')
   }
-  return { apiPort, uiPort, networkAccess: rawNetworkAccess === 'true' }
+
+  return { apiPort, networkAccess: rawNetworkAccess === 'true' }
 }
 
 export async function loadConfig(): Promise<AppConfig> {
   const dataDir = resolveDataDir()
   const stored = await readConfigStore(dataDir)
 
+  // Secrets reach `gh` and any other subprocess through inherited env. Existing
+  // env always wins so an operator can override one without editing config.
   for (const [key, value] of Object.entries(stored.secrets)) {
     if (process.env[key] === undefined) {
       process.env[key] = value
     }
   }
 
-  const { projects, slack } = validateStoredConfig(stored)
+  const { projects, hermes, cloud } = validateStoredConfig(stored)
 
   return {
     concurrency: parseRuntimeConcurrency(),
     logs: ['info', 'success', 'warn', 'error'],
     server: parseRuntimeServerConfig(),
     projects,
-    slack,
+    hermes,
+    cloud,
   }
 }

@@ -1,0 +1,43 @@
+# Builds @parallax/cloud-dashboard.
+#
+# A sibling of ./Dockerfile rather than a stage inside it: the two services are
+# deployed and scaled independently, and a shared image would rebuild and
+# restart the control plane every time a button moved.
+#
+# Railway is pointed at this file by .railway/railway.ts, which sets the dashboard
+# service's builder and dockerfilePath. The build context is the repo root because
+# this is a pnpm workspace and the lockfile lives there.
+#
+#   docker build -f Dockerfile.dashboard -t parallax-dashboard .
+
+# ── build ──────────────────────────────────────────────────────────────────
+# pnpm refuses to remove a node_modules directory without a TTY, and the
+# builder has none.
+FROM node:23-slim AS build
+WORKDIR /app
+ENV CI=true
+RUN corepack enable
+
+# Only the manifests first, so the dependency layer survives source edits.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/cloud-dashboard/package.json packages/cloud-dashboard/
+RUN pnpm install --frozen-lockfile --filter @parallax/cloud-dashboard...
+
+COPY packages/cloud-dashboard packages/cloud-dashboard
+RUN pnpm --filter @parallax/cloud-dashboard build
+
+# ── runtime ────────────────────────────────────────────────────────────────
+# No node_modules at all. server.mjs is deliberately dependency-free and the
+# bundle is already built, so the runtime image carries static files and one
+# script — nothing that could need patching for a transitive CVE.
+FROM node:23-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=build /app/packages/cloud-dashboard/dist ./dist
+COPY --from=build /app/packages/cloud-dashboard/server.mjs ./server.mjs
+
+# Railway overrides PORT; this is the local default and matches server.mjs.
+EXPOSE 8080
+USER node
+CMD ["node", "server.mjs"]
