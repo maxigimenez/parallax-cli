@@ -134,14 +134,39 @@ a:focus-visible,
   overflow: hidden;
 }
 
-.px-sidebar__brand {
+/*
+ * The organization control.
+ *
+ * The design puts an org switcher here, not the product wordmark — the
+ * wordmark belongs to the login screen. One key resolves to exactly one
+ * organization, so there is nothing to switch between; the menu carries the
+ * org and the sign-out action instead of inventing a list.
+ */
+.px-orgbutton {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--bits-space-3);
+  width: calc(100% - var(--bits-space-4));
   margin: 10px var(--bits-space-2) 6px;
   padding: var(--bits-space-3);
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   min-width: 0;
+  transition: background 0.12s linear;
+}
+
+.px-orgbutton:hover {
+  background: var(--bits-raised);
+}
+
+.px-orgbutton:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
 }
 
 .px-sidebar__mark {
@@ -159,11 +184,115 @@ a:focus-visible,
   display: block;
 }
 
-.px-sidebar__org {
+.px-orgbutton__text {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--bits-space-1);
   min-width: 0;
+}
+
+.px-orgbutton__name {
+  font-size: var(--bits-font-size-body);
+  color: var(--bits-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-orgbutton__meta {
+  font-size: var(--bits-font-size-label);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-orgbutton__caret {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-text-muted);
+  transition: transform 0.16s steps(3);
+}
+
+.px-orgbutton[aria-expanded='true'] .px-orgbutton__caret {
+  transform: rotate(180deg);
+}
+
+.px-orgmenu {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 74px;
+  z-index: 20;
+  border: 2px solid var(--bits-line);
+  background: var(--bits-ink);
+  box-shadow: 6px 6px 0 var(--bits-backdrop, rgb(0 0 0 / 50%));
+}
+
+.px-orgmenu__row {
+  width: 100%;
+  padding: 13px 14px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--bits-muted);
+  color: var(--bits-text-soft);
+  font: inherit;
+  font-size: var(--bits-font-size-small);
+  text-align: left;
+  cursor: default;
+  min-width: 0;
+}
+
+.px-orgmenu__row--action {
+  cursor: pointer;
+  border-bottom: 0;
+  font-size: var(--bits-font-size-caption);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bits-text-muted);
+  transition:
+    background 0.12s linear,
+    color 0.12s linear;
+}
+
+.px-orgmenu__row--action:hover {
+  background: var(--bits-muted);
+  color: var(--bits-text);
+}
+
+.px-orgmenu__row--action:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+.px-orgmenu__initial {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--bits-primary);
+  color: var(--bits-ink);
+  font-family: var(--bits-font-display);
+  font-size: var(--bits-font-size-label);
+}
+
+.px-orgmenu__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-orgmenu__check {
+  font-size: var(--bits-font-size-caption);
+  color: var(--bits-primary);
 }
 
 .px-sidebar__nav {
@@ -196,7 +325,7 @@ a:focus-visible,
   gap: 2px;
 }
 
-.px-navitem {
+.px-root .px-navitem {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -204,6 +333,10 @@ a:focus-visible,
   background: transparent;
   border: 0;
   border-left: 3px solid transparent;
+  /* The design's idle foreground is #a9a394, which the library has no token
+   * for — it sits between --bits-text-soft and --bits-text-muted. Using the
+   * nearest token keeps this correct in Ocean and any custom theme, at the
+   * cost of an idle item a shade brighter than drawn. Filed upstream. */
   color: var(--bits-text-soft);
   font: inherit;
   font-size: var(--bits-font-size-small);
@@ -215,17 +348,18 @@ a:focus-visible,
     color 0.12s linear;
 }
 
-.px-navitem:hover {
-  background: var(--bits-raised);
-  color: var(--bits-text);
+/* Background only. The design does not brighten the label on hover — the
+ * colour change is reserved for telling you which page you are on. */
+.px-root .px-navitem:hover {
+  background: var(--bits-muted);
 }
 
-.px-navitem:focus-visible {
+.px-root .px-navitem:focus-visible {
   outline: none;
   box-shadow: var(--bits-focus-ring);
 }
 
-.px-navitem[aria-current='page'] {
+.px-root .px-navitem[aria-current='page'] {
   background: var(--bits-muted);
   border-left-color: var(--bits-primary);
   color: var(--bits-text);
@@ -238,7 +372,7 @@ a:focus-visible,
   background: var(--bits-line-strong);
 }
 
-.px-navitem[aria-current='page'] .px-navitem__dot {
+.px-root .px-navitem[aria-current='page'] .px-navitem__dot {
   background: var(--bits-primary);
 }
 
@@ -326,7 +460,25 @@ a:focus-visible,
   min-width: 0;
 }
 
-.px-crumbs__link {
+/*
+ * ── A note on the `.px-root` prefixes below ─────────────────────────────
+ *
+ * The library styles bare elements — `.bits-theme a`, `.bits-theme h1`,
+ * `.bits-theme h2`, `.bits-theme p`, `.bits-theme code` and more — at
+ * specificity (0,1,1). A single application class on one of those elements is
+ * (0,1,0) and silently loses, with no warning and no visible error: it simply
+ * renders the library's defaults.
+ *
+ * That is what made every breadcrumb and idle sidebar link render primary
+ * orange instead of muted grey, and every section heading render as 24px
+ * display type instead of an 11px label. Prefixing with `.px-root` takes these
+ * rules to (0,2,0), which wins without resorting to `!important`.
+ *
+ * Only the rules that land on an element the library styles carry the prefix.
+ * Everything targeting a `div`, `span`, `table` or `pre` is left alone.
+ */
+
+.px-root .px-crumbs__link {
   font-family: var(--bits-font-display);
   font-size: var(--bits-font-size-h4);
   line-height: 13px;
@@ -338,7 +490,7 @@ a:focus-visible,
   transition: color 0.12s linear;
 }
 
-.px-crumbs__link:hover {
+.px-root .px-crumbs__link:hover {
   color: var(--bits-primary);
 }
 
@@ -349,12 +501,13 @@ a:focus-visible,
   background: var(--bits-line-strong);
 }
 
-.px-crumbs__here {
+.px-root .px-crumbs__here {
   font-family: var(--bits-font-display);
   font-size: var(--bits-font-size-h4);
   line-height: 13px;
   color: var(--bits-text);
   margin: 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -429,14 +582,15 @@ a:focus-visible,
   flex-wrap: wrap;
 }
 
-.px-section__title {
+.px-root .px-section__title {
+  font-family: var(--bits-font-body);
   font-size: var(--bits-font-size-small);
+  font-weight: 400;
   letter-spacing: 0.16em;
+  line-height: 1.4;
   text-transform: uppercase;
   color: var(--bits-text-soft);
   margin: 0;
-  font-weight: inherit;
-  font-family: inherit;
 }
 
 .px-section__body {
@@ -550,13 +704,13 @@ a:focus-visible,
   font-variant-numeric: tabular-nums;
 }
 
-.px-rowlink {
+.px-root .px-rowlink {
   display: block;
   color: inherit;
   min-width: 0;
 }
 
-.px-rowlink:hover {
+.px-root .px-rowlink:hover {
   color: inherit;
 }
 
@@ -750,8 +904,12 @@ a:focus-visible,
   flex-wrap: wrap;
 }
 
-.px-secret__value {
+.px-root .px-secret__value {
+  padding: 0;
+  background: none;
+  font-family: var(--bits-font-body);
   font-size: var(--bits-font-size-small);
+  line-height: 1.6;
   color: var(--bits-text-soft);
   letter-spacing: 0.04em;
   overflow-wrap: anywhere;
@@ -804,7 +962,7 @@ a:focus-visible,
   min-width: 0;
 }
 
-.px-event__message {
+.px-root .px-event__message {
   font-size: var(--bits-font-size-small);
   color: var(--bits-text-muted);
   line-height: 1.6;
@@ -968,13 +1126,13 @@ a:focus-visible,
     flex-direction: row;
   }
 
-  .px-navitem {
+  .px-root .px-navitem {
     border-left: 0;
     border-bottom: 3px solid transparent;
     white-space: nowrap;
   }
 
-  .px-navitem[aria-current='page'] {
+  .px-root .px-navitem[aria-current='page'] {
     border-left-color: transparent;
     border-bottom-color: var(--bits-primary);
   }

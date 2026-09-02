@@ -1,7 +1,5 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Button } from '@16-bits-design/ui/button'
-import { Text } from '@16-bits-design/ui/typography'
 import { useSession } from '../lib/session.js'
 import { relativeTime } from '../lib/format.js'
 import type { Runner } from '../api/types.js'
@@ -72,6 +70,94 @@ function RunnerLine({ runners }: { runners: Runner[] | undefined }): ReactNode {
   )
 }
 
+/**
+ * The organization, and the one action attached to it.
+ *
+ * The design puts an org switcher at the top of the sidebar; the product
+ * wordmark belongs to the login screen. A key resolves to exactly one
+ * organization, so the menu carries that org and signing out, rather than a
+ * list that could never have a second entry.
+ */
+function OrgControl(): ReactNode {
+  const { session, signOut } = useSession()
+  const [open, setOpen] = useState(false)
+  const wrapper = useRef<HTMLDivElement>(null)
+
+  // Closing on an outside click or Escape is the difference between a menu and
+  // a thing that gets stuck open.
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+    const onPointer = (event: MouseEvent): void => {
+      if (!wrapper.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const name = session?.me.org.name ?? '—'
+
+  return (
+    <div style={{ position: 'relative', flex: 'none' }} ref={wrapper}>
+      <button
+        type="button"
+        className="px-orgbutton"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen(!open)}
+      >
+        <img
+          src="/brand/parallax-icon.svg"
+          alt=""
+          className="px-sidebar__mark"
+          aria-hidden="true"
+        />
+        <span className="px-orgbutton__text">
+          <span className="px-orgbutton__name">{name}</span>
+          <span className="px-orgbutton__meta">{session?.me.key.name ?? 'organization'}</span>
+        </span>
+        <span className="px-orgbutton__caret" aria-hidden="true">
+          ▼
+        </span>
+      </button>
+
+      {open ? (
+        <div className="px-orgmenu" role="menu">
+          <div className="px-orgmenu__row">
+            <span className="px-orgmenu__initial" aria-hidden="true">
+              {name.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="px-orgmenu__label">{name}</span>
+            <span className="px-orgmenu__check" aria-hidden="true">
+              ●
+            </span>
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            className="px-orgmenu__row px-orgmenu__row--action"
+            onClick={signOut}
+          >
+            sign out
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function Sidebar({
   runners,
   counts,
@@ -79,24 +165,9 @@ export function Sidebar({
   runners: Runner[] | undefined
   counts: Record<string, number | undefined>
 }): ReactNode {
-  const { session, signOut } = useSession()
-
   return (
     <nav className="px-sidebar" aria-label="Primary">
-      <div className="px-sidebar__brand">
-        <img
-          src="/brand/parallax-icon.svg"
-          alt=""
-          className="px-sidebar__mark"
-          aria-hidden="true"
-        />
-        <span className="px-sidebar__org">
-          <img src="/brand/parallax-wordmark.svg" alt="Parallax" className="px-sidebar__wordmark" />
-          <Text size="caption" tone="muted">
-            {session?.me.org.name ?? '—'}
-          </Text>
-        </span>
-      </div>
+      <OrgControl />
 
       <div className="px-sidebar__nav">
         {GROUPS.map((group) => (
@@ -126,12 +197,6 @@ export function Sidebar({
 
       <div className="px-sidebar__foot">
         <RunnerLine runners={runners} />
-        <div className="px-runnerline" style={{ justifyContent: 'space-between' }}>
-          <span className="px-runnerline__text">{session?.me.key.prefix ?? 'key'}…</span>
-          <Button size="sm" variant="ghost" onClick={signOut}>
-            sign out
-          </Button>
-        </div>
       </div>
     </nav>
   )

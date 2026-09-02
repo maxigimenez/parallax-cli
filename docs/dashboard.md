@@ -177,6 +177,28 @@ loading, segmented filters and code blocks. Those gaps are filed as issues on th
 library, and each local implementation is a candidate to delete when its component
 lands.
 
+### The `.px-root` prefix, and why it is not decoration
+
+The library styles bare elements — `.bits-theme a`, `.bits-theme h1`, `.bits-theme h2`,
+`.bits-theme p`, `.bits-theme code` — at specificity **(0,1,1)**. An application class
+on one of those elements is **(0,1,0)** and loses *silently*: no error, no warning, just
+the library's defaults.
+
+This is not hypothetical. Every breadcrumb and every idle sidebar link rendered
+`--bits-primary` orange instead of muted grey, and every section heading rendered as
+24px display type instead of an 11px label, for exactly this reason. It survived
+review because the result looks deliberate — an all-orange nav reads as a styling
+choice until you hold it next to the design.
+
+So any rule whose class lands on an element the library styles is written
+`.px-root .px-thing`, reaching (0,2,0) without `!important`. Rules targeting a `div`,
+`span`, `table` or `pre` need no prefix and do not have one.
+
+`test/specificity.test.ts` enforces it: it reads the library's stylesheet to learn
+which elements are styled bare, scans the JSX for `px-` classes on those elements, and
+fails if the matching rule is unscoped. Nothing in TypeScript, ESLint or the build can
+catch this, so it is a test.
+
 One layout note worth keeping, because it is easy to reintroduce: `ThemeProvider`
 renders a real `div` between `#root` and the app. `.px-root` gives that element a
 height, and `.px-shell` is anchored to `100dvh` rather than a percentage — a height
