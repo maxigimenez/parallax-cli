@@ -120,9 +120,9 @@ The dashboard is a **second Railway service**, alongside `api`.
 
 ### Deploying
 
-Actions → **Deploy dashboard** → *Run workflow*, which lets you pick the branch; or
-automatically on a push to `main` touching `packages/cloud-dashboard/**`,
-`Dockerfile.dashboard` or `.railway/railway.ts`.
+Actions → **Deploy dashboard** → *Run workflow*, which lets you pick the branch.
+Deploys are manual: merging and shipping are separate decisions, and there is no push
+trigger.
 
 By hand:
 

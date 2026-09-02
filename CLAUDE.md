@@ -148,6 +148,11 @@ Four workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test on Node 2
 24, build both images), `deploy-cloud-api.yml` and `deploy-dashboard.yml` (Railway),
 `publish-cli.yml` (npm). `docs/releasing.md` covers secrets and the manual fallbacks.
 
+**Only CI runs on push.** Both deploys are `workflow_dispatch` only — merging and
+shipping are separate decisions, and a deploy interrupts every runner's long poll.
+Neither declares a GitHub environment; `publish-cli` declares `npm` because npm's
+trusted publisher is configured against that name.
+
 The Node matrix is load-bearing: 22 needs `--experimental-sqlite` and 24 ignores it, so
 both must run for the supported range to mean anything. Its floor is 22.12 rather than
 22.11 because Vite 8, which builds the dashboard, requires it. CI builds before testing

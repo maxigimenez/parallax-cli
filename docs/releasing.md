@@ -5,8 +5,8 @@ Four workflows. One runs on every change; three ship things.
 | Workflow | Trigger | What it does |
 |---|---|---|
 | [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24, build both images |
-| [`deploy-cloud-api.yml`](../.github/workflows/deploy-cloud-api.yml) | Manual, or `main` touching `cloud-api` | Deploys to Railway and waits for `/health` |
-| [`deploy-dashboard.yml`](../.github/workflows/deploy-dashboard.yml) | Manual, or `main` touching `cloud-dashboard` | Deploys to Railway and waits for `/health` |
+| [`deploy-cloud-api.yml`](../.github/workflows/deploy-cloud-api.yml) | Manual only | Deploys to Railway and waits for `/health` |
+| [`deploy-dashboard.yml`](../.github/workflows/deploy-dashboard.yml) | Manual only | Deploys to Railway and waits for `/health` |
 | [`publish-cli.yml`](../.github/workflows/publish-cli.yml) | Manual, or a published GitHub release | Verifies, packs, and publishes `parallax-cli` to npm |
 
 ---
@@ -56,21 +56,20 @@ client-side route, and the health check Railway polls.
 
 ### Deploying
 
-There are two ways in.
-
-**Manually**, from the Actions tab — *Deploy cloud-api → Run workflow*. GitHub's
-**"Use workflow from"** dropdown picks the branch, and the deploy uses that checkout,
-so you can ship a branch before it merges. The service name defaults to `api`.
+**Deploys are manual.** From the Actions tab — *Deploy cloud-api → Run workflow*.
+GitHub's **"Use workflow from"** dropdown picks the branch, and the deploy uses that
+checkout, so you can ship a branch before it merges. The service name defaults to
+`api`.
 
 > **The Run workflow button only appears once the workflow is on your default branch.**
 > GitHub reads `workflow_dispatch` from `main` regardless of which branch you want to
 > run. Until this merges, deploy by hand with `pnpm railway:deploy:api` from the repo
 > root.
 
-**Automatically**, on a push to `main` that touches `packages/cloud-api/**`,
-`packages/common/**`, `Dockerfile` or `.railway/railway.ts`. Path-filtered rather than every
-merge, because redeploying the control plane interrupts a runner's long poll for no
-reason. Delete the `push:` block if you would rather every deploy be deliberate.
+There is deliberately no push trigger. Merging and shipping are different decisions:
+redeploying the control plane interrupts every runner's long poll, and a merge does not
+mean "this is ready to go live". Coupling them also meant every merge produced a failed
+deployment on the repository's Environments page.
 
 The workflow deploys straight from the checkout, so no git remote needs connecting on
 the Railway side, and the repo root is the Docker build context.
@@ -119,9 +118,8 @@ Full detail, including the local stack, is in [dashboard.md](./dashboard.md).
 
 ### Deploying
 
-Actions → *Deploy dashboard → Run workflow*, picking the branch; or automatically on a
-push to `main` touching `packages/cloud-dashboard/**`, `Dockerfile.dashboard` or
-`.railway/railway.ts`. By hand: `pnpm railway:deploy:dashboard`.
+Actions → *Deploy dashboard → Run workflow*, picking the branch. Manual only, for the
+same reason as the control plane. By hand: `pnpm railway:deploy:dashboard`.
 
 `railway up` deploys source and does not reconcile configuration, so a change to
 `.railway/railway.ts` needs `pnpm railway:apply` as well.
@@ -244,6 +242,13 @@ whatever it was last told to.
 One `RAILWAY_TOKEN` covers both services: a project token reaches every service in the
 project, and `--service` picks which one.
 
-All three shipping workflows declare a GitHub **environment** (`production`, `npm`), so
-you can add required reviewers under **Settings → Environments** to gate any of them
-behind an approval.
+Only `publish-cli` declares a GitHub **environment** (`npm`), and it has to: npm's
+trusted publisher is configured against that environment name as well as the repository
+and workflow filename. Changing or removing it breaks publishing with an error that
+does not mention the environment.
+
+The deploy workflows declare none. They did, and every merge then wrote a failed
+deployment to the repository's Environments page — noise from a deploy nobody asked
+for. If you later want an approval gate on deploys, add `environment:` back to the job
+and configure required reviewers under **Settings → Environments**; deploys stay
+manual either way.
