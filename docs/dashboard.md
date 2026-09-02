@@ -105,8 +105,8 @@ The dashboard is a **second Railway service**, alongside `api`.
    `Dockerfile.dashboard` rather than the control plane's:
 
    ```bash
-   railway config plan     # preview; changes nothing
-   railway config apply
+   pnpm railway:plan      # preview; changes nothing
+   pnpm railway:apply
    ```
 
    This step is load-bearing. A service with no configuration of its own falls back
@@ -127,14 +127,14 @@ automatically on a push to `main` touching `packages/cloud-dashboard/**`,
 By hand:
 
 ```bash
-railway up --service dashboard
+pnpm railway:deploy:dashboard
 ```
 
 The image is built from `Dockerfile.dashboard` at the repo root, with the root as
 build context because this is a pnpm workspace.
 
 > **`railway up` deploys source; it does not reconcile configuration.** After changing
-> `.railway/railway.ts`, run `railway config apply` — otherwise the service keeps
+> `.railway/railway.ts`, run `pnpm railway:apply` — otherwise the service keeps
 > building whatever it was last told to.
 
 ## Why a server at all

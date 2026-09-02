@@ -15,8 +15,15 @@ import { defineRailway, postgres, preserve, project, service, volume } from 'rai
  * serving the wrong thing — is not merely fixed but unrepresentable. Every
  * service's builder and Dockerfile are stated here, next to each other.
  *
- *   railway config plan    preview, changes nothing
- *   railway config apply   apply after review
+ *   pnpm railway:plan     preview, changes nothing
+ *   pnpm railway:apply    apply after review
+ *
+ * `restartPolicyType` is deliberately absent. It is applied and live as
+ * ON_FAILURE on both services, but it is also Railway's default, and the plan
+ * reader reports it as unset — so declaring it makes every plan show two
+ * phantom changes forever. A plan that never reads clean is one nobody reads,
+ * which costs more than restating a default is worth. `restartPolicyMaxRetries`
+ * stays, because 5 is not the default.
  */
 export default defineRailway(() => {
   const Postgres = postgres('Postgres', { region: 'europe-west4-drams3a' })
@@ -38,7 +45,6 @@ export default defineRailway(() => {
       preDeployCommand: ['node dist/migrate-cli.js'],
       healthcheckPath: '/health',
       healthcheckTimeout: 30,
-      restartPolicyType: 'ON_FAILURE',
       restartPolicyMaxRetries: 5,
     },
     replicas: { 'europe-west4-drams3a': 1 },
@@ -55,7 +61,6 @@ export default defineRailway(() => {
       startCommand: 'node server.mjs',
       healthcheckPath: '/health',
       healthcheckTimeout: 30,
-      restartPolicyType: 'ON_FAILURE',
       restartPolicyMaxRetries: 5,
     },
     replicas: { 'europe-west4-drams3a': 1 },

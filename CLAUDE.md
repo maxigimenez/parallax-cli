@@ -25,6 +25,12 @@ pnpm parallax agents
 pnpm parallax runs
 pnpm parallax stop
 
+# railway — plan/apply reconcile .railway/railway.ts, deploy ships source
+pnpm railway:plan
+pnpm railway:apply
+pnpm railway:deploy:api
+pnpm railway:deploy:dashboard
+
 # cloud, against a local or Railway Postgres
 DATABASE_URL=... pnpm --filter @parallax/cloud-api dev
 DATABASE_URL=... pnpm --filter @parallax/cloud-api db:migrate
@@ -155,8 +161,10 @@ deprecated: services could no longer opt in from 2026-08-28, and it retires on
 unrepresentable — with no root `railway.json`, a new service cannot inherit another's
 builder and silently deploy the wrong image.
 
-`railway config plan` previews; `railway config apply` applies after review. Neither
-deploys — `railway up` still does that.
+`pnpm railway:plan` previews; `pnpm railway:apply` applies after review. Neither
+deploys — `pnpm railway:deploy:api` and `pnpm railway:deploy:dashboard` do that, and
+they reconcile no configuration, so a change to `.railway/railway.ts` needs an apply
+as well.
 
 ## Key conventions
 

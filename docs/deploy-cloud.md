@@ -114,8 +114,8 @@ The image sets `WORKDIR /app/packages/cloud-api`, so both commands are relative 
 source.
 
 ```bash
-railway config plan     # preview; changes nothing
-railway config apply    # reconcile the project with the file
+pnpm railway:plan      # preview; changes nothing
+pnpm railway:apply     # reconcile the project with the file
 ```
 
 **`railway config apply` and `railway up` are different verbs.** `apply` reconciles
@@ -156,7 +156,7 @@ Once the service exists, **[CI can deploy for you](./releasing.md#deploying-clou
 hand:
 
 ```bash
-railway up --service api
+pnpm railway:deploy:api
 railway domain --service api        # generate a public URL
 ```
 
@@ -240,7 +240,7 @@ const dashboard = service('dashboard', {
 })
 ```
 
-Run `railway config apply` after creating the service. Skip it and the service has no
+Run `pnpm railway:apply` after creating the service. Skip it and the service has no
 configuration of its own, which is how a dashboard service ends up deploying the
 control plane image — starting cleanly, passing its health check, and serving the
 wrong thing.

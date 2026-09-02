@@ -64,7 +64,7 @@ so you can ship a branch before it merges. The service name defaults to `api`.
 
 > **The Run workflow button only appears once the workflow is on your default branch.**
 > GitHub reads `workflow_dispatch` from `main` regardless of which branch you want to
-> run. Until this merges, deploy by hand with `railway up --service api` from the repo
+> run. Until this merges, deploy by hand with `pnpm railway:deploy:api` from the repo
 > root.
 
 **Automatically**, on a push to `main` that touches `packages/cloud-api/**`,
@@ -103,7 +103,7 @@ its config file.
    rather than the control plane's:
 
    ```bash
-   railway config plan && railway config apply
+   pnpm railway:plan && pnpm railway:apply
    ```
 
    Skip it and the service falls back to Railway's own detection — which is how a
@@ -121,10 +121,10 @@ Full detail, including the local stack, is in [dashboard.md](./dashboard.md).
 
 Actions → *Deploy dashboard → Run workflow*, picking the branch; or automatically on a
 push to `main` touching `packages/cloud-dashboard/**`, `Dockerfile.dashboard` or
-`.railway/railway.ts`. By hand: `railway up --service dashboard`.
+`.railway/railway.ts`. By hand: `pnpm railway:deploy:dashboard`.
 
 `railway up` deploys source and does not reconcile configuration, so a change to
-`.railway/railway.ts` needs `railway config apply` as well.
+`.railway/railway.ts` needs `pnpm railway:apply` as well.
 
 The health check passes on `{"status":"ok"}` and emits a **warning** — not a failure —
 when the response says `apiConfigured: false`. A dashboard that cannot reach an API
@@ -178,8 +178,9 @@ things that only fail on a user's machine:
 ### Doing it by hand
 
 ```bash
-pnpm version:set 0.2.0
-pnpm install && pnpm lint && pnpm test && pnpm build
+pnpm version:set 0.3.0                 # every package, and the cli's internal pins
+pnpm install --lockfile-only           # the lockfile records those pins
+pnpm lint && pnpm test && pnpm build
 
 cd packages/cli
 pnpm pack:tarball                     # runs prepack, then restores workspace links
@@ -210,6 +211,24 @@ places or `npm publish` fails with a 415, or installs and then breaks at runtime
 1. `dependencies` and `bundleDependencies` in `packages/cli/package.json`
 2. `bundledPackages` in `packages/cli/scripts/prepare-package.mjs`
 3. the tarball assertion in `publish-cli.yml`
+
+---
+
+## Railway scripts
+
+The raw CLI commands are wrapped, so nobody has to remember which verb does what:
+
+| Script | Command | What it does |
+|---|---|---|
+| `pnpm railway:plan` | `railway config plan` | Previews. Changes nothing. |
+| `pnpm railway:apply` | `railway config apply` | Reconciles the project with `.railway/railway.ts`. |
+| `pnpm railway:deploy:api` | `railway up --service api` | Ships source to the control plane. |
+| `pnpm railway:deploy:dashboard` | `railway up --service dashboard` | Ships source to the dashboard. |
+
+**`apply` and `deploy` are different verbs.** `apply` reconciles configuration —
+builders, Dockerfile paths, start commands, health checks. `deploy` uploads source. A
+change to `.railway/railway.ts` followed by only a deploy leaves the service building
+whatever it was last told to.
 
 ---
 
