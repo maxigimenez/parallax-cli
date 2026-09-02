@@ -1,22 +1,19 @@
 import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Badge } from '@16-bits-design/ui/badge'
 import { Button } from '@16-bits-design/ui/button'
 import { Dialog } from '@16-bits-design/ui/dialog'
-import { Input } from '@16-bits-design/ui/input'
-import { Select } from '@16-bits-design/ui/select'
 import { Text } from '@16-bits-design/ui/typography'
 import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useKey, useSession } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
 import { relativeTime } from '../lib/format.js'
-import { Alert } from '../components/Alert.js'
 import { EmptyState } from '../components/EmptyState.js'
 import { ErrorPanel } from '../components/ErrorPanel.js'
 import { Loading } from '../components/Loading.js'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
-import { SecretValue } from '../components/SecretValue.js'
 import type { ApiKey } from '../api/types.js'
 
 /**
@@ -30,35 +27,12 @@ import type { ApiKey } from '../api/types.js'
  */
 export function AccessKeys(): ReactNode {
   const key = useKey()
+  const navigate = useNavigate()
   const { session } = useSession()
   const { toast } = useToast()
   const keys = useResource((k, signal) => api.keys(k, signal), [])
 
-  const [name, setName] = useState('')
-  const [scope, setScope] = useState<'runner' | 'user'>('user')
-  const [minted, setMinted] = useState<{ key: string; name: string } | undefined>(undefined)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | undefined>(undefined)
   const [revoking, setRevoking] = useState<ApiKey | undefined>(undefined)
-
-  const create = async (): Promise<void> => {
-    if (!name.trim()) {
-      setError('Name the key after where it will live, so it can be revoked without guessing.')
-      return
-    }
-    setSaving(true)
-    setError(undefined)
-    try {
-      const created = await api.createKey(key, { name: name.trim(), scope })
-      setMinted({ key: created.key, name: name.trim() })
-      setName('')
-      keys.reload()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const revoke = async (target: ApiKey): Promise<void> => {
     try {
@@ -82,70 +56,29 @@ export function AccessKeys(): ReactNode {
 
   return (
     <>
-      <PageHeader title="Access keys" parent={{ label: 'Overview', to: '/' }} />
+      <PageHeader
+        title="Access keys"
+        parent={{ label: 'Overview', to: '/' }}
+        actions={<Button onClick={() => navigate('/keys/new')}>generate key</Button>}
+      />
       <Panel caption="Credentials for runners and for people">
         <div className="px-panel__body">
-          {minted ? (
-            <Alert tone="warning" title="Copy this key now">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <span>
-                  This is the only time <strong>{minted.name}</strong> is shown. The API stores only
-                  a hash, so it cannot be recovered — mint a replacement if it is lost.
-                </span>
-                <SecretValue value={minted.key} label={minted.name} />
-                <div>
-                  <Button size="sm" variant="secondary" onClick={() => setMinted(undefined)}>
-                    done
-                  </Button>
-                </div>
-              </div>
-            </Alert>
-          ) : null}
-
-          <Section title="Mint a key">
-            <div className="px-form">
-              <div className="px-form__row">
-                <Input
-                  label="Name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="cerebro runner"
-                  hint="Where this key will be used."
-                />
-                <Select
-                  label="Scope"
-                  value={scope}
-                  onValueChange={(value) => setScope(value as 'runner' | 'user')}
-                  options={[
-                    { value: 'user', label: 'User — dashboard and API' },
-                    { value: 'runner', label: 'Runner — the orchestrator daemon' },
-                  ]}
-                />
-              </div>
-              <Text size="caption" tone="muted">
-                Scopes do not overlap. A runner key is refused on these screens, and a user key is
-                refused by the runner.
-              </Text>
-              {error ? (
-                <Alert tone="danger" title="The key was not created">
-                  {error}
-                </Alert>
-              ) : null}
-              <div className="px-form__actions">
-                <Button onClick={() => void create()} loading={saving} loadingLabel="minting">
-                  generate key
-                </Button>
-              </div>
-            </div>
-          </Section>
-
           <Section title="Active keys" padded={false}>
             {keys.loading ? (
               <Loading label="Loading keys" />
             ) : keys.error ? (
               <ErrorPanel message={keys.error} onRetry={keys.reload} />
             ) : active.length === 0 ? (
-              <EmptyState title="No active keys">Mint one above to get started.</EmptyState>
+              <EmptyState
+                title="No active keys"
+                action={
+                  <Button size="sm" onClick={() => navigate('/keys/new')}>
+                    generate key
+                  </Button>
+                }
+              >
+                A key is how a runner and this dashboard authenticate.
+              </EmptyState>
             ) : (
               <div className="px-tablewrap">
                 <table className="px-table">
@@ -186,19 +119,21 @@ export function AccessKeys(): ReactNode {
                               {relativeTime(entry.last_used_at)}
                             </Text>
                           </td>
-                          <td style={{ textAlign: 'right' }}>
-                            {isCurrent ? (
-                              <Badge tone="outline">this session</Badge>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => setRevoking(entry)}
-                                aria-label={`Revoke key ${entry.name}`}
-                              >
-                                revoke
-                              </Button>
-                            )}
+                          <td>
+                            <div className="px-rowactions">
+                              {isCurrent ? (
+                                <Badge tone="outline">this session</Badge>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setRevoking(entry)}
+                                  aria-label={`Revoke key ${entry.name}`}
+                                >
+                                  revoke
+                                </Button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )

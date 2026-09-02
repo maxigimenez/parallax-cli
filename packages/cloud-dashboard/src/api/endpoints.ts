@@ -37,8 +37,21 @@ export const api = {
   routes: (key: string, signal?: AbortSignal) =>
     request<{ routes: RoutingRule[] }>(key, '/v1/routes', { signal }).then((r) => r.routes),
 
+  route: (key: string, id: string, signal?: AbortSignal) =>
+    request<{ route: RoutingRule }>(key, `/v1/routes/${encodeURIComponent(id)}`, { signal }).then(
+      (r) => r.route
+    ),
+
   createRoute: (key: string, body: unknown) =>
-    request<RoutingRule>(key, '/v1/routes', { method: 'POST', body }),
+    request<{ route: RoutingRule }>(key, '/v1/routes', { method: 'POST', body }).then(
+      (r) => r.route
+    ),
+
+  updateRoute: (key: string, id: string, body: unknown) =>
+    request<{ route: RoutingRule }>(key, `/v1/routes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body,
+    }).then((r) => r.route),
 
   deleteRoute: (key: string, id: string) =>
     request<{ ok: true }>(key, `/v1/routes/${encodeURIComponent(id)}`, { method: 'DELETE' }),

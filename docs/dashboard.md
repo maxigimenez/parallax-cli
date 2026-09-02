@@ -152,6 +152,53 @@ It also gets the caching right in the one way that matters: hashed assets under
 `/assets/` are immutable for a year, and `index.html` never is — cache that and a
 deploy reaches nobody still holding the previous one.
 
+## Creating and editing
+
+Every screen that creates something does it on **its own page**, reached from a button
+in the top right of the list: `/routes/new`, `/projects/new`, `/keys/new`. Routes can
+also be edited, at `/routes/:id/edit`.
+
+The button is why the action slot in the page header is always rendered, even empty. A
+slot that appears only on pages with a button shifts the header — and everything under
+it — by a button's height as you move between sections.
+
+### The route form
+
+Creating starts from a template, because the combinations that actually fire are a
+small subset of what the schema permits, and the catalog is that subset. The form then
+asks only for what the template declares, and asks for it with the right control:
+
+| Template placeholder | Control |
+|---|---|
+| `<PROJECT_ID>` | a dropdown of registered projects |
+| `<AGENT_PROFILE>` | a dropdown of discovered agents |
+| `<AGENT_GITHUB_LOGIN>` | filled from the selected agent |
+| anything else | a text field |
+
+Free text where the API already knows the answer produces a route that is structurally
+valid and can never match — a typo'd project id fires nothing, silently, forever.
+Selecting the agent is also what fills a `githubLogin` target, so the two cannot drift
+apart the way two independent fields would.
+
+Under the prompt is the list of variables the runner substitutes at dispatch. Clicking
+one inserts it at the cursor. This matters more than it looks: the runner deliberately
+leaves an unrecognised `{{placeholder}}` visible rather than blanking it, so a typo
+cannot become a confidently wrong run — but that only helps if the writer knows which
+names are real.
+
+### What editing changes, and what it keeps
+
+The form owns name, project, agent, priority, enabled, timeout and prompt. Everything
+else — the match clauses, the guard that stops a route re-firing on the agent's own
+work, the outcome — is written back untouched, and shown read-only under *show
+definition* so it is not a surprise.
+
+That separation is the point. Renaming a route must never quietly drop its loop guard,
+and a form that rebuilt the rule from its own fields would do exactly that.
+
+`PUT /v1/routes/:id` replaces the whole rule and revalidates it, so a route can never
+be saved into a state the runner would reject.
+
 ## What it does not do
 
 - **No agent management.** Agents are Hermes profiles discovered on the runner's
@@ -161,8 +208,6 @@ deploy reaches nobody still holding the previous one.
   and a set of keys; anyone holding a `prx_usr_` key has the same access.
 - **No renaming an organization.** Its name is set by `org-cli.js` at creation and
   there is no endpoint to change it.
-- **No route editing.** Routes are created from a template and deleted. Changing one
-  means deleting it and creating its replacement, which is also what the API offers.
 
 ## Design system
 

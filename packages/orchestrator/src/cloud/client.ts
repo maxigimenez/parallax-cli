@@ -93,6 +93,21 @@ export class CloudClient {
     })
   }
 
+  /**
+   * Periodic proof of life, with enough detail to be worth reading.
+   *
+   * The runner accepts no inbound connections, so nothing can ask it how it is
+   * doing — health has to be pushed or it does not exist. Sent once per poll
+   * cycle, which is roughly every 25 seconds against a 90-second staleness
+   * window, so three have to be missed before anything is reported wrong.
+   */
+  heartbeat(health: RunnerHealth): Promise<void> {
+    return this.post<void>('/v1/runner/heartbeat', {
+      name: this.config.runnerName,
+      ...health,
+    })
+  }
+
   pushInventory(agents: AgentDescriptor[]): Promise<void> {
     return this.request<void>('/v1/runner/inventory', {
       method: 'PUT',
@@ -139,6 +154,15 @@ export class CloudClient {
   mirrorEvents(runId: string, events: RunLogEntry[]): Promise<void> {
     return this.post<void>(`/v1/runner/runs/${encodeURIComponent(runId)}/events`, { events })
   }
+}
+
+/** What the runner reports about itself on each cycle. */
+export interface RunnerHealth {
+  startedAt: string
+  hermesOk: boolean
+  hermesDetail: string
+  activeRuns: number
+  lastError: string | null
 }
 
 export type OutboxItem =

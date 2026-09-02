@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Badge } from '@16-bits-design/ui/badge'
 import { Button } from '@16-bits-design/ui/button'
 import { Dialog } from '@16-bits-design/ui/dialog'
@@ -9,7 +9,7 @@ import { api } from '../api/endpoints.js'
 import { API_URL } from '../config.js'
 import { useKey, useSession } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
-import { relativeTime } from '../lib/format.js'
+import { relativeTime, uptime } from '../lib/format.js'
 import { Alert } from '../components/Alert.js'
 import { EmptyState } from '../components/EmptyState.js'
 import { ErrorPanel } from '../components/ErrorPanel.js'
@@ -35,6 +35,16 @@ export function Settings(): ReactNode {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | undefined>(undefined)
   const [disconnecting, setDisconnecting] = useState(false)
+
+  // Uptime and "last seen" are both derived from now, so they need a clock of
+  // their own — the runner data itself has not changed between ticks.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const failing = (runners.data ?? []).filter((runner) => runner.last_error)
 
   const save = async (): Promise<void> => {
     if (!webhook.trim()) {
@@ -173,8 +183,11 @@ export function Settings(): ReactNode {
                   <thead>
                     <tr>
                       <th scope="col">Runner</th>
-                      <th scope="col">Host</th>
-                      <th scope="col">Version</th>
+                      <th scope="col">Hermes</th>
+                      <th scope="col" className="px-table__num">
+                        Running
+                      </th>
+                      <th scope="col">Uptime</th>
                       <th scope="col">Last seen</th>
                     </tr>
                   </thead>
@@ -184,27 +197,67 @@ export function Settings(): ReactNode {
                         <td>
                           <span className="px-agentcell">
                             <span
-                              className={`px-runnerline__dot${runner.stale ? ' px-runnerline__dot--stale' : ''}`}
+                              className={`px-runnerline__dot${
+                                runner.stale
+                                  ? ' px-runnerline__dot--stale'
+                                  : runner.hermes_ok === false
+                                    ? ' px-runnerline__dot--warn'
+                                    : ''
+                              }`}
                               aria-hidden="true"
                             />
-                            <span className="px-cell__primary">{runner.name}</span>
+                            <span className="px-cell">
+                              <span className="px-cell__primary">{runner.name}</span>
+                              <span className="px-cell__secondary">
+                                {[runner.hostname, runner.version].filter(Boolean).join(' · ') ||
+                                  '—'}
+                              </span>
+                            </span>
                           </span>
                         </td>
                         <td>
+                          {/*
+                           * Null, not false, when the runner is too old to send
+                           * a heartbeat. Reporting "unreachable" for "did not
+                           * say" would be worse than saying nothing.
+                           */}
+                          {runner.hermes_ok === null ? (
+                            <Text size="small" tone="faint">
+                              not reported
+                            </Text>
+                          ) : (
+                            <span className="px-cell">
+                              <Badge tone={runner.hermes_ok ? 'success' : 'danger'}>
+                                {runner.hermes_ok ? 'reachable' : 'unreachable'}
+                              </Badge>
+                              <span className="px-cell__secondary">
+                                {runner.hermes_detail ?? ''}
+                              </span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-table__num">
                           <Text size="small" tone="soft">
-                            {runner.hostname ?? '—'}
+                            {runner.active_runs ?? '—'}
                           </Text>
                         </td>
                         <td>
                           <Text size="small" tone="soft">
-                            {runner.version ?? '—'}
+                            {runner.started_at ? uptime(runner.started_at, now) : '—'}
                           </Text>
                         </td>
                         <td>
-                          <Text size="small" tone={runner.stale ? 'default' : 'muted'}>
-                            {relativeTime(runner.last_seen_at)}
-                            {runner.stale ? ' · stale' : ''}
-                          </Text>
+                          <span className="px-cell">
+                            <span
+                              className="px-cell__secondary"
+                              style={{ color: 'var(--bits-text-soft)' }}
+                            >
+                              {relativeTime(runner.last_seen_at, now)}
+                            </span>
+                            {runner.stale ? (
+                              <span className="px-cell__secondary">stale</span>
+                            ) : null}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -213,6 +266,16 @@ export function Settings(): ReactNode {
               </div>
             )}
           </Section>
+
+          {failing.length > 0 ? (
+            <Alert tone="danger" title="A runner reported an error on its last cycle">
+              {failing.map((runner) => (
+                <div key={runner.id}>
+                  <strong>{runner.name}</strong>: {runner.last_error}
+                </div>
+              ))}
+            </Alert>
+          ) : null}
         </div>
       </Panel>
 

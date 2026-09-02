@@ -521,10 +521,25 @@ a:focus-visible,
   animation: px-blink 1.1s steps(1) infinite;
 }
 
+/*
+ * Reserves a button's height whether or not there is a button, so the panel
+ * below sits at the same offset on every page.
+ */
 .px-topbar__actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  min-height: 38px;
+}
+
+/* Row actions sit right and stay on one line as the table scrolls. */
+.px-rowactions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--bits-space-2);
+  white-space: nowrap;
 }
 
 /* ── Panel ──────────────────────────────────────────────────────────── */
@@ -717,6 +732,9 @@ a:focus-visible,
 .px-cell {
   display: flex;
   flex-direction: column;
+  /* Stretch is the flex default, which makes an inline thing like a Badge fill
+   * the whole column width. Cells stack labels, not blocks. */
+  align-items: flex-start;
   gap: 5px;
   min-width: 0;
 }
@@ -1184,4 +1202,48 @@ a:focus-visible,
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ── Prompt variables ───────────────────────────────────────────────── */
+
+.px-vars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-2);
+}
+
+.px-vars__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--bits-space-1);
+}
+
+.px-vars__chip {
+  padding: var(--bits-space-1) var(--bits-space-2);
+  border: 2px solid var(--bits-line);
+  background: var(--bits-surface);
+  color: var(--bits-text-soft);
+  font-family: var(--bits-font-body);
+  font-size: var(--bits-font-size-caption);
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    border-color 0.12s linear,
+    color 0.12s linear;
+}
+
+.px-vars__chip:hover {
+  border-color: var(--bits-primary);
+  color: var(--bits-text);
+}
+
+.px-vars__chip:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+/* A runner that is checking in but cannot reach Hermes: alive, but useless. */
+.px-runnerline__dot--warn {
+  background: var(--bits-amber);
+  animation: none;
 }

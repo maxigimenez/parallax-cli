@@ -125,7 +125,14 @@ one where the other is required is a 401.
 
 The runner **long-polls** `GET /v1/runner/commands` rather than accepting inbound
 connections, so it works behind NAT with no tunnel. That poll also paces the runner's
-main loop.
+main loop, and `POST /v1/runner/heartbeat` rides on the same cycle — nothing can ask
+the runner how it is doing, so health is pushed or it does not exist. `last_seen_at` is
+additionally touched by any authenticated runner request, so liveness never depends on
+the runner remembering to report it.
+
+CORS on the user API must list its methods explicitly. `@fastify/cors` defaults to
+`GET,HEAD,POST`, which makes a browser's preflight refuse every DELETE and PUT while
+curl, sending no preflight, works perfectly.
 
 Migrations are plain `.sql` files applied in filename order, one transaction each.
 

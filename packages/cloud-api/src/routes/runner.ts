@@ -25,6 +25,17 @@ export function registerRunnerRoutes(app: FastifyInstance, db: Database): void {
       return reply.code(401).send({ error: 'A runner API key is required.' })
     }
     ;(request as { auth?: AuthContext }).auth = auth
+
+    // Any authenticated runner call is proof of life, and the command long-poll
+    // makes one roughly every 25 seconds on its own. Touching last_seen_at here
+    // means liveness never depends on the runner remembering to say so — a
+    // runner on an older build, which never sends a heartbeat, still reports as
+    // alive because it is still polling.
+    //
+    // Fire-and-forget: liveness bookkeeping must not fail a real request.
+    void db
+      .query('UPDATE runners SET last_seen_at = now() WHERE org_id = $1', [auth.orgId])
+      .catch(() => undefined)
   })
 
   const authOf = (request: unknown): AuthContext => (request as { auth: AuthContext }).auth
@@ -39,18 +50,76 @@ export function registerRunnerRoutes(app: FastifyInstance, db: Database): void {
       version?: string
     }
 
+    // started_at is set from the server clock on every hello, because hello is
+    // sent exactly once per process. It is the runner's uptime, not the age of
+    // the row, and resetting it on re-registration is the point: a restart is
+    // the thing an operator wants to see.
     const { rows } = await db.query<{ id: string }>(
-      `INSERT INTO runners (id, org_id, name, hostname, version, last_seen_at)
-       VALUES ($1, $2, $3, $4, $5, now())
+      `INSERT INTO runners (id, org_id, name, hostname, version, last_seen_at, started_at)
+       VALUES ($1, $2, $3, $4, $5, now(), now())
        ON CONFLICT (org_id, name)
        DO UPDATE SET hostname = EXCLUDED.hostname,
                      version = EXCLUDED.version,
-                     last_seen_at = now()
+                     last_seen_at = now(),
+                     started_at = now(),
+                     last_error = NULL
        RETURNING id`,
       [newId('rnr'), orgId, name, hostname ?? null, version ?? null]
     )
 
     return { runnerId: rows[0].id, routesRevision: String(Date.now()) }
+  })
+
+  /**
+   * Periodic health, richer than "it is still there".
+   *
+   * The runner is behind NAT and accepts no inbound connections, so the
+   * dashboard can never call the runner — health has to be pushed. Every field
+   * is optional so an older runner, which sends none of them, still registers
+   * and still reads as alive.
+   */
+  app.post('/v1/runner/heartbeat', async (request, reply) => {
+    const { orgId } = authOf(request)
+    const body = request.body as {
+      name?: string
+      startedAt?: string
+      hermesOk?: boolean
+      hermesDetail?: string
+      activeRuns?: number
+      lastError?: string | null
+    }
+
+    if (!body.name) {
+      return reply.code(400).send({ error: 'name is required.' })
+    }
+
+    const { rowCount } = await db.query(
+      `UPDATE runners
+          SET last_seen_at  = now(),
+              started_at    = COALESCE($3::timestamptz, started_at),
+              hermes_ok     = $4,
+              hermes_detail = $5,
+              active_runs   = $6,
+              last_error    = $7
+        WHERE org_id = $1 AND name = $2`,
+      [
+        orgId,
+        body.name,
+        body.startedAt ?? null,
+        body.hermesOk ?? null,
+        body.hermesDetail ?? null,
+        body.activeRuns ?? null,
+        body.lastError ?? null,
+      ]
+    )
+
+    // A heartbeat for a runner the cloud has never seen means the row was
+    // deleted, or this runner has never said hello. Saying so lets the runner
+    // re-register rather than heartbeating into the void forever.
+    if (rowCount === 0) {
+      return reply.code(404).send({ error: `Runner "${body.name}" is not registered.` })
+    }
+    return { ok: true }
   })
 
   // ── Inventory ──────────────────────────────────────────────

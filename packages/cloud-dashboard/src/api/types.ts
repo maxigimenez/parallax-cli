@@ -27,6 +27,13 @@ export interface Runner {
   hostname: string | null
   version: string | null
   last_seen_at: string | null
+  /** When the runner process started, so uptime is its age, not the row's. */
+  started_at: string | null
+  /** Null until a runner new enough to send a heartbeat has sent one. */
+  hermes_ok: boolean | null
+  hermes_detail: string | null
+  active_runs: number | null
+  last_error: string | null
   stale: boolean
 }
 

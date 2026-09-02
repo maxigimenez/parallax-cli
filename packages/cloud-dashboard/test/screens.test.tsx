@@ -31,6 +31,8 @@ const ROUTES: Record<string, unknown> = {
   '/v1/runs/run_1/events': eventsFixture,
   '/v1/keys': keysFixture,
   '/v1/integrations/slack': slackFixture,
+  '/v1/route-templates': { templates: [] },
+  '/v1/prompt-templates': { templates: [], variables: ['ticket.ref', 'ticket.url'] },
 }
 
 beforeEach(() => {
@@ -71,25 +73,45 @@ describe('signed-in shell', () => {
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeTruthy()
   })
 
-  // The recorded runner had not checked in for over 90 seconds by the time the
-  // fixture was captured, so this is the stale path as the API really reports it.
-  it('names the runner and when it was last seen once it goes stale', async () => {
-    await renderAt('/')
-    expect(await screen.findByText(/cerebro · last seen/)).toBeTruthy()
-  })
-
-  it('reports a runner that is checking in as live', async () => {
-    const fresh = { runners: [{ ...runnersFixture.runners[0], stale: false }] }
+  const withRunner = (patch: Record<string, unknown>) => {
+    const runners = { runners: [{ ...runnersFixture.runners[0], ...patch }] }
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string | URL | Request) => {
         const path = new URL(String(input)).pathname
-        const body = path === '/v1/runners' ? fresh : ROUTES[path]
+        const body = path === '/v1/runners' ? runners : ROUTES[path]
         return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 })
       })
     )
+  }
+
+  it('reports a runner that is checking in as live', async () => {
+    withRunner({ stale: false, hermes_ok: true, active_runs: 0 })
     await renderAt('/')
     expect(await screen.findByText(/cerebro · live/)).toBeTruthy()
+  })
+
+  it('reports how many runs are in flight when there are any', async () => {
+    withRunner({ stale: false, hermes_ok: true, active_runs: 3 })
+    await renderAt('/')
+    expect(await screen.findByText(/cerebro · 3 running/)).toBeTruthy()
+  })
+
+  it('names when a stale runner was last seen', async () => {
+    withRunner({ stale: true })
+    await renderAt('/')
+    expect(await screen.findByText(/cerebro · last seen/)).toBeTruthy()
+  })
+
+  /**
+   * Three states, not two. A runner that is checking in but cannot reach Hermes
+   * will never start anything, and calling that healthy would defeat the point
+   * of the indicator.
+   */
+  it('distinguishes a live runner that cannot reach Hermes', async () => {
+    withRunner({ stale: false, hermes_ok: false, hermes_detail: 'ECONNREFUSED' })
+    await renderAt('/')
+    expect(await screen.findByText(/cerebro · hermes unreachable/)).toBeTruthy()
   })
 })
 
@@ -153,9 +175,13 @@ describe('other screens', () => {
     expect(screen.getAllByText('coder').length).toBeGreaterThan(0)
   })
 
-  it('lists the stored route', async () => {
+  it('lists the stored route and offers to edit it', async () => {
     await renderAt('/routes')
-    expect(await screen.findByText('Assess on label')).toBeTruthy()
+    expect(await screen.findByText('Assess on label edited')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Edit route/ })).toBeTruthy()
+    // Creating lives on its own page, so the list carries a link to it rather
+    // than a form.
+    expect(screen.getByRole('button', { name: /^new route$/i })).toBeTruthy()
   })
 
   it('lists the registered project', async () => {
@@ -219,5 +245,33 @@ describe('layout chain', () => {
     await screen.findByRole('navigation', { name: 'Primary' })
     const shell = container.querySelector('.px-shell')
     expect(shell!.parentElement).toBe(container.querySelector('.px-root'))
+  })
+})
+
+describe('page header', () => {
+  /**
+   * Every list screen carries a create button and every detail screen does not,
+   * so the actions slot must exist either way. Rendering it conditionally makes
+   * the header — and the panel under it — shift by a button's height as you
+   * move between sections.
+   */
+  it('renders the actions slot on every screen, with or without a button', async () => {
+    for (const [path, expectAction] of [
+      ['/', true],
+      ['/runs', true],
+      ['/routes', true],
+      ['/projects', true],
+      ['/keys', true],
+      ['/agents', false],
+      ['/settings', false],
+    ] as const) {
+      const { container, unmount } = await renderAt(path)
+      await screen.findByRole('navigation', { name: 'Primary' })
+
+      const slot = container.querySelector('.px-topbar__actions')
+      expect(slot, `${path} must render an actions slot`).not.toBeNull()
+      expect(slot!.childElementCount > 0, `${path} action button presence`).toBe(expectAction)
+      unmount()
+    }
   })
 })

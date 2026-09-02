@@ -7,6 +7,7 @@ import {
   isTerminal,
   relativeTime,
   STATUS_TONE,
+  uptime,
 } from '../src/lib/format.js'
 
 describe('duration', () => {
@@ -112,5 +113,27 @@ describe('epochMillis', () => {
     expect(epochMillis(null)).toBeUndefined()
     expect(epochMillis('not a number')).toBeUndefined()
     expect(epochMillis('')).toBe(0)
+  })
+})
+
+describe('uptime', () => {
+  const start = '2026-09-01T00:00:00.000Z'
+  const at = (iso: string): number => Date.parse(iso)
+
+  // Coarser than `duration` on purpose: nobody reads a daemon's uptime to the
+  // second, and a value that changes every second reads as noise.
+  it('coarsens as it grows', () => {
+    expect(uptime(start, at('2026-09-01T00:00:42.000Z'))).toBe('42s')
+    expect(uptime(start, at('2026-09-01T00:20:00.000Z'))).toBe('20m')
+    expect(uptime(start, at('2026-09-01T05:30:00.000Z'))).toBe('5h 30m')
+    expect(uptime(start, at('2026-09-04T06:00:00.000Z'))).toBe('3d 6h')
+  })
+
+  it('does not go negative when the clocks disagree', () => {
+    expect(uptime(start, at('2026-08-31T23:00:00.000Z'))).toBe('0s')
+  })
+
+  it('reports a dash for an unparseable timestamp', () => {
+    expect(uptime('not a date')).toBe('—')
   })
 })

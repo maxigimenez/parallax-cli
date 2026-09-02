@@ -68,10 +68,19 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
 
   // ── Runners and agents ─────────────────────────────────────
 
+  /**
+   * Runners and how they are doing.
+   *
+   * `stale` is the whole point of the endpoint, so the threshold matters: the
+   * runner heartbeats every 30 seconds, and 90 allows three to be missed before
+   * anything is reported wrong. A shorter window would report every transient
+   * network blip as an outage.
+   */
   app.get('/v1/runners', async (request) => {
     const { orgId } = authOf(request)
     const { rows } = await db.query(
-      `SELECT id, name, hostname, version, last_seen_at,
+      `SELECT id, name, hostname, version, last_seen_at, started_at,
+              hermes_ok, hermes_detail, active_runs, last_error,
               (last_seen_at < now() - interval '90 seconds') AS stale
        FROM runners WHERE org_id = $1 ORDER BY name`,
       [orgId]
@@ -170,6 +179,66 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
       ]
     )
     return reply.code(201).send({ route: stored })
+  })
+
+  app.get('/v1/routes/:id', async (request, reply) => {
+    const { orgId } = authOf(request)
+    const { id } = request.params as { id: string }
+    const { rows } = await db.query<{ definition: RoutingRule }>(
+      'SELECT definition FROM routes WHERE org_id = $1 AND id = $2',
+      [orgId, id]
+    )
+    if (rows.length === 0) {
+      return reply.code(404).send({ error: `Route "${id}" not found.` })
+    }
+    return { route: rows[0].definition }
+  })
+
+  /**
+   * Replaces a route in place.
+   *
+   * A full replacement rather than a partial merge. A route is a single
+   * decision — trigger, match, target, execution, outcome — and the parts
+   * constrain each other: a `githubLogin` target is valid on a pull request
+   * trigger and invalid on a ticket one. Merging a field at a time would let a
+   * caller move a route through states the validator rejects as a whole, so the
+   * body is validated as the complete rule it will become.
+   *
+   * The id in the path wins over any id in the body, so a copy-pasted
+   * definition cannot rewrite a different route.
+   */
+  app.put('/v1/routes/:id', async (request, reply) => {
+    const { orgId } = authOf(request)
+    const { id } = request.params as { id: string }
+    const body = request.body as RoutingRule
+
+    const route: RoutingRule = { ...body, id }
+    const problem = validateRoutingRule(route)
+    if (problem) {
+      return reply.code(400).send({ error: problem })
+    }
+
+    const stored: RoutingRule = { ...route, guard: { ...DEFAULT_ROUTE_GUARD, ...route.guard } }
+    const { rowCount } = await db.query(
+      `UPDATE routes
+          SET name = $3, priority = $4, enabled = $5, definition = $6, updated_at = now()
+        WHERE org_id = $1 AND id = $2`,
+      [
+        orgId,
+        id,
+        stored.name,
+        stored.priority ?? 0,
+        stored.enabled !== false,
+        JSON.stringify(stored),
+      ]
+    )
+
+    // Not an upsert: PUT to a route that does not exist is a mistake worth
+    // reporting, not a reason to create one under a caller-chosen id.
+    if (rowCount === 0) {
+      return reply.code(404).send({ error: `Route "${id}" not found.` })
+    }
+    return { route: stored }
   })
 
   app.delete('/v1/routes/:id', async (request) => {

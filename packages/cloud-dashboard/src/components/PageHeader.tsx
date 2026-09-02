@@ -30,7 +30,12 @@ export function PageHeader({
         <h1 className="px-crumbs__here">{title}</h1>
         <span className="px-caret" aria-hidden="true" />
       </div>
-      {actions ? <div className="px-topbar__actions">{actions}</div> : null}
+      {/*
+       * Always rendered, even when empty. A slot that appears only on pages
+       * with a button makes the header — and everything under it — shift by a
+       * button's height as you move between sections.
+       */}
+      <div className="px-topbar__actions">{actions}</div>
     </div>
   )
 }

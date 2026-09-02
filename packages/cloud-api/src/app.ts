@@ -9,7 +9,16 @@ export async function buildApp(db: Database): Promise<FastifyInstance> {
 
   // The dashboard is a separate origin, so CORS is on for the user API. Runner
   // traffic is server-to-server and unaffected by it either way.
-  await app.register(cors, { origin: process.env.CORS_ORIGINS?.split(',') ?? true })
+  //
+  // `methods` is not optional here. @fastify/cors defaults to `GET,HEAD,POST`,
+  // so a browser's preflight refuses PUT, PATCH and DELETE — which silently
+  // broke every delete button and the Slack save in the dashboard, while curl,
+  // which sends no preflight, worked perfectly. The list mirrors what the user
+  // API actually exposes.
+  await app.register(cors, {
+    origin: process.env.CORS_ORIGINS?.split(',') ?? true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  })
 
   // Unauthenticated on purpose: Railway's health check runs before any key exists.
   app.get('/health', async () => {

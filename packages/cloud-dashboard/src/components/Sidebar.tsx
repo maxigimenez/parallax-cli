@@ -32,8 +32,10 @@ const GROUPS: { label: string; items: NavEntry[] }[] = [
 
 /**
  * Reports the runner the way an operator actually asks about it: is anything
- * out there, and did it check in recently. Multiple runners collapse to a count
- * because one org has one Mac Mini in practice, and a list of one is noise.
+ * out there, did it check in recently, and is it able to reach Hermes.
+ *
+ * Multiple runners collapse to a count because one org has one machine in
+ * practice, and a list of one is noise. The full picture is on Settings.
  */
 function RunnerLine({ runners }: { runners: Runner[] | undefined }): ReactNode {
   if (!runners) {
@@ -52,19 +54,38 @@ function RunnerLine({ runners }: { runners: Runner[] | undefined }): ReactNode {
       </span>
     )
   }
+
   const live = runners.filter((runner) => !runner.stale)
   const primary = live[0] ?? runners[0]
   const stale = live.length === 0
+
+  // Three states, not two. A runner that is checking in but cannot reach Hermes
+  // will never start anything, and reporting that as healthy would be a lie of
+  // exactly the kind this indicator exists to prevent.
+  const degraded = !stale && primary.hermes_ok === false
+  const modifier = stale
+    ? ' px-runnerline__dot--stale'
+    : degraded
+      ? ' px-runnerline__dot--warn'
+      : ''
+
+  const detail = stale
+    ? `last seen ${relativeTime(primary.last_seen_at)}`
+    : degraded
+      ? 'hermes unreachable'
+      : primary.active_runs
+        ? `${primary.active_runs} running`
+        : 'live'
+
   return (
-    <span className="px-runnerline" title={primary.hostname ?? primary.name}>
-      <span
-        className={`px-runnerline__dot${stale ? ' px-runnerline__dot--stale' : ''}`}
-        aria-hidden="true"
-      />
+    <span
+      className="px-runnerline"
+      title={[primary.hostname, primary.hermes_detail].filter(Boolean).join(' · ')}
+    >
+      <span className={`px-runnerline__dot${modifier}`} aria-hidden="true" />
       <span className="px-runnerline__text">
-        {stale
-          ? `${primary.name} · last seen ${relativeTime(primary.last_seen_at)}`
-          : `${primary.name}${runners.length > 1 ? ` +${runners.length - 1}` : ''} · live`}
+        {primary.name}
+        {runners.length > 1 ? ` +${runners.length - 1}` : ''} · {detail}
       </span>
     </span>
   )

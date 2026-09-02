@@ -1,7 +1,7 @@
 import { RUN_STATUS, type Logger, type RunStatus, type RunUsage } from '@parallax/common'
 import type { HermesClient } from './client.js'
 import { mapHermesEvent, extractText } from './event-mapper.js'
-import { isHermesTerminalStatus, type HermesRunState } from './types.js'
+import { isHermesTerminalStatus, type HermesCapabilities, type HermesRunState } from './types.js'
 
 export interface HermesRunJob {
   /** Parallax run id — used for log correlation, not sent to Hermes. */
@@ -88,6 +88,11 @@ export class HermesAdapter {
 
   get profile(): string {
     return this.client.profile
+  }
+
+  /** Whether the gateway answers, and what it says it is. Used for health. */
+  async capabilities(): Promise<HermesCapabilities> {
+    return this.client.capabilities()
   }
 
   async cancel(hermesRunId: string): Promise<void> {

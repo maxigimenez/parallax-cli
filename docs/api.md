@@ -388,6 +388,25 @@ adding an agent as a reviewer re-fires even when nothing else about the PR chang
 
 ---
 
+### Reading and editing one
+
+```http
+GET /v1/routes/{id}
+PUT /v1/routes/{id}
+```
+
+`PUT` replaces the route entirely rather than merging fields. A route is a
+single decision, and its parts constrain each other — a `githubLogin` target is
+valid on a pull request trigger and rejected on a ticket one — so a partial
+update could walk a route through states the validator rejects as a whole. The
+body is validated as the complete rule it will become.
+
+The id in the path wins over any id in the body, so a copy-pasted definition
+cannot rewrite a different route. `PUT` to an id that does not exist is a `404`,
+not an upsert.
+
+---
+
 ## Runs
 
 ```http
@@ -412,12 +431,48 @@ Statuses: `queued`, `running`, `awaiting_approval`, `completed`, `failed`, `canc
 
 ```http
 GET /v1/agents      Hermes profiles, as discovered by the runner (incl. avatar_url)
-GET /v1/runners     registered runners, with a `stale` flag after 90s of silence
+GET /v1/runners     registered runners, with health and a `stale` flag
 ```
 
 Agents are derived state, republished wholesale on every inventory push — a profile
 deleted in Hermes disappears here rather than lingering. They are read-only through the
 API; the source of truth is Hermes itself.
+
+### Runner health
+
+```json
+{
+  "name": "cerebro",
+  "hostname": "cerebro.local",
+  "version": "0.2.0",
+  "started_at": "2026-09-01T20:00:00.000Z",
+  "last_seen_at": "2026-09-02T08:14:31.000Z",
+  "hermes_ok": true,
+  "hermes_detail": "hermes-4-70b",
+  "active_runs": 1,
+  "last_error": null,
+  "stale": false
+}
+```
+
+The runner accepts no inbound connections, so nothing can ask it how it is doing —
+health is pushed on every poll cycle, roughly every 25 seconds. `stale` is
+`last_seen_at` older than **90 seconds**, which allows three heartbeats to be missed
+before anything is reported wrong.
+
+Three states matter, not two. A runner that is checking in but reports
+`hermes_ok: false` will never start anything, and calling that healthy would defeat the
+point of the indicator. `hermes_ok: null` means the runner is too old to send a
+heartbeat — reporting "unreachable" for "did not say" would be worse than saying
+nothing.
+
+`last_seen_at` is also refreshed by *any* authenticated runner request, so a runner
+predating the heartbeat still reads as alive on the strength of its long poll alone.
+
+> **If every runner reads as stale**, it is running a build from before this existed.
+> `last_seen_at` was previously written only by `hello`, which a runner sends once at
+> startup — so a runner up for three days reported "last seen 3 days ago", and
+> everything older than 90 seconds was stale. Update the runner.
 
 ---
 
@@ -449,7 +504,8 @@ network. Delivery is deduplicated on `(run, event)`, so a retry can never double
 Documented for completeness. The runner calls these; you should not need to.
 
 ```http
-POST  /v1/runner/hello                    register and heartbeat
+POST  /v1/runner/hello                    register; resets started_at
+POST  /v1/runner/heartbeat                periodic health, once per poll cycle
 PUT   /v1/runner/inventory                publish discovered agents
 GET   /v1/runner/projects                 pull ticket sources to watch
 GET   /v1/runner/routes                   pull enabled routes

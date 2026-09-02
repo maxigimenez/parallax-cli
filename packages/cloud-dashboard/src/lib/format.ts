@@ -99,3 +99,27 @@ export function epochMillis(value: number | string | null): number | undefined {
   const millis = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(millis) ? millis : undefined
 }
+
+/**
+ * How long a runner has been up.
+ *
+ * Coarser than `duration`: nobody reads a daemon's uptime to the second, and a
+ * value that changes every second reads as noise rather than information.
+ */
+export function uptime(startedAt: string, now = Date.now()): string {
+  const start = Date.parse(startedAt)
+  if (Number.isNaN(start)) {
+    return '—'
+  }
+  const seconds = Math.max(0, Math.round((now - start) / 1000))
+  if (seconds < 60) {
+    return `${seconds}s`
+  }
+  if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)}m`
+  }
+  if (seconds < 86_400) {
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+  }
+  return `${Math.floor(seconds / 86_400)}d ${Math.floor((seconds % 86_400) / 3600)}h`
+}

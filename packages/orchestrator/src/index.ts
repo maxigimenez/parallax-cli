@@ -61,6 +61,32 @@ function buildAdapters(config: AppConfig): Map<string, HermesAdapter> {
 }
 
 /**
+ * Is Hermes answering?
+ *
+ * One profile is enough: the adapters all address the same gateway, so a
+ * failure here means the gateway is down or the runner cannot reach it, which
+ * is the condition worth reporting. Probing every profile every cycle would
+ * multiply requests to say the same thing.
+ *
+ * Never throws — this reports health, and a health check that can take down the
+ * loop it reports on is worse than no health check.
+ */
+async function probeHermes(
+  adapters: Map<string, HermesAdapter>
+): Promise<{ ok: boolean; detail: string }> {
+  const first = adapters.values().next()
+  if (first.done) {
+    return { ok: false, detail: 'no enabled Hermes profiles' }
+  }
+  try {
+    const capabilities = await first.value.capabilities()
+    return { ok: true, detail: capabilities.model ?? capabilities.platform ?? 'reachable' }
+  } catch (error: unknown) {
+    return { ok: false, detail: errorMessage(error) }
+  }
+}
+
+/**
  * Discovers agents and, when a cloud is configured, publishes the inventory.
  *
  * Discovery failures are reported but never fatal: five healthy profiles should
@@ -350,6 +376,48 @@ async function main(): Promise<void> {
   let cursor = 0
   let pollFailures = 0
 
+  // Reported as the runner's uptime, so it is the moment this process came up
+  // rather than the age of its row in the cloud.
+  const startedAt = new Date().toISOString()
+  let lastCycleError: string | null = null
+  let heartbeatFailing = false
+
+  /**
+   * Tells the cloud the runner is alive, and how it is doing.
+   *
+   * Sent after the work of a cycle rather than before it, so `activeRuns` and
+   * `lastError` describe what just happened instead of the previous round. A
+   * failure here is logged at debug and otherwise ignored: losing a heartbeat
+   * degrades an indicator, and must never interrupt dispatching.
+   */
+  const sendHeartbeat = async (): Promise<void> => {
+    if (!cloud) {
+      return
+    }
+    const hermes = await probeHermes(runtime.adapters)
+    try {
+      await cloud.heartbeat({
+        startedAt,
+        hermesOk: hermes.ok,
+        hermesDetail: hermes.detail,
+        activeRuns: inFlight.size,
+        lastError: lastCycleError,
+      })
+      if (heartbeatFailing) {
+        logger.info('Heartbeat restored.')
+        heartbeatFailing = false
+      }
+    } catch (error: unknown) {
+      // Only the transition into failure is worth a line. A cloud outage lasts
+      // many cycles, and one warning per cycle would bury everything else in
+      // the log for the duration.
+      if (!heartbeatFailing) {
+        heartbeatFailing = true
+        logger.warn(`Heartbeat failed: ${errorMessage(error)}`)
+      }
+    }
+  }
+
   for (;;) {
     try {
       await outbox?.flush()
@@ -395,9 +463,15 @@ async function main(): Promise<void> {
       const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1_000
       db.pruneDispatchLedger(monthAgo)
       db.pruneObservations(monthAgo)
+      lastCycleError = null
     } catch (error: unknown) {
-      logger.error(`Poll cycle error: ${errorMessage(error)}`)
+      lastCycleError = errorMessage(error)
+      logger.error(`Poll cycle error: ${lastCycleError}`)
     }
+
+    // Outside the try, so a cycle that threw still reports — that is precisely
+    // the cycle whose error an operator needs to see on the dashboard.
+    await sendHeartbeat()
 
     // The long poll doubles as the loop's pacing: it returns as soon as a human
     // queues something, and otherwise costs one held connection per window.
