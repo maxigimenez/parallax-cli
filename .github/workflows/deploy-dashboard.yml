@@ -1,9 +1,10 @@
 name: Deploy dashboard
 
 on:
-  # Same two ways in as the control plane. Manual dispatch picks the branch, so
-  # a change can be deployed before it merges; the push trigger is path-filtered
-  # rather than firing on every merge to main.
+  # Manual only, matching the control plane. A merge is not the same event as
+  # "this is ready to go live", and coupling them made every merge produce a
+  # failed deployment. "Use workflow from" picks the branch, so a change can
+  # still be deployed before it merges.
   workflow_dispatch:
     inputs:
       service:
@@ -14,14 +15,6 @@ on:
         description: Railway environment
         required: false
         default: production
-
-  push:
-    branches: [main]
-    paths:
-      - 'packages/cloud-dashboard/**'
-      - 'Dockerfile.dashboard'
-      - '.railway/railway.ts'
-      - '.github/workflows/deploy-dashboard.yml'
 
 concurrency:
   # Serialized for the same reason as the API: two deploys racing on one
@@ -34,7 +27,6 @@ jobs:
     name: Deploy to Railway
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

@@ -1,11 +1,11 @@
 name: Deploy cloud-api
 
 on:
-  # Two ways in. Manual dispatch lets you pick the branch, so a change can be
-  # deployed before it merges. The push trigger is path-filtered rather than
-  # firing on every merge to main, because redeploying the control plane
-  # interrupts a runner's long poll for no reason. Delete the `push:` block
-  # below if you would rather every deploy be deliberate.
+  # Manual only, and deliberately so. Deploying the control plane interrupts
+  # every runner's long poll, and a merge is not the same event as "this is
+  # ready to go live" — the two were coupled and every merge started producing
+  # a failed deployment. "Use workflow from" picks the branch, so a change can
+  # still be deployed before it merges.
   workflow_dispatch:
     inputs:
       service:
@@ -17,15 +17,6 @@ on:
         required: false
         default: production
 
-  push:
-    branches: [main]
-    paths:
-      - 'packages/cloud-api/**'
-      - 'packages/common/**'
-      - 'Dockerfile'
-      - '.railway/railway.ts'
-      - '.github/workflows/deploy-cloud-api.yml'
-
 concurrency:
   # Never two deploys at once: the pre-deploy step runs migrations.
   group: deploy-cloud-api
@@ -36,7 +27,6 @@ jobs:
     name: Deploy to Railway
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: production
 
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
