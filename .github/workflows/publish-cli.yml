@@ -89,6 +89,28 @@ jobs:
               || { echo "::error::@parallax/$pkg is missing from the tarball."; exit 1; }
           done
 
+      # The check that would have caught 0.2.0. Everything above passes on a
+      # tarball whose bundled packages cannot resolve their own dependencies,
+      # because `--version` never reaches the orchestrator's entry point, so the
+      # import that fails is never evaluated.
+      #
+      # This installs the tarball the way a user does — a directory with no
+      # workspace, no pnpm store and no hoisting — and checks that every package
+      # the bundled code imports is actually present. Package presence rather
+      # than module resolution, because resolving on another package's behalf
+      # needs a resolver rooted at that package, and importing the modules to
+      # find out would execute them.
+      - name: Verify a clean install has everything the bundle imports
+        run: |
+          set -euo pipefail
+          TARBALL="$(ls "$PWD"/packages/cli/parallax-cli-*.tgz)"
+          WORK="$(mktemp -d)"
+          cp .github/scripts/verify-bundled-imports.mjs "$WORK/"
+          cd "$WORK"
+          npm init -y >/dev/null
+          npm install "$TARBALL" >/dev/null
+          node verify-bundled-imports.mjs
+
       - name: Publish
         if: ${{ !inputs.dry_run }}
         run: |

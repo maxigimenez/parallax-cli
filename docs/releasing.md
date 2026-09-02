@@ -201,14 +201,38 @@ npm install /path/to/parallax-cli-0.2.0.tgz
 
 ---
 
-## Adding a package to the CLI bundle
+## The CLI bundle
 
-If the CLI ever depends on another internal package, it must be added to **three**
-places or `npm publish` fails with a 415, or installs and then breaks at runtime:
+`@parallax/common` and `@parallax/orchestrator` are unpublished. They ship *inside* the
+tarball as `bundleDependencies`, which has one consequence worth internalising:
+
+> **A bundled package ships without its own dependencies.** `prepare-package.mjs` writes
+> each one a minimal manifest carrying no `dependencies` at all, so npm never learns
+> that the orchestrator needs `p-limit`, `fastify`, `@fastify/cors` and `strip-ansi`.
+> Nothing installs them. The install succeeds; the first `parallax start` on a user's
+> machine dies with `ERR_MODULE_NOT_FOUND`.
+
+So **`packages/cli/package.json` must declare every third-party dependency of every
+package it bundles**, at the same version. Three things enforce it:
+
+- `packages/cli/test/bundled-dependencies.test.ts` compares the manifests, and runs on
+  every PR.
+- `prepare-package.mjs` refuses to pack if they disagree.
+- `publish-cli.yml` installs the packed tarball into a clean directory and runs
+  [`verify-bundled-imports.mjs`](../.github/scripts/verify-bundled-imports.mjs), which
+  checks that every package the bundled code imports is actually there.
+
+That last one is the only check that sees the tarball the way a user does. It exists
+because 0.2.0 shipped broken past a pack-install-and-run test: `--version` and
+`preflight` never reach the orchestrator's entry point, so the import that fails is
+never evaluated.
+
+### Adding another internal package
 
 1. `dependencies` and `bundleDependencies` in `packages/cli/package.json`
 2. `bundledPackages` in `packages/cli/scripts/prepare-package.mjs`
 3. the tarball assertion in `publish-cli.yml`
+4. its third-party `dependencies`, copied into the CLI's own
 
 ---
 
