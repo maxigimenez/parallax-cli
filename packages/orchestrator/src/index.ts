@@ -15,7 +15,7 @@ import { logger, setLoggerDatabase, setLogLevels } from './logger.js'
 import { createRunId } from './run-id.js'
 import { HermesAdapter } from './hermes/adapter.js'
 import { createClientForProfile, discoverAgents } from './hermes/discovery.js'
-import { Dispatcher } from './routing/dispatcher.js'
+import { Dispatcher, type OutcomeHandlers, type PromptRunRequest } from './routing/dispatcher.js'
 import { RunLifecycle } from './routing/run-lifecycle.js'
 import { CloudClient, MirrorOutbox, type RunnerCommand } from './cloud/client.js'
 import {
@@ -30,6 +30,19 @@ import { validateRuntimeRequirements } from './runtime/preflight.js'
 
 /** Fallback cadence when there is no cloud to long-poll against. */
 const OFFLINE_POLL_INTERVAL_MS = 20_000
+
+/**
+ * Outcome handlers for a run with no tracker item behind it.
+ *
+ * A manual prompt has no ticket to label and no pull request to comment on.
+ * The dispatcher never calls these on that path, so they exist to satisfy the
+ * dependency rather than to do anything -- and throwing here would turn a
+ * future mistake into a failed run instead of a silent no-op.
+ */
+const NO_OUTCOMES: OutcomeHandlers = {
+  postComment: async () => undefined,
+  updateLabels: async () => undefined,
+}
 
 const RUNNER_VERSION = process.env.PARALLAX_VERSION ?? '0.2.0'
 
@@ -346,6 +359,48 @@ async function main(): Promise<void> {
       logger.error(`Dispatch failed for ${event.ref}: ${errorMessage(error)}`)
     })
 
+  /**
+   * Runs an operator's own prompt against one agent.
+   *
+   * Through the same concurrency limit as routed work, because the limit is
+   * about this machine's capacity and a manual run consumes exactly as much of
+   * it. No project and no route are involved, so the dispatcher is built
+   * without a tracker writer -- there is no ticket to comment on.
+   */
+  const runPrompt = (request: PromptRunRequest): Promise<void> =>
+    limit(async () => {
+      const result = await new Dispatcher({
+        db,
+        logger,
+        lifecycle,
+        outcomes: NO_OUTCOMES,
+        adapters: runtime.adapters,
+        agents: runtime.agents,
+        newRunId: createRunId,
+        inFlight,
+      }).dispatchPrompt(request)
+
+      if (result.outcome === 'skipped') {
+        logger.warn(result.detail ?? `Manual run skipped: ${result.reason}.`)
+      }
+    }).catch((error: unknown) => {
+      logger.error(`Manual run failed: ${errorMessage(error)}`)
+    })
+
+  /**
+   * Acts on one queued command.
+   *
+   * Commands that start an agent are *started* and not awaited, for the same
+   * reason the trigger path does not await a dispatch: a run can take half an
+   * hour, and this is called from the poll loop. Awaiting one would stop the
+   * runner collecting triggers, stop it handling the commands behind it in the
+   * batch, and -- worst of all -- stop its heartbeat, so the dashboard would
+   * report the runner as stale for exactly as long as it was busy doing what it
+   * was asked. Both helpers attach their own `catch`, so nothing is unhandled.
+   *
+   * `cancel` and `resync` are awaited. They are fast, and their whole point is
+   * to have taken effect before the next cycle reads the config they changed.
+   */
   const handleCommand = async (command: RunnerCommand): Promise<void> => {
     switch (command.type) {
       case 'cancel': {
@@ -367,9 +422,28 @@ async function main(): Promise<void> {
           logger.warn(`Ignoring manual run command with no resolvable project.`)
           return
         }
-        await runDispatch(project, event)
+        // Started, not awaited -- see the note on handleCommand.
+        void runDispatch(project, event)
         break
       }
+      case 'run-prompt': {
+        const agentProfile = String(command.payload.agentProfile ?? '')
+        const prompt = String(command.payload.prompt ?? '')
+        const title = command.payload.title ? String(command.payload.title) : undefined
+        if (!agentProfile || !prompt) {
+          logger.warn('Ignoring prompt run command with no agent or no prompt.')
+          return
+        }
+        void runPrompt({ agentProfile, prompt, title })
+        break
+      }
+      default:
+        // Named rather than ignored. The cloud is deployed independently of the
+        // runners polling it, so a runner too old for a command type is a real
+        // state -- and one where "nothing happened" needs an explanation.
+        logger.warn(
+          `Ignoring command of unknown type "${command.type}"; this runner may need updating.`
+        )
     }
   }
 

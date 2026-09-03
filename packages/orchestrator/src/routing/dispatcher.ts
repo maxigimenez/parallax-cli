@@ -6,6 +6,7 @@ import {
   type AgentDescriptor,
   type CommentTarget,
   type Logger,
+  TRIGGER_TYPE,
   type RoutingRule,
   type RunRecord,
   type TriggerEvent,
@@ -23,6 +24,19 @@ export type DispatchResult =
   | { outcome: 'failed'; runId?: string; reason: string }
 
 export type SkipReason = 'no-route' | 'duplicate' | 'unknown-agent' | 'agent-busy'
+
+/**
+ * A run an operator asked for directly: one agent, one prompt, no route.
+ *
+ * `title` is what the run is called in the dashboard. It is optional because
+ * the prompt itself is a reasonable name for the work, and deriving one is
+ * better than making somebody invent a label before they can press the button.
+ */
+export interface PromptRunRequest {
+  agentProfile: string
+  prompt: string
+  title?: string
+}
 
 /**
  * Side effects Parallax owns after a run finishes.
@@ -47,6 +61,35 @@ export interface DispatcherDeps {
   now?: () => number
   /** Registry of in-flight runs, so the API can abort one by id. */
   inFlight?: Map<string, AbortController>
+}
+
+/**
+ * What a manual run records where a routed one records its route and trigger.
+ *
+ * Both schemas require these columns, and inventing a plausible-looking route
+ * id would be worse than saying plainly that there was not one. The dashboard
+ * shows `routeName` in its Route column, so this is read by people.
+ */
+const MANUAL_ROUTE_ID = 'manual'
+const MANUAL_ROUTE_NAME = 'manual run'
+
+/**
+ * How long a manual run may take before Parallax stops it.
+ *
+ * The same 30 minutes every route template defaults to. A route can be tuned
+ * because it runs unattended and forever; a manual run is watched by the person
+ * who started it, so one fewer field in the way is worth more than the knob.
+ */
+const MANUAL_TIMEOUT_SECONDS = 1_800
+
+/** How much of the prompt becomes the run's title when none is given. */
+const TITLE_LENGTH = 80
+
+function titleFrom(prompt: string): string {
+  const firstLine = prompt.trim().split('\n')[0].trim()
+  return firstLine.length > TITLE_LENGTH
+    ? `${firstLine.slice(0, TITLE_LENGTH - 1)}\u2026`
+    : firstLine
 }
 
 export class Dispatcher {
@@ -274,6 +317,125 @@ export class Dispatcher {
       this.deps.lifecycle.failed(runId, reason)
       await this.clearMarker(guard, event, PARALLAX_LABEL.FAILED)
       await this.postFailure(route, event, reason)
+      return { outcome: 'failed', runId, reason }
+    } finally {
+      this.deps.inFlight?.delete(runId)
+    }
+  }
+
+  /**
+   * Starts one named agent on an operator's own prompt.
+   *
+   * Everything routing does is deliberately absent. There is no rule to
+   * evaluate, so no route is matched; no trigger, so nothing is claimed in the
+   * dispatch ledger; no ticket or pull request, so no label is moved and no
+   * comment is posted. What remains is the part that is genuinely shared: one
+   * agent at a time, driven through the same lifecycle so the run looks like
+   * every other run in the dashboard.
+   *
+   * Skipping the ledger is safe precisely because there is no trigger to
+   * re-observe. The ledger exists to stop an unchanged ticket firing twice per
+   * poll cycle; a person pressing a button twice means it twice.
+   */
+  async dispatchPrompt(request: PromptRunRequest): Promise<DispatchResult> {
+    const agent = this.deps.agents.find(
+      (candidate) => candidate.enabled && candidate.profile === request.agentProfile
+    )
+    if (!agent) {
+      const detail = `Agent "${request.agentProfile}" is not a known enabled agent on this runner.`
+      this.deps.logger.warn(detail)
+      return { outcome: 'skipped', reason: 'unknown-agent', detail }
+    }
+
+    // The one-run-per-agent invariant is not a routing concern -- it is a fact
+    // about Hermes, which corrupts a profile's memory if two runs drive it at
+    // once. A manual run is refused rather than deferred: nothing will retry it,
+    // and the person who pressed the button is owed the reason.
+    if (this.deps.db.countActiveRunsForAgent(agent.profile) >= MAX_CONCURRENT_RUNS_PER_AGENT) {
+      const detail = `Agent "${agent.profile}" is already running; try again when it finishes.`
+      this.deps.logger.warn(detail)
+      return { outcome: 'skipped', reason: 'agent-busy', detail }
+    }
+
+    const adapter = this.deps.adapters.get(agent.profile)
+    if (!adapter) {
+      const detail = `No Hermes client configured for profile "${agent.profile}".`
+      this.deps.logger.warn(detail)
+      return { outcome: 'skipped', reason: 'unknown-agent', detail }
+    }
+
+    const runId = this.deps.newRunId()
+    const now = this.now()
+    const record: RunRecord = {
+      id: runId,
+      routeId: MANUAL_ROUTE_ID,
+      routeName: MANUAL_ROUTE_NAME,
+      agentProfile: agent.profile,
+      // No project: a prompt is not about a repository unless it says so, and
+      // naming one would imply a scope nothing enforces.
+      projectId: '',
+      triggerType: TRIGGER_TYPE.MANUAL,
+      // The run is its own trigger. Using the run id keeps `triggerRef` unique
+      // and traceable rather than a constant repeated across every manual run.
+      triggerRef: runId,
+      triggerRevision: String(now),
+      title: request.title?.trim() || titleFrom(request.prompt),
+      status: RUN_STATUS.QUEUED,
+      createdAt: now,
+      updatedAt: now,
+    }
+    this.deps.lifecycle.created(record)
+
+    const controller = new AbortController()
+    this.deps.inFlight?.set(runId, controller)
+    let hermesRunId: string | undefined
+
+    try {
+      this.deps.lifecycle.running(runId, `Started agent "${agent.profile}" on a manual prompt`)
+
+      const result = await adapter.run(
+        {
+          runId,
+          prompt: request.prompt,
+          model: agent.model ?? null,
+          timeoutSeconds: MANUAL_TIMEOUT_SECONDS,
+          onRunCreated: (id) => {
+            hermesRunId = id
+            this.deps.lifecycle.attachHermesRun(runId, id)
+          },
+        },
+        controller.signal
+      )
+
+      this.deps.lifecycle.attachHermesRun(runId, result.hermesRunId, result.sessionId)
+      const summary = resolveSummary(result.output)
+
+      switch (result.status) {
+        case RUN_STATUS.COMPLETED:
+          this.deps.lifecycle.completed(runId, summary, result.usage)
+          break
+        case RUN_STATUS.AWAITING_APPROVAL:
+          this.deps.lifecycle.awaitingApproval(runId)
+          break
+        case RUN_STATUS.CANCELED:
+          this.deps.lifecycle.canceled(runId, result.error)
+          break
+        default:
+          this.deps.lifecycle.failed(runId, result.error ?? 'Agent run failed.', result.usage)
+          break
+      }
+
+      return { outcome: 'dispatched', runId, status: result.status }
+    } catch (error: unknown) {
+      if (controller.signal.aborted) {
+        if (hermesRunId) {
+          await adapter.cancel(hermesRunId).catch(() => undefined)
+        }
+        this.deps.lifecycle.canceled(runId, 'Canceled by operator.')
+        return { outcome: 'dispatched', runId, status: RUN_STATUS.CANCELED }
+      }
+      const reason = error instanceof Error ? error.message : String(error)
+      this.deps.lifecycle.failed(runId, reason)
       return { outcome: 'failed', runId, reason }
     } finally {
       this.deps.inFlight?.delete(runId)

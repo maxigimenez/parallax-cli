@@ -5,8 +5,8 @@ import { Select } from '@16-bits-design/ui/select'
 import { Toggle } from '@16-bits-design/ui/toggle'
 import { Text } from '@16-bits-design/ui/typography'
 import type { Agent, Project, RoutingRule } from '../api/types.js'
-import { Alert } from './Alert.js'
-import { CodeBlock } from './CodeBlock.js'
+import { Alert } from '@16-bits-design/ui/alert'
+import { Code } from '@16-bits-design/ui/code'
 import { PromptField } from './PromptField.js'
 import { Section } from './Panel.js'
 
@@ -225,9 +225,9 @@ export function RouteForm({
           </Button>
         </div>
         {showPreserved ? (
-          <CodeBlock label="The parts of this route the form does not edit">
+          <Code label="The parts of this route the form does not edit">
             {JSON.stringify(preserved, null, 2)}
-          </CodeBlock>
+          </Code>
         ) : null}
       </Section>
 

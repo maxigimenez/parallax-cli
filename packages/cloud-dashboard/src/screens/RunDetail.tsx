@@ -9,11 +9,11 @@ import { api } from '../api/endpoints.js'
 import { useKey } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
 import { duration, epochMillis, isTerminal, relativeTime, STATUS_TONE } from '../lib/format.js'
-import { Alert } from '../components/Alert.js'
-import { CodeBlock } from '../components/CodeBlock.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { Alert } from '@16-bits-design/ui/alert'
+import { Code } from '@16-bits-design/ui/code'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
 import type { RunEvent } from '../api/types.js'
@@ -77,7 +77,7 @@ export function RunDetail(): ReactNode {
       <>
         <PageHeader title="Run" parent={{ label: 'Runs', to: '/runs' }} />
         <Panel caption="Loading this run">
-          <Loading label="Loading run" />
+          <Spinner label="Loading run" />
         </Panel>
       </>
     )
@@ -162,13 +162,13 @@ export function RunDetail(): ReactNode {
 
           {data.summary ? (
             <Section title="Summary">
-              <CodeBlock label="Run summary">{data.summary}</CodeBlock>
+              <Code label="Run summary">{data.summary}</Code>
             </Section>
           ) : null}
 
           <Section title="Events" padded={false}>
             {events.loading ? (
-              <Loading label="Loading events" />
+              <Spinner label="Loading events" />
             ) : events.error ? (
               <ErrorPanel message={events.error} onRetry={events.reload} />
             ) : (events.data ?? []).length === 0 ? (

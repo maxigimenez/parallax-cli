@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ThemeProvider } from '@16-bits-design/ui/theme'
 import { ToastProvider } from '@16-bits-design/ui/toast'
 import { AppShell } from './components/AppShell.js'
-import { Loading } from './components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { SessionProvider, useSession } from './lib/session.js'
 import { AccessKeys } from './screens/AccessKeys.js'
 import { Agents } from './screens/Agents.js'
@@ -26,7 +26,7 @@ function Authenticated(): ReactNode {
   // re-verified, and rendering the login form underneath it would flash a form
   // the user is about to be taken past.
   if (restoring) {
-    return <Loading label="Restoring your session" />
+    return <Spinner label="Restoring your session" />
   }
   if (!session) {
     return <Login />
@@ -58,10 +58,13 @@ export function App(): ReactNode {
     // ToastProvider sits inside ThemeProvider so portalled toasts and dialogs
     // inherit the theme rather than rendering unthemed at the document root.
     //
+    // "nebula" is not a built-in theme. The library takes any name and writes
+    // it to data-bits-theme; src/theme-nebula.css defines what it means.
+    //
     // ThemeProvider renders a real div, which would otherwise sit between #root
     // and the app with an auto height — collapsing every percentage height
     // below it. px-root re-establishes the chain.
-    <ThemeProvider theme="ember" className="px-root">
+    <ThemeProvider theme="nebula" className="px-root">
       <ToastProvider>
         <SessionProvider>
           <BrowserRouter>

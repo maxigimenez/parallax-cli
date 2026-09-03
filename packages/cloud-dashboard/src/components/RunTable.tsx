@@ -2,6 +2,15 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Avatar } from '@16-bits-design/ui/avatar'
 import { Badge } from '@16-bits-design/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCellContent,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@16-bits-design/ui/table'
 import { Text } from '@16-bits-design/ui/typography'
 import type { Run } from '../api/types.js'
 import { duration, initials, relativeTime, STATUS_TONE } from '../lib/format.js'
@@ -17,68 +26,64 @@ import { duration, initials, relativeTime, STATUS_TONE } from '../lib/format.js'
  */
 export function RunTable({ runs, now }: { runs: Run[]; now: number }): ReactNode {
   return (
-    <div className="px-tablewrap">
-      <table className="px-table">
-        <thead>
-          <tr>
-            <th scope="col">Trigger</th>
-            <th scope="col">Agent</th>
-            <th scope="col">Route</th>
-            <th scope="col">Elapsed</th>
-            <th scope="col">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((run) => {
-            const profile = run.agent_profile ?? 'unassigned'
-            return (
-              <tr key={run.id}>
-                <td>
-                  <Link to={`/runs/${run.id}`} className="px-rowlink">
-                    <span className="px-cell">
-                      <span className="px-cell__primary">
-                        {run.title ?? run.trigger_ref ?? run.id}
-                      </span>
-                      <span className="px-cell__secondary">
-                        {[run.trigger_ref, run.project_id].filter(Boolean).join(' · ') || run.id}
-                      </span>
-                    </span>
-                  </Link>
-                </td>
-                <td>
-                  <span className="px-agentcell">
-                    <Avatar name={profile} initials={initials(profile)} size="sm" />
-                    <span className="px-cell">
-                      <span className="px-cell__primary">{profile}</span>
-                      <span className="px-cell__secondary">
-                        {run.agent_profile ? 'hermes profile' : 'no agent'}
-                      </span>
-                    </span>
-                  </span>
-                </td>
-                <td>
-                  <Text size="small" tone="soft">
-                    {run.route_name ?? '—'}
-                  </Text>
-                </td>
-                <td>
-                  <span className="px-cell">
-                    <span className="px-cell__secondary" style={{ color: 'var(--bits-text-soft)' }}>
+    <Table scrollLabel="Runs" containerClassName="px-tablewrap" minWidth={640}>
+      <TableHead>
+        <TableRow>
+          <TableHeader>Trigger</TableHeader>
+          <TableHeader>Agent</TableHeader>
+          <TableHeader>Route</TableHeader>
+          <TableHeader>Elapsed</TableHeader>
+          <TableHeader>Status</TableHeader>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {runs.map((run) => {
+          const profile = run.agent_profile ?? 'unassigned'
+          return (
+            <TableRow key={run.id}>
+              <TableCell>
+                <Link to={`/runs/${run.id}`} className="px-rowlink">
+                  <TableCellContent
+                    primary={run.title ?? run.trigger_ref ?? run.id}
+                    secondary={
+                      [run.trigger_ref, run.project_id].filter(Boolean).join(' · ') || run.id
+                    }
+                  />
+                </Link>
+              </TableCell>
+              <TableCell>
+                <span className="px-agentcell">
+                  <Avatar name={profile} initials={initials(profile)} size="sm" />
+                  <TableCellContent
+                    primary={profile}
+                    secondary={run.agent_profile ? 'hermes profile' : 'no agent'}
+                  />
+                </span>
+              </TableCell>
+              <TableCell>
+                <Text size="small" tone="soft">
+                  {run.route_name ?? '—'}
+                </Text>
+              </TableCell>
+              <TableCell>
+                <TableCellContent
+                  primary={
+                    <Text size="caption" tone="soft">
                       {duration(run.started_at, run.ended_at, now)}
-                    </span>
-                    <span className="px-cell__secondary">{relativeTime(run.updated_at, now)}</span>
-                  </span>
-                </td>
-                <td>
-                  <Badge tone={STATUS_TONE[run.status] ?? 'neutral'}>
-                    {run.status.replace(/_/g, ' ')}
-                  </Badge>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+                    </Text>
+                  }
+                  secondary={relativeTime(run.updated_at, now)}
+                />
+              </TableCell>
+              <TableCell>
+                <Badge tone={STATUS_TONE[run.status] ?? 'neutral'}>
+                  {run.status.replace(/_/g, ' ')}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }

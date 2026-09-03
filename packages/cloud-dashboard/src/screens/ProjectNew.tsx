@@ -7,7 +7,7 @@ import { Textarea } from '@16-bits-design/ui/textarea'
 import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useKey } from '../lib/session.js'
-import { Alert } from '../components/Alert.js'
+import { Alert } from '@16-bits-design/ui/alert'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
 

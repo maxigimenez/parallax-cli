@@ -15,7 +15,7 @@ import {
 } from '../lib/routeDraft.js'
 import { fillRouteTemplate } from '../lib/routeTemplate.js'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
 import { RouteForm, type RouteDraft } from '../components/RouteForm.js'
@@ -114,7 +114,7 @@ export function RouteNew(): ReactNode {
       <PageHeader title="New route" parent={{ label: 'Routes', to: '/routes' }} />
       <Panel caption="When this happens, start that agent">
         {loading ? (
-          <Loading label="Loading templates" />
+          <Spinner label="Loading templates" />
         ) : failure ? (
           <ErrorPanel message={failure} onRetry={templates.reload} />
         ) : (

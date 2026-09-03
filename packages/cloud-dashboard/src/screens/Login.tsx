@@ -5,7 +5,8 @@ import { Text } from '@16-bits-design/ui/typography'
 import { ApiError, verifyKey } from '../api/client.js'
 import { API_URL, IS_CONFIGURED } from '../config.js'
 import { useSession } from '../lib/session.js'
-import { Alert } from '../components/Alert.js'
+import { Alert } from '@16-bits-design/ui/alert'
+import { BrandMark } from '../components/BrandMark.js'
 
 /**
  * The whole of signing in: paste a user key.
@@ -53,13 +54,7 @@ export function Login(): ReactNode {
         <div className="px-login__body">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="px-login__brand">
-              <img
-                src="/brand/parallax-icon.svg"
-                alt=""
-                width={34}
-                height={34}
-                aria-hidden="true"
-              />
+              <BrandMark className="px-sidebar__mark" />
               <img
                 src="/brand/parallax-wordmark.svg"
                 alt="Parallax"

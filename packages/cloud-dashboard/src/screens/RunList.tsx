@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@16-bits-design/ui/button'
+import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useResource } from '../lib/useResource.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel } from '../components/Panel.js'
+import { RunPromptDialog } from '../components/RunPromptDialog.js'
 import { RunTable } from '../components/RunTable.js'
-import { Segmented } from '../components/Segmented.js'
+import { Segmented } from '@16-bits-design/ui/segmented'
 import type { RunStatus } from '../api/types.js'
 
 type Filter = 'all' | 'active' | 'failed' | 'completed'
@@ -29,6 +31,8 @@ const MATCHES: Record<Filter, (status: RunStatus) => boolean> = {
  */
 export function RunList(): ReactNode {
   const [filter, setFilter] = useState<Filter>('all')
+  const [running, setRunning] = useState(false)
+  const { toast } = useToast()
   const runs = useResource((key, signal) => api.runs(key, { limit: 200 }, signal), [], {
     pollMs: 15_000,
   })
@@ -50,14 +54,17 @@ export function RunList(): ReactNode {
         title="Runs"
         parent={{ label: 'Overview', to: '/' }}
         actions={
-          <Button
-            variant="secondary"
-            onClick={runs.reload}
-            loading={runs.refreshing}
-            loadingLabel="syncing"
-          >
-            sync now
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              onClick={runs.reload}
+              loading={runs.refreshing}
+              loadingLabel="syncing"
+            >
+              sync now
+            </Button>
+            <Button onClick={() => setRunning(true)}>run agent</Button>
+          </>
         }
       />
       <Panel
@@ -66,7 +73,7 @@ export function RunList(): ReactNode {
             <Segmented
               label="Filter runs by status"
               value={filter}
-              onChange={setFilter}
+              onValueChange={(next) => setFilter(next as Filter)}
               options={[
                 { value: 'all', label: 'all' },
                 { value: 'active', label: 'in progress' },
@@ -78,7 +85,7 @@ export function RunList(): ReactNode {
         }
       >
         {runs.loading ? (
-          <Loading label="Loading runs" />
+          <Spinner label="Loading runs" />
         ) : runs.error ? (
           <ErrorPanel message={runs.error} onRetry={runs.reload} />
         ) : visible.length === 0 ? (
@@ -91,6 +98,22 @@ export function RunList(): ReactNode {
           <RunTable runs={visible} now={now} />
         )}
       </Panel>
+
+      <RunPromptDialog
+        open={running}
+        onClose={() => setRunning(false)}
+        onQueued={(runner) => {
+          toast({
+            tone: 'success',
+            title: 'Run queued',
+            message: `${runner} will start it on its next poll, within about 30 seconds.`,
+          })
+          // The runner has to fetch the command before the run exists, so the
+          // usual 15-second poll would show an empty list for a moment and read
+          // as nothing having happened. Reloading now costs one request.
+          runs.reload()
+        }}
+      />
     </>
   )
 }

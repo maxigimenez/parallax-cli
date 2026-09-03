@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import agentsFixture from './fixtures/agents.json'
 import eventsFixture from './fixtures/runs_run_1_events.json'
 import keysFixture from './fixtures/keys.json'
@@ -273,5 +274,106 @@ describe('page header', () => {
       expect(slot!.childElementCount > 0, `${path} action button presence`).toBe(expectAction)
       unmount()
     }
+  })
+})
+
+/**
+ * Starting an agent on a prompt written here, with no route behind it.
+ *
+ * The interesting part is not the form — it is that the choices offered can
+ * only produce a command a runner can answer: an agent that lives on the
+ * selected machine, and is enabled.
+ */
+describe('running an agent from the runs screen', () => {
+  const openDialog = async () => {
+    await renderAt('/runs')
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /run agent/i }))
+    return user
+  }
+
+  it('offers the runs screen a way to start a run', async () => {
+    await renderAt('/runs')
+    expect(await screen.findByRole('button', { name: /run agent/i })).toBeTruthy()
+  })
+
+  it('opens a dialog naming the runner and the agent', async () => {
+    await openDialog()
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: /run an agent/i })).toBeTruthy()
+    expect(within(dialog).getByLabelText(/runner/i)).toBeTruthy()
+    expect(within(dialog).getByLabelText(/agent/i)).toBeTruthy()
+    expect(within(dialog).getByLabelText(/prompt/i)).toBeTruthy()
+  })
+
+  /**
+   * A disabled profile would be accepted by the form and refused by the API,
+   * one round trip later. Offering only what can actually run is the difference
+   * between a dropdown and a guess.
+   */
+  it('offers only the enabled agents on the selected runner', async () => {
+    const user = await openDialog()
+    const dialog = await screen.findByRole('dialog')
+
+    // The library's Select is a listbox, not a native <select>: the options
+    // exist only once it is open.
+    await user.click(within(dialog).getByLabelText(/agent/i))
+    const offered = (await screen.findAllByRole('option')).map((option) => option.textContent)
+
+    expect(offered.some((label) => label?.includes('product'))).toBe(true)
+    expect(offered.some((label) => label?.includes('reviewer'))).toBe(true)
+    // `coder` is registered on the same runner but disabled.
+    expect(offered.some((label) => label?.includes('coder'))).toBe(false)
+  })
+
+  it('says when the chosen runner has stopped checking in', async () => {
+    await openDialog()
+    // The fixture runner is stale. Hiding it would present "no runners" for
+    // what is really "the runner stopped polling" — different problems. It is
+    // said twice on purpose: once in the option, once as a warning about the
+    // consequence, which is that the run waits rather than starting.
+    expect(await screen.findByText('That runner is not checking in')).toBeTruthy()
+    expect(screen.getByText(/queued and delivered whenever it polls again/i)).toBeTruthy()
+  })
+
+  it('will not queue an empty prompt', async () => {
+    await openDialog()
+    const dialog = await screen.findByRole('dialog')
+    const start = within(dialog).getByRole('button', { name: /start run/i })
+    expect((start as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('posts the runner, the agent and the prompt, and reports it queued', async () => {
+    const posts: Array<{ url: string; body: unknown }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const path = new URL(String(input)).pathname
+        if (init?.method === 'POST' && path === '/v1/runs') {
+          posts.push({ url: path, body: JSON.parse(String(init.body)) })
+          return new Response(JSON.stringify({ queued: 'cmd_1', runner: 'cerebro' }), {
+            status: 202,
+          })
+        }
+        const body = ROUTES[path]
+        return new Response(JSON.stringify(body ?? {}), { status: body ? 200 : 404 })
+      })
+    )
+
+    const user = await openDialog()
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText(/prompt/i), 'Audit the billing export')
+    await user.click(within(dialog).getByRole('button', { name: /start run/i }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(posts[0].body).toMatchObject({
+      runnerId: 'rnr_examplexxxxxxxx1',
+      agentProfile: 'product',
+      prompt: 'Audit the billing export',
+    })
+
+    // The run does not exist until the runner polls, so the confirmation has to
+    // say so rather than leaving someone watching an unchanged list.
+    expect(await screen.findByText(/next poll/i)).toBeTruthy()
   })
 })

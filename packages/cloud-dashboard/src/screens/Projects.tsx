@@ -7,10 +7,19 @@ import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useKey } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
-import { CodeBlock } from '../components/CodeBlock.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { Code } from '@16-bits-design/ui/code'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCellContent,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@16-bits-design/ui/table'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel } from '../components/Panel.js'
 import type { Project } from '../api/types.js'
@@ -49,7 +58,7 @@ export function Projects(): ReactNode {
       />
       <Panel caption="Where triggers come from">
         {projects.loading ? (
-          <Loading label="Loading projects" />
+          <Spinner label="Loading projects" />
         ) : projects.error ? (
           <ErrorPanel message={projects.error} onRetry={projects.reload} />
         ) : (projects.data ?? []).length === 0 ? (
@@ -64,49 +73,50 @@ export function Projects(): ReactNode {
             The runner polls nothing until a project exists, so no route can ever fire.
           </EmptyState>
         ) : (
-          <div className="px-tablewrap">
-            <table className="px-table">
-              <thead>
-                <tr>
-                  <th scope="col">Project</th>
-                  <th scope="col">Provider</th>
-                  <th scope="col">Filters</th>
-                  <th scope="col">
-                    <span className="px-visually-hidden">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(projects.data ?? []).map((project) => (
-                  <tr key={project.id}>
-                    <td>
-                      <span className="px-cell__primary">{project.id}</span>
-                    </td>
-                    <td>
-                      <Badge tone="outline">{project.provider}</Badge>
-                    </td>
-                    <td>
-                      <CodeBlock label={`Filters for ${project.id}`}>
-                        {JSON.stringify(project.filters ?? {}, null, 2)}
-                      </CodeBlock>
-                    </td>
-                    <td>
-                      <div className="px-rowactions">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleting(project)}
-                          aria-label={`Remove project ${project.id}`}
-                        >
-                          remove
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table scrollLabel="Registered projects" containerClassName="px-tablewrap">
+            <TableHead>
+              <TableRow>
+                <TableHeader>Project</TableHeader>
+                <TableHeader>Provider</TableHeader>
+                <TableHeader>Filters</TableHeader>
+                <TableHeader>
+                  <span className="px-visually-hidden">Actions</span>
+                </TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(projects.data ?? []).map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell>
+                    <TableCellContent primary={project.id} />
+                  </TableCell>
+                  <TableCell>
+                    <Badge tone="outline">{project.provider}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {/*
+                     * The label is rendered, not just announced, so it is kept
+                     * short: the row already names the project, and repeating
+                     * it inside the cell is noise on every row.
+                     */}
+                    <Code label="Filters">{JSON.stringify(project.filters ?? {}, null, 2)}</Code>
+                  </TableCell>
+                  <TableCell>
+                    <div className="px-rowactions">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleting(project)}
+                        aria-label={`Remove project ${project.id}`}
+                      >
+                        remove
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Panel>
 

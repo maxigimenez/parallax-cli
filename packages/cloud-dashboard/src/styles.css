@@ -325,7 +325,7 @@ a:focus-visible,
   gap: 2px;
 }
 
-.px-root .px-navitem {
+.px-navitem {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -333,11 +333,10 @@ a:focus-visible,
   background: transparent;
   border: 0;
   border-left: 3px solid transparent;
-  /* The design's idle foreground is #a9a394, which the library has no token
-   * for — it sits between --bits-text-soft and --bits-text-muted. Using the
-   * nearest token keeps this correct in Ocean and any custom theme, at the
-   * cost of an idle item a shade brighter than drawn. Filed upstream. */
-  color: var(--bits-text-soft);
+  /* The idle nav foreground. `--bits-text-dim` is the library's token for
+   * exactly this role — readable but subordinate — and is a step dimmer than
+   * `--bits-text-soft`, which is what this used before the token existed. */
+  color: var(--bits-text-dim);
   font: inherit;
   font-size: var(--bits-font-size-small);
   text-align: left;
@@ -350,16 +349,16 @@ a:focus-visible,
 
 /* Background only. The design does not brighten the label on hover — the
  * colour change is reserved for telling you which page you are on. */
-.px-root .px-navitem:hover {
+.px-navitem:hover {
   background: var(--bits-muted);
 }
 
-.px-root .px-navitem:focus-visible {
+.px-navitem:focus-visible {
   outline: none;
   box-shadow: var(--bits-focus-ring);
 }
 
-.px-root .px-navitem[aria-current='page'] {
+.px-navitem[aria-current='page'] {
   background: var(--bits-muted);
   border-left-color: var(--bits-primary);
   color: var(--bits-text);
@@ -372,7 +371,7 @@ a:focus-visible,
   background: var(--bits-line-strong);
 }
 
-.px-root .px-navitem[aria-current='page'] .px-navitem__dot {
+.px-navitem[aria-current='page'] .px-navitem__dot {
   background: var(--bits-primary);
 }
 
@@ -461,24 +460,24 @@ a:focus-visible,
 }
 
 /*
- * ── A note on the `.px-root` prefixes below ─────────────────────────────
+ * ── A note on overriding the library's element defaults ─────────────────
  *
- * The library styles bare elements — `.bits-theme a`, `.bits-theme h1`,
- * `.bits-theme h2`, `.bits-theme p`, `.bits-theme code` and more — at
- * specificity (0,1,1). A single application class on one of those elements is
- * (0,1,0) and silently loses, with no warning and no visible error: it simply
- * renders the library's defaults.
+ * The library styles bare elements — `a`, `h1`–`h6`, `p`, `code` and more —
+ * as defaults, but wraps each selector in `:where()`, so they contribute no
+ * specificity. A single application class beats them.
  *
- * That is what made every breadcrumb and idle sidebar link render primary
- * orange instead of muted grey, and every section heading render as 24px
- * display type instead of an 11px label. Prefixing with `.px-root` takes these
- * rules to (0,2,0), which wins without resorting to `!important`.
+ * That was not always true. At 0.1.0 the rules were `.bits-theme a` at
+ * (0,1,1), which silently out-specified a one-class app rule: every breadcrumb
+ * and idle sidebar link rendered primary orange instead of muted grey, and
+ * every section heading rendered as 24px display type. The workaround was to
+ * double up every selector under `.px-root`; the library fixed it at the
+ * source in 0.2.0, so the doubling is gone.
  *
- * Only the rules that land on an element the library styles carry the prefix.
- * Everything targeting a `div`, `span`, `table` or `pre` is left alone.
+ * `test/specificity.test.ts` pins the fix, because a regression there would be
+ * invisible again.
  */
 
-.px-root .px-crumbs__link {
+.px-crumbs__link {
   font-family: var(--bits-font-display);
   font-size: var(--bits-font-size-h4);
   line-height: 13px;
@@ -490,7 +489,7 @@ a:focus-visible,
   transition: color 0.12s linear;
 }
 
-.px-root .px-crumbs__link:hover {
+.px-crumbs__link:hover {
   color: var(--bits-primary);
 }
 
@@ -501,7 +500,7 @@ a:focus-visible,
   background: var(--bits-line-strong);
 }
 
-.px-root .px-crumbs__here {
+.px-crumbs__here {
   font-family: var(--bits-font-display);
   font-size: var(--bits-font-size-h4);
   line-height: 13px;
@@ -597,7 +596,7 @@ a:focus-visible,
   flex-wrap: wrap;
 }
 
-.px-root .px-section__title {
+.px-section__title {
   font-family: var(--bits-font-body);
   font-size: var(--bits-font-size-small);
   font-weight: 400;
@@ -669,92 +668,26 @@ a:focus-visible,
 /* ── Table ──────────────────────────────────────────────────────────── */
 
 /*
- * A real <table>, not a grid of divs: rows and headers must be announced as
- * such, and a run list is genuinely tabular. `--px-cols` lets each screen set
- * its own column proportions while the chrome stays identical.
+ * The library's Table draws its own frame. Inside a panel that frame is the
+ * second one on the same edge, so it is dropped here rather than nesting two
+ * borders a pixel apart.
  */
 .px-tablewrap {
-  overflow-x: auto;
+  border: 0;
+  background: none;
 }
 
-.px-table {
-  width: 100%;
-  min-width: 640px;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.px-table th {
-  padding: 10px 18px;
-  border-bottom: 2px solid var(--bits-line);
-  font-size: var(--bits-font-size-label);
-  font-weight: inherit;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--bits-text-muted);
-  white-space: nowrap;
-}
-
-.px-table td {
-  padding: var(--bits-space-3) 18px;
-  border-bottom: 2px solid var(--bits-raised);
-  vertical-align: middle;
-  min-width: 0;
-}
-
-.px-table tbody tr {
-  transition: background 0.12s linear;
-}
-
-.px-table tbody tr:hover {
-  background: var(--bits-raised);
-}
-
-.px-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.px-table__num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.px-root .px-rowlink {
+.px-rowlink {
   display: block;
   color: inherit;
   min-width: 0;
 }
 
-.px-root .px-rowlink:hover {
+.px-rowlink:hover {
   color: inherit;
 }
 
-.px-cell {
-  display: flex;
-  flex-direction: column;
-  /* Stretch is the flex default, which makes an inline thing like a Badge fill
-   * the whole column width. Cells stack labels, not blocks. */
-  align-items: flex-start;
-  gap: 5px;
-  min-width: 0;
-}
-
-.px-cell__primary {
-  font-size: var(--bits-font-size-body);
-  color: var(--bits-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.px-cell__secondary {
-  font-size: var(--bits-font-size-caption);
-  color: var(--bits-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* An avatar or status dot beside a two-line cell. */
 .px-agentcell {
   display: flex;
   align-items: center;
@@ -762,157 +695,7 @@ a:focus-visible,
   min-width: 0;
 }
 
-/* ── Segmented filter ───────────────────────────────────────────────── */
-
-.px-segmented {
-  display: flex;
-  gap: 2px;
-  background: var(--bits-line);
-  border: 2px solid var(--bits-line);
-}
-
-.px-segmented__option {
-  padding: 7px var(--bits-space-3);
-  font: inherit;
-  font-size: var(--bits-font-size-caption);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border: 0;
-  background: var(--bits-raised);
-  color: var(--bits-text-muted);
-  cursor: pointer;
-  transition:
-    background 0.12s linear,
-    color 0.12s linear;
-}
-
-.px-segmented__option:hover {
-  color: var(--bits-text);
-}
-
-.px-segmented__option:focus-visible {
-  outline: none;
-  box-shadow: var(--bits-focus-ring);
-}
-
-.px-segmented__option[aria-pressed='true'] {
-  background: var(--bits-primary);
-  color: var(--bits-ink);
-}
-
-/* ── States ─────────────────────────────────────────────────────────── */
-
-.px-alert {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: var(--bits-space-3) var(--bits-space-4);
-  border: 2px solid var(--bits-line);
-  background: var(--bits-raised);
-  color: var(--bits-text-soft);
-  font-size: var(--bits-font-size-small);
-  line-height: 1.6;
-}
-
-.px-alert--danger {
-  border-color: var(--bits-danger);
-  color: var(--bits-danger-soft);
-}
-
-.px-alert--warning {
-  border-color: var(--bits-amber);
-}
-
-.px-alert__icon {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  font-size: var(--bits-font-size-caption);
-  color: var(--bits-ink);
-  background: var(--bits-primary);
-}
-
-.px-alert--danger .px-alert__icon {
-  background: var(--bits-danger);
-}
-
-.px-alert--warning .px-alert__icon {
-  background: var(--bits-amber);
-}
-
-.px-alert__body {
-  min-width: 0;
-  flex: 1;
-}
-
-.px-empty {
-  padding: 44px var(--bits-space-5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--bits-space-3);
-  text-align: center;
-}
-
-.px-empty__mark {
-  display: flex;
-  gap: 3px;
-}
-
-.px-empty__mark span {
-  width: 10px;
-  height: 10px;
-  background: var(--bits-muted);
-}
-
-.px-empty__mark span:nth-child(2) {
-  background: var(--bits-line-strong);
-}
-
-/* A determinate-looking bar for an indeterminate wait would be a lie; this
- * scans instead, and every use is paired with live-region text. */
-.px-loading {
-  padding: 40px var(--bits-space-5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--bits-space-4);
-}
-
-.px-loading__track {
-  width: 120px;
-  height: 6px;
-  background: var(--bits-muted);
-  overflow: hidden;
-  position: relative;
-}
-
-.px-loading__bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 34%;
-  background: var(--bits-primary);
-  animation: px-scan 1.1s steps(6) infinite;
-}
-
-/* ── Code and secrets ───────────────────────────────────────────────── */
-
-.px-code {
-  margin: 0;
-  padding: var(--bits-space-3) var(--bits-space-4);
-  border: 2px solid var(--bits-line);
-  background: var(--bits-surface);
-  color: var(--bits-text-soft);
-  font-family: var(--bits-font-body);
-  font-size: var(--bits-font-size-small);
-  line-height: 1.6;
-  overflow-x: auto;
-  white-space: pre;
-  tab-size: 2;
-}
+/* ── Secrets ────────────────────────────────────────────────────────── */
 
 .px-secret {
   display: flex;
@@ -922,7 +705,13 @@ a:focus-visible,
   flex-wrap: wrap;
 }
 
-.px-root .px-secret__value {
+/*
+ * A revealed key is 40-odd characters. The library's chip treatment for a bare
+ * <code> is right for an identifier and wrong for this, so it is overridden --
+ * which a single class can now do, since the library's bare-element defaults
+ * are wrapped in :where().
+ */
+.px-secret__value {
   padding: 0;
   background: none;
   font-family: var(--bits-font-body);
@@ -980,7 +769,7 @@ a:focus-visible,
   min-width: 0;
 }
 
-.px-root .px-event__message {
+.px-event__message {
   font-size: var(--bits-font-size-small);
   color: var(--bits-text-muted);
   line-height: 1.6;
@@ -1095,6 +884,112 @@ a:focus-visible,
   padding-top: 14px;
 }
 
+/* ── Run dialog ─────────────────────────────────────────────────────── */
+
+/*
+ * A modal that holds a form.
+ *
+ * The library's Dialog is a confirmation: it puts its description in a `<p>`,
+ * where a browser reparents any form control, and its focus trap looks only for
+ * buttons, links and inputs. Both are fine for "are you sure"; neither works
+ * for a select and a textarea. Filed upstream as maxigimenez/16-bits-design#21
+ * — this goes when a composable dialog lands.
+ *
+ * Geometry and colour are the library's own dialog values, so the two read as
+ * the same component to anyone using the app.
+ */
+.px-modal {
+  position: fixed;
+  z-index: 900;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  font-family: var(--bits-font-body);
+}
+
+.px-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: var(--bits-backdrop);
+  cursor: default;
+}
+
+.px-modal__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  /* Wider than a confirmation, because a prompt needs room to be read back;
+   * capped in `dvh` so a long form scrolls inside the panel and the page
+   * behind it never does. */
+  width: min(560px, 100%);
+  max-height: min(680px, calc(100dvh - 80px));
+  border: var(--bits-border-width) solid var(--bits-line);
+  background: var(--bits-panel);
+  box-shadow: 8px 8px 0 var(--bits-shadow);
+  color: var(--bits-text);
+}
+
+.px-modal__head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: var(--bits-space-5) var(--bits-space-5) 0;
+}
+
+.px-modal__title {
+  flex: 1;
+  margin: 0;
+  color: var(--bits-text);
+  font-family: var(--bits-font-display);
+  font-size: var(--bits-font-size-h4);
+  line-height: 1.3;
+}
+
+.px-modal__close {
+  flex: none;
+  padding: var(--bits-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--bits-text-faint);
+  font-family: var(--bits-font-body);
+  font-size: var(--bits-font-size-small);
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.12s linear;
+}
+
+.px-modal__close:hover {
+  color: var(--bits-text);
+}
+
+.px-modal__close:focus-visible {
+  outline: none;
+  box-shadow: var(--bits-focus-ring);
+}
+
+.px-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--bits-space-4);
+  padding: var(--bits-space-4) var(--bits-space-5);
+}
+
+.px-modal__foot {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--bits-space-2);
+  padding: var(--bits-space-4) var(--bits-space-5) var(--bits-space-5);
+  border-top: 2px solid var(--bits-line);
+}
+
 /* ── Narrow screens ─────────────────────────────────────────────────── */
 
 /*
@@ -1144,13 +1039,13 @@ a:focus-visible,
     flex-direction: row;
   }
 
-  .px-root .px-navitem {
+  .px-navitem {
     border-left: 0;
     border-bottom: 3px solid transparent;
     white-space: nowrap;
   }
 
-  .px-root .px-navitem[aria-current='page'] {
+  .px-navitem[aria-current='page'] {
     border-left-color: transparent;
     border-bottom-color: var(--bits-primary);
   }

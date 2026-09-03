@@ -12,6 +12,15 @@ import { authenticate, generateKey, newId, parseBearer, type AuthContext } from 
 import type { Database } from '../db.js'
 
 /**
+ * A ceiling on a hand-written prompt.
+ *
+ * Not a guess at what an agent will accept -- Hermes decides that -- but a
+ * bound on what a single request can push into a JSONB column and back out
+ * through every runner's command poll.
+ */
+const MAX_PROMPT_LENGTH = 20_000
+
+/**
  * The human-facing API.
  *
  * This is the contract `packages/dashboard` will consume, so it is shaped for a
@@ -325,10 +334,94 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     return { events: rows }
   })
 
-  /** Queue a manual dispatch for the runner to pick up on its next poll. */
+  /**
+   * Queue a manual dispatch for the runner to pick up on its next poll.
+   *
+   * Two shapes, and exactly one per request:
+   *
+   * - `{ event }` synthesises a trigger and puts it through the rule engine, so
+   *   it starts whichever agent a route would have started. This is "run that
+   *   ticket now".
+   * - `{ agentProfile, prompt }` starts one named agent on the operator's own
+   *   text, with no route and no trigger involved at all. This is "ask this
+   *   agent to do this thing".
+   *
+   * Sending both is rejected rather than resolved by precedence: they answer
+   * different questions, and guessing which one was meant would start the wrong
+   * agent on the wrong work.
+   */
   app.post('/v1/runs', async (request, reply) => {
     const { orgId } = authOf(request)
-    const body = request.body as { event?: unknown }
+    const body = request.body as {
+      event?: unknown
+      prompt?: unknown
+      agentProfile?: unknown
+      runnerId?: unknown
+      title?: unknown
+    }
+
+    const wantsPrompt = body.prompt !== undefined || body.agentProfile !== undefined
+    if (body.event !== undefined && wantsPrompt) {
+      return reply
+        .code(400)
+        .send({ error: 'Send either event, or agentProfile and prompt — not both.' })
+    }
+
+    if (wantsPrompt) {
+      const agentProfile = typeof body.agentProfile === 'string' ? body.agentProfile.trim() : ''
+      const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+
+      if (!agentProfile) {
+        return reply.code(400).send({ error: 'agentProfile is required.' })
+      }
+      if (!prompt) {
+        return reply.code(400).send({ error: 'prompt is required and cannot be blank.' })
+      }
+      if (prompt.length > MAX_PROMPT_LENGTH) {
+        return reply
+          .code(400)
+          .send({ error: `prompt is limited to ${MAX_PROMPT_LENGTH} characters.` })
+      }
+
+      // The agent decides the machine. Resolving it here rather than trusting
+      // the caller means a dashboard left open across an inventory change
+      // cannot address a command to a runner that no longer has the profile --
+      // which would queue a command nothing ever answers.
+      const { rows } = await db.query<{ runner_id: string; runner_name: string; enabled: boolean }>(
+        `SELECT a.runner_id, r.name AS runner_name, a.enabled
+         FROM agents a JOIN runners r ON r.id = a.runner_id
+         WHERE a.org_id = $1 AND a.profile = $2
+           AND ($3::text IS NULL OR a.runner_id = $3)`,
+        [orgId, agentProfile, typeof body.runnerId === 'string' ? body.runnerId : null]
+      )
+      const agent = rows[0]
+      if (!agent) {
+        return reply
+          .code(404)
+          .send({ error: `No agent "${agentProfile}" is registered on that runner.` })
+      }
+      if (!agent.enabled) {
+        return reply.code(409).send({ error: `Agent "${agentProfile}" is disabled.` })
+      }
+
+      const id = newId('cmd')
+      await db.query(
+        `INSERT INTO runner_commands (id, org_id, runner_id, type, payload)
+         VALUES ($1,$2,$3,'run-prompt',$4)`,
+        [
+          id,
+          orgId,
+          agent.runner_id,
+          JSON.stringify({
+            agentProfile,
+            prompt,
+            title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : null,
+          }),
+        ]
+      )
+      return reply.code(202).send({ queued: id, runner: agent.runner_name })
+    }
+
     if (!body.event) {
       return reply.code(400).send({ error: 'event is required.' })
     }

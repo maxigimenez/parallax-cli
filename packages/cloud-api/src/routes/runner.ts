@@ -205,16 +205,17 @@ export function registerRunnerRoutes(app: FastifyInstance, db: Database): void {
 
   app.get('/v1/runner/commands', async (request) => {
     const { orgId } = authOf(request)
-    const query = request.query as { cursor?: string; wait?: string }
+    const query = request.query as { cursor?: string; wait?: string; runner?: string }
     const cursor = Number.parseInt(query.cursor ?? '0', 10) || 0
     const wait = Math.min(Number.parseInt(query.wait ?? '25', 10) || 25, MAX_WAIT_SECONDS)
+    const runnerId = await runnerIdFor(db, orgId, query.runner)
 
     const deadline = Date.now() + wait * 1_000
 
     // Poll the table rather than using LISTEN/NOTIFY: it survives connection
     // churn and pooling, and at one runner per org the cost is negligible.
     for (;;) {
-      const commands = await fetchCommands(db, orgId, cursor)
+      const commands = await fetchCommands(db, orgId, cursor, runnerId)
       if (commands.length > 0 || Date.now() >= deadline) {
         return { commands }
       }
@@ -222,12 +223,23 @@ export function registerRunnerRoutes(app: FastifyInstance, db: Database): void {
     }
   })
 
+  /**
+   * Acks through a cursor, for this runner's share of the queue.
+   *
+   * The runner filter matters as much here as on the poll. Acking by cursor
+   * alone marks every org command up to that point delivered, so on a two-runner
+   * org whichever polled first would ack the other's addressed commands out of
+   * existence before they were ever fetched.
+   */
   app.post('/v1/runner/commands/ack', async (request) => {
     const { orgId } = authOf(request)
-    const { cursor } = request.body as { cursor: number }
+    const { cursor, runner } = request.body as { cursor: number; runner?: string }
+    const runnerId = await runnerIdFor(db, orgId, runner)
     await db.query(
-      'UPDATE runner_commands SET acked_at = now() WHERE org_id = $1 AND cursor <= $2 AND acked_at IS NULL',
-      [orgId, cursor]
+      `UPDATE runner_commands SET acked_at = now()
+        WHERE org_id = $1 AND cursor <= $2 AND acked_at IS NULL
+          AND (runner_id IS NULL OR runner_id = $3)`,
+      [orgId, cursor, runnerId]
     )
     return { ok: true }
   })
@@ -301,16 +313,42 @@ async function currentRunner(db: Database, orgId: string): Promise<string | null
 interface CommandRow {
   cursor: string
   id: string
-  type: 'run' | 'cancel' | 'resync'
+  type: 'run' | 'cancel' | 'resync' | 'run-prompt'
   payload: Record<string, unknown>
 }
 
-async function fetchCommands(db: Database, orgId: string, cursor: number) {
+/**
+ * Resolves the polling runner's name to its id.
+ *
+ * Returns null when the runner does not say who it is, which an older build
+ * does not. A null id matches only unaddressed commands below, so such a runner
+ * keeps receiving everything it always did and never claims a command addressed
+ * to a machine it is not.
+ */
+async function runnerIdFor(
+  db: Database,
+  orgId: string,
+  name: string | undefined
+): Promise<string | null> {
+  if (!name) {
+    return null
+  }
+  const { rows } = await db.query<{ id: string }>(
+    'SELECT id FROM runners WHERE org_id = $1 AND name = $2',
+    [orgId, name]
+  )
+  return rows[0]?.id ?? null
+}
+
+async function fetchCommands(db: Database, orgId: string, cursor: number, runnerId: string | null) {
+  // A null runner_id is a broadcast -- resync, and every command queued before
+  // commands were addressed at all -- so it goes to whoever polls.
   const { rows } = await db.query<CommandRow>(
     `SELECT cursor, id, type, payload FROM runner_commands
      WHERE org_id = $1 AND cursor > $2 AND acked_at IS NULL
+       AND (runner_id IS NULL OR runner_id = $3)
      ORDER BY cursor ASC LIMIT 50`,
-    [orgId, cursor]
+    [orgId, cursor, runnerId]
   )
   return rows.map((row) => ({
     id: row.id,

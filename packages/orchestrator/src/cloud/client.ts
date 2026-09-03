@@ -10,7 +10,7 @@ import type {
 export interface RunnerCommand {
   id: string
   cursor: number
-  type: 'run' | 'cancel' | 'resync'
+  type: 'run' | 'cancel' | 'resync' | 'run-prompt'
   payload: Record<string, unknown>
 }
 
@@ -130,14 +130,22 @@ export class CloudClient {
    * closes, so an empty array is the normal, healthy result -- not an error.
    */
   pollCommands(cursor: number, signal?: AbortSignal): Promise<{ commands: RunnerCommand[] }> {
+    // Naming ourselves is what lets the cloud address a command at one machine.
+    // A command that names no runner is still delivered to everyone, so this is
+    // additive: it narrows what this runner may claim, never what it receives.
     return this.request<{ commands: RunnerCommand[] }>(
-      `/v1/runner/commands?cursor=${cursor}&wait=${POLL_WAIT_SECONDS}`,
+      `/v1/runner/commands?cursor=${cursor}&wait=${POLL_WAIT_SECONDS}&runner=${encodeURIComponent(this.config.runnerName)}`,
       { timeoutMs: POLL_TIMEOUT_MS, signal }
     )
   }
 
   ackCommands(throughCursor: number): Promise<void> {
-    return this.post<void>('/v1/runner/commands/ack', { cursor: throughCursor })
+    // Same filter as the poll: acking by cursor alone would mark another
+    // runner's addressed commands delivered before it ever fetched them.
+    return this.post<void>('/v1/runner/commands/ack', {
+      cursor: throughCursor,
+      runner: this.config.runnerName,
+    })
   }
 
   mirrorRun(run: RunRecord): Promise<void> {
