@@ -162,6 +162,27 @@ The button is why the action slot in the page header is always rendered, even em
 slot that appears only on pages with a button shifts the header — and everything under
 it — by a button's height as you move between sections.
 
+### Running an agent directly
+
+The runs screen carries a **run agent** button, which opens a dialog: a runner, an
+agent on that runner, and a prompt. It starts that agent on that text — no route, no
+ticket, no trigger.
+
+This exists because routes answer "when something happens, do this" and a one-off
+question does not need a rule that outlives it. Creating a throwaway route to ask one,
+then remembering to delete it, is how a route table fills with entries nobody dares
+turn off.
+
+The agent list is filtered to enabled agents **on the selected runner**, because a
+profile lives on exactly one machine; offering the whole pool would let someone address
+a command to a runner that has never heard of it. A stale runner is offered but named
+as stale, and the dialog says the command will wait — hiding it would present "no
+runners" for what is really "the runner stopped checking in".
+
+The run does not exist until the runner picks the command up, so the confirmation says
+so rather than leaving someone watching an unchanged list. It then appears like any
+other run, with `manual run` in its Route column.
+
 ### The route form
 
 Creating starts from a template, because the combinations that actually fire are a
@@ -213,39 +234,87 @@ be saved into a state the runner would reject.
 
 The UI is built on [`@16-bits-design/ui`](https://github.com/maxigimenez/16-bits-design),
 which is the component library for this visual language — square geometry, 2px borders,
-offset shadows, JetBrains Mono body and Silkscreen display type, on the `ember` theme.
+offset shadows, JetBrains Mono body and Silkscreen display type.
 
 Application code uses `--bits-*` semantic variables and never hardcodes a colour, so
 the whole dashboard follows the theme. `src/styles.css` holds layout only: the shell,
-the tables, and the states the library does not ship yet — alerts, empty states,
-loading, segmented filters and code blocks. Those gaps are filed as issues on the
-library, and each local implementation is a candidate to delete when its component
-lands.
+the sidebar, the run dialog, and the few surfaces the library does not ship.
 
-### The `.px-root` prefix, and why it is not decoration
+At 0.1.0 that file also carried local implementations of an alert, an empty state, a
+loading indicator, a segmented filter, a code block and a table, each filed upstream as
+an issue. **0.2.0 shipped all six**, and they are now imported rather than reimplemented:
 
-The library styles bare elements — `.bits-theme a`, `.bits-theme h1`, `.bits-theme h2`,
-`.bits-theme p`, `.bits-theme code` — at specificity **(0,1,1)**. An application class
-on one of those elements is **(0,1,0)** and loses *silently*: no error, no warning, just
-the library's defaults.
+| Was | Now |
+|---|---|
+| `components/Alert.tsx` | `@16-bits-design/ui/alert` |
+| `components/EmptyState.tsx` | `@16-bits-design/ui/empty-state` |
+| `components/Loading.tsx` | `@16-bits-design/ui/spinner` |
+| `components/Segmented.tsx` | `@16-bits-design/ui/segmented` |
+| `components/CodeBlock.tsx` | `@16-bits-design/ui/code` |
+| `.px-table` markup | `@16-bits-design/ui/table` |
 
-This is not hypothetical. Every breadcrumb and every idle sidebar link rendered
-`--bits-primary` orange instead of muted grey, and every section heading rendered as
-24px display type instead of an 11px label, for exactly this reason. It survived
-review because the result looks deliberate — an all-orange nav reads as a styling
-choice until you hold it next to the design.
+Two behavioural notes from that swap, because both are easy to undo by accident:
 
-So any rule whose class lands on an element the library styles is written
-`.px-root .px-thing`, reaching (0,2,0) without `!important`. Rules targeting a `div`,
-`span`, `table` or `pre` need no prefix and do not have one.
+- The library's `Table` draws its own frame. Inside a panel that is the second border
+  on the same edge, so `.px-tablewrap` removes it. The class is now only a modifier on
+  the library's scroll container, not a container of ours.
+- Block `Code` **renders** its label rather than only announcing it. In a page section
+  that is useful; in a table cell it duplicates the row, so those labels are short.
 
-`test/specificity.test.ts` enforces it: it reads the library's stylesheet to learn
-which elements are styled bare, scans the JSX for `px-` classes on those elements, and
-fails if the matching rule is unscoped. Nothing in TypeScript, ESLint or the build can
-catch this, so it is a test.
+### The nebula theme
 
-One layout note worth keeping, because it is easy to reintroduce: `ThemeProvider`
-renders a real `div` between `#root` and the app. `.px-root` gives that element a
-height, and `.px-shell` is anchored to `100dvh` rather than a percentage — a height
-inherited through flex-grow is used but not *definite*, so percentage heights below it
-fall back to auto and every column collapses to its content.
+The dashboard runs on a **custom theme**, not a built-in one. `ThemeProvider` takes any
+name and writes it to `data-bits-theme`; `src/theme-nebula.css` defines what `nebula`
+means. It is loaded after the library stylesheet, which is what lets its palette win.
+
+Only colour is redefined. Geometry, type and spacing come from the library's `:root`,
+because those are the visual language rather than the palette. The text ramp is
+calibrated against ember's — each step within a few tenths of the corresponding
+contrast against `--bits-panel` — rather than picked by eye.
+
+`--bits-ink` is set explicitly, which the built-in `ocean` does not do: ink is the
+foreground on a primary fill, and inheriting ember's warm brown onto a purple badge is
+exactly the kind of silent failure a custom theme invites. `test/theme.test.ts` pins
+that, and that the theme covers every colour a built-in theme defines — a token a theme
+forgets is not an error, it simply inherits ember, and you find out when one hover
+state renders orange.
+
+The mark in the sidebar is drawn by `components/BrandMark.tsx` for the same reason. The
+file it replaced hardcoded ember's palette, and an `<img>` cannot read a custom
+property whatever the SVG says. `public/brand/parallax-icon.svg` stays for the favicon,
+which is outside the document either way.
+
+### Element defaults, and the test that used to guard them
+
+The library styles bare elements — `a`, `h1`–`h6`, `p`, `code` — as defaults wrapped in
+`:where()`, so they contribute no specificity and a single application class overrides
+them.
+
+That was not always true. At 0.1.0 those rules were `.bits-theme a` at specificity
+(0,1,1), which silently out-specified a one-class app rule: every breadcrumb and idle
+sidebar link rendered primary orange instead of muted grey, and every section heading
+rendered as 24px display type. It survived review because the result looks deliberate —
+an all-orange nav reads as a styling choice until you hold it next to the design.
+
+The workaround was to double every affected selector under `.px-root`. The library
+fixed it at the source, so the doubling is gone and `test/specificity.test.ts` is
+inverted: it no longer checks that the app doubles up its selectors, it checks that the
+library still makes doubling unnecessary. A regression would be as invisible as the
+original bug.
+
+`.px-root` itself remains, for the reason it was always also needed: `ThemeProvider`
+renders a real `div` between `#root` and the app, and that element needs a height.
+`.px-shell` is anchored to `100dvh` rather than a percentage — a height inherited
+through flex-grow is used but not *definite*, so percentage heights below it fall back
+to auto and every column collapses to its content.
+
+### Still local
+
+`components/RunPromptDialog.tsx` is the one component built here rather than imported.
+The library's `Dialog` is a confirmation: it renders its `description` inside a `<p>`,
+where a browser reparents any form control, and its focus trap looks only for buttons,
+links and inputs — not a `select` or a `textarea`. Both are right for "are you sure"
+and neither works for a form. Filed upstream as
+[maxigimenez/16-bits-design#21](https://github.com/maxigimenez/16-bits-design/issues/21);
+it is a candidate to delete when a composable dialog lands, and its CSS deliberately reuses the library's own dialog
+geometry so the two read as the same component.

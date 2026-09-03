@@ -83,6 +83,19 @@ export const api = {
       signal,
     }).then((r) => r.events),
 
+  /**
+   * Start one agent on a prompt written here, with no route involved.
+   *
+   * Queued rather than started: the runner is behind NAT and accepts no inbound
+   * connections, so this returns as soon as the cloud has the command, and the
+   * run appears in the list once the runner has picked it up. `queued` is a
+   * command id, not a run id — there is no run yet to have one.
+   */
+  startRun: (
+    key: string,
+    body: { runnerId: string; agentProfile: string; prompt: string; title?: string }
+  ) => request<{ queued: string; runner: string }>(key, '/v1/runs', { method: 'POST', body }),
+
   cancelRun: (key: string, id: string) =>
     request<{ queued: string }>(key, `/v1/runs/${encodeURIComponent(id)}/cancel`, {
       method: 'POST',

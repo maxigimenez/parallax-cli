@@ -115,6 +115,15 @@ Two invariants the dispatcher enforces:
    any work starts. `INSERT OR IGNORE` is the concurrency control. A failure before the
    agent was reached releases the claim so a fix can run.
 
+`Dispatcher.dispatchPrompt()` is the one path around all of this: an operator's own
+prompt against one named agent, from the dashboard's *run agent* button. No rule is
+evaluated, nothing is claimed in the ledger, and no label or comment is written —
+there is no trigger to re-observe and no ticket to write to. Invariant 1 still holds,
+but a manual run against a busy agent is **refused** rather than deferred, because
+nothing will retry it and the person who pressed the button is owed the reason. The run
+records `routeId: 'manual'` and `triggerType: 'manual'`; inventing a plausible route id
+would be worse than saying there was not one.
+
 ### Route catalog (`packages/common/src/route-catalog.ts`)
 
 The supported cases are declared once, as complete routes, and served from
@@ -130,7 +139,18 @@ Two API-key scopes, separated from day one: `prx_rnr_` for the runner
 one where the other is required is a 401.
 
 The runner **long-polls** `GET /v1/runner/commands` rather than accepting inbound
-connections, so it works behind NAT with no tunnel. That poll also paces the runner's
+connections, so it works behind NAT with no tunnel. Commands are *addressed*: one
+carrying a `runner_id` reaches only that runner, one carrying none is a broadcast. The
+poll and the ack both pass `runner=<name>`, and the ack must — acking by cursor alone
+marks another runner's addressed commands delivered before it ever fetched them.
+
+Commands that start an agent are started and *not* awaited by the poll loop — a run can
+take half an hour, and awaiting one would stop the runner collecting triggers and stop
+its heartbeat, so the dashboard would report it stale for exactly as long as it was busy.
+`cancel` and `resync` are awaited, because they must have taken effect before the next
+cycle reads what they changed.
+
+That poll also paces the runner's
 main loop, and `POST /v1/runner/heartbeat` rides on the same cycle — nothing can ask
 the runner how it is doing, so health is pushed or it does not exist. `last_seen_at` is
 additionally touched by any authenticated runner request, so liveness never depends on
@@ -178,8 +198,14 @@ as well.
 - **Strict parsing**: all CLI arg and request parsing goes through dedicated parser
   functions in `args.ts`; never parse inline. An unknown flag is an error.
 - **`pnpm parallax <command>`** is the canonical local testing entrypoint.
+- Runner console lines are stamped with an ISO-8601 UTC instant, and a run event's
+  echoed line reports the time the event was *recorded* rather than a fresh clock read,
+  so the log and the stored event never disagree about when something failed.
 - **Docs updates belong in the same commit** as behavior changes.
 - Tests live in `packages/<name>/test/` and mirror the `src/` structure.
+- The dashboard runs on a custom `@16-bits-design/ui` theme (`nebula`, purple), defined
+  in `src/theme-nebula.css` and pinned by `test/theme.test.ts` — a token a theme forgets
+  silently inherits the library's ember default rather than erroring.
 - The dashboard's screen tests run against payloads recorded from a live `cloud-api`
   over real Postgres, in `test/fixtures/`. Hand-written ones agree with the source by
   construction and miss what actually breaks a browser — `run_events.ts` arrives as a

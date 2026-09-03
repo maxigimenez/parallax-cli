@@ -3,14 +3,23 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Badge } from '@16-bits-design/ui/badge'
 import { Button } from '@16-bits-design/ui/button'
 import { Dialog } from '@16-bits-design/ui/dialog'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCellContent,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@16-bits-design/ui/table'
 import { Text } from '@16-bits-design/ui/typography'
 import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useKey } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel } from '../components/Panel.js'
 import type { RoutingRule } from '../api/types.js'
@@ -50,7 +59,7 @@ export function RouteList(): ReactNode {
       />
       <Panel caption="When this happens, start that agent">
         {routes.loading ? (
-          <Loading label="Loading routes" />
+          <Spinner label="Loading routes" />
         ) : routes.error ? (
           <ErrorPanel message={routes.error} onRetry={routes.reload} />
         ) : (routes.data ?? []).length === 0 ? (
@@ -65,80 +74,71 @@ export function RouteList(): ReactNode {
             Nothing will start an agent until a route exists.
           </EmptyState>
         ) : (
-          <div className="px-tablewrap">
-            <table className="px-table">
-              <thead>
-                <tr>
-                  <th scope="col">Route</th>
-                  <th scope="col">Trigger</th>
-                  <th scope="col">Agent</th>
-                  <th scope="col" className="px-table__num">
-                    Priority
-                  </th>
-                  <th scope="col">
-                    <span className="px-visually-hidden">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {(routes.data ?? []).map((route) => (
-                  <tr key={route.id}>
-                    <td>
-                      <Link to={`/routes/${route.id}/edit`} className="px-rowlink">
-                        <span className="px-cell">
-                          <span className="px-cell__primary">{route.name}</span>
-                          <span className="px-cell__secondary">{route.id}</span>
-                        </span>
-                      </Link>
-                    </td>
-                    <td>
-                      <span className="px-cell">
-                        <span className="px-cell__primary">{route.trigger?.type}</span>
-                        <span className="px-cell__secondary">
-                          {route.trigger?.projectId ?? 'any project'}
-                        </span>
-                      </span>
-                    </td>
-                    <td>
-                      <Text size="small" tone="soft">
-                        {route.target?.agentRef?.profile ??
-                          route.target?.agentRef?.githubLogin ??
-                          '—'}
-                      </Text>
-                    </td>
-                    <td className="px-table__num">
-                      <Text size="small" tone="soft">
-                        {route.priority}
-                      </Text>
-                    </td>
-                    <td>
-                      <div className="px-rowactions">
-                        <Badge tone={route.enabled ? 'success' : 'neutral'}>
-                          {route.enabled ? 'enabled' : 'disabled'}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => navigate(`/routes/${route.id}/edit`)}
-                          aria-label={`Edit route ${route.name}`}
-                        >
-                          edit
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setDeleting(route)}
-                          aria-label={`Delete route ${route.name}`}
-                        >
-                          delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Table scrollLabel="Routes" containerClassName="px-tablewrap">
+            <TableHead>
+              <TableRow>
+                <TableHeader>Route</TableHeader>
+                <TableHeader>Trigger</TableHeader>
+                <TableHeader>Agent</TableHeader>
+                <TableHeader align="end">Priority</TableHeader>
+                <TableHeader>
+                  <span className="px-visually-hidden">Actions</span>
+                </TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(routes.data ?? []).map((route) => (
+                <TableRow key={route.id}>
+                  <TableCell>
+                    <Link to={`/routes/${route.id}/edit`} className="px-rowlink">
+                      <TableCellContent primary={route.name} secondary={route.id} />
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <TableCellContent
+                      primary={route.trigger?.type}
+                      secondary={route.trigger?.projectId ?? 'any project'}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Text size="small" tone="soft">
+                      {route.target?.agentRef?.profile ??
+                        route.target?.agentRef?.githubLogin ??
+                        '—'}
+                    </Text>
+                  </TableCell>
+                  <TableCell align="end">
+                    <Text size="small" tone="soft">
+                      {route.priority}
+                    </Text>
+                  </TableCell>
+                  <TableCell>
+                    <div className="px-rowactions">
+                      <Badge tone={route.enabled ? 'success' : 'neutral'}>
+                        {route.enabled ? 'enabled' : 'disabled'}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/routes/${route.id}/edit`)}
+                        aria-label={`Edit route ${route.name}`}
+                      >
+                        edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDeleting(route)}
+                        aria-label={`Delete route ${route.name}`}
+                      >
+                        delete
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </Panel>
 

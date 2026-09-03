@@ -3,6 +3,15 @@ import { Badge } from '@16-bits-design/ui/badge'
 import { Button } from '@16-bits-design/ui/button'
 import { Dialog } from '@16-bits-design/ui/dialog'
 import { Input } from '@16-bits-design/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCellContent,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@16-bits-design/ui/table'
 import { Text } from '@16-bits-design/ui/typography'
 import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
@@ -10,10 +19,10 @@ import { API_URL } from '../config.js'
 import { useKey, useSession } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
 import { relativeTime, uptime } from '../lib/format.js'
-import { Alert } from '../components/Alert.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { Alert } from '@16-bits-design/ui/alert'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
 
@@ -117,7 +126,7 @@ export function Settings(): ReactNode {
 
           <Section title="Slack notifications">
             {slack.loading ? (
-              <Loading label="Loading Slack settings" />
+              <Spinner label="Loading Slack settings" />
             ) : slack.error ? (
               <ErrorPanel message={slack.error} onRetry={slack.reload} />
             ) : (
@@ -169,7 +178,7 @@ export function Settings(): ReactNode {
 
           <Section title="Runners" padded={false}>
             {runners.loading ? (
-              <Loading label="Loading runners" />
+              <Spinner label="Loading runners" />
             ) : runners.error ? (
               <ErrorPanel message={runners.error} onRetry={runners.reload} />
             ) : (runners.data ?? []).length === 0 ? (
@@ -178,92 +187,84 @@ export function Settings(): ReactNode {
                 registers itself on its first poll.
               </EmptyState>
             ) : (
-              <div className="px-tablewrap">
-                <table className="px-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Runner</th>
-                      <th scope="col">Hermes</th>
-                      <th scope="col" className="px-table__num">
-                        Running
-                      </th>
-                      <th scope="col">Uptime</th>
-                      <th scope="col">Last seen</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(runners.data ?? []).map((runner) => (
-                      <tr key={runner.id}>
-                        <td>
-                          <span className="px-agentcell">
-                            <span
-                              className={`px-runnerline__dot${
-                                runner.stale
-                                  ? ' px-runnerline__dot--stale'
-                                  : runner.hermes_ok === false
-                                    ? ' px-runnerline__dot--warn'
-                                    : ''
-                              }`}
-                              aria-hidden="true"
-                            />
-                            <span className="px-cell">
-                              <span className="px-cell__primary">{runner.name}</span>
-                              <span className="px-cell__secondary">
-                                {[runner.hostname, runner.version].filter(Boolean).join(' · ') ||
-                                  '—'}
-                              </span>
-                            </span>
-                          </span>
-                        </td>
-                        <td>
-                          {/*
-                           * Null, not false, when the runner is too old to send
-                           * a heartbeat. Reporting "unreachable" for "did not
-                           * say" would be worse than saying nothing.
-                           */}
-                          {runner.hermes_ok === null ? (
-                            <Text size="small" tone="faint">
-                              not reported
-                            </Text>
-                          ) : (
-                            <span className="px-cell">
+              <Table scrollLabel="Registered runners" containerClassName="px-tablewrap">
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Runner</TableHeader>
+                    <TableHeader>Hermes</TableHeader>
+                    <TableHeader align="end">Running</TableHeader>
+                    <TableHeader>Uptime</TableHeader>
+                    <TableHeader>Last seen</TableHeader>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(runners.data ?? []).map((runner) => (
+                    <TableRow key={runner.id}>
+                      <TableCell>
+                        <span className="px-agentcell">
+                          <span
+                            className={`px-runnerline__dot${
+                              runner.stale
+                                ? ' px-runnerline__dot--stale'
+                                : runner.hermes_ok === false
+                                  ? ' px-runnerline__dot--warn'
+                                  : ''
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <TableCellContent
+                            primary={runner.name}
+                            secondary={
+                              [runner.hostname, runner.version].filter(Boolean).join(' · ') || '—'
+                            }
+                          />
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {/*
+                         * Null, not false, when the runner is too old to send
+                         * a heartbeat. Reporting "unreachable" for "did not
+                         * say" would be worse than saying nothing.
+                         */}
+                        {runner.hermes_ok === null ? (
+                          <Text size="small" tone="faint">
+                            not reported
+                          </Text>
+                        ) : (
+                          <TableCellContent
+                            primary={
                               <Badge tone={runner.hermes_ok ? 'success' : 'danger'}>
                                 {runner.hermes_ok ? 'reachable' : 'unreachable'}
                               </Badge>
-                              <span className="px-cell__secondary">
-                                {runner.hermes_detail ?? ''}
-                              </span>
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-table__num">
-                          <Text size="small" tone="soft">
-                            {runner.active_runs ?? '—'}
-                          </Text>
-                        </td>
-                        <td>
-                          <Text size="small" tone="soft">
-                            {runner.started_at ? uptime(runner.started_at, now) : '—'}
-                          </Text>
-                        </td>
-                        <td>
-                          <span className="px-cell">
-                            <span
-                              className="px-cell__secondary"
-                              style={{ color: 'var(--bits-text-soft)' }}
-                            >
+                            }
+                            secondary={runner.hermes_detail ?? ''}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell align="end">
+                        <Text size="small" tone="soft">
+                          {runner.active_runs ?? '—'}
+                        </Text>
+                      </TableCell>
+                      <TableCell>
+                        <Text size="small" tone="soft">
+                          {runner.started_at ? uptime(runner.started_at, now) : '—'}
+                        </Text>
+                      </TableCell>
+                      <TableCell>
+                        <TableCellContent
+                          primary={
+                            <Text size="caption" tone="soft">
                               {relativeTime(runner.last_seen_at, now)}
-                            </span>
-                            {runner.stale ? (
-                              <span className="px-cell__secondary">stale</span>
-                            ) : null}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                            </Text>
+                          }
+                          secondary={runner.stale ? 'stale' : undefined}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </Section>
 

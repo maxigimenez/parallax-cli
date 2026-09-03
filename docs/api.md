@@ -414,6 +414,7 @@ GET  /v1/runs?status=failed&limit=50
 GET  /v1/runs/:id
 GET  /v1/runs/:id/events?since=<ms>&limit=500
 POST /v1/runs                { "event": { … } }   queue a manual dispatch
+POST /v1/runs                { "agentProfile", "prompt" }   run one agent directly
 POST /v1/runs/:id/cancel
 POST /v1/resync                                   make the runner reload config
 ```
@@ -424,6 +425,40 @@ interval.
 
 Statuses: `queued`, `running`, `awaiting_approval`, `completed`, `failed`, `canceled`.
 `awaiting_approval` still occupies its agent.
+
+### Starting an agent on your own prompt
+
+`POST /v1/runs` takes two shapes, and exactly one per request. Sending both is a `400`:
+they answer different questions, and guessing which was meant would start the wrong
+agent on the wrong work.
+
+```http
+POST /v1/runs
+{
+  "agentProfile": "product",
+  "prompt": "Audit the billing export and report anything odd.",
+  "runnerId": "rnr_…",        // optional; the agent already implies one
+  "title": "Billing audit"    // optional; the prompt's first line otherwise
+}
+```
+
+- `{ "event": … }` synthesises a trigger and puts it through the rule engine, so it
+  starts whichever agent a **route** would have started.
+- `{ "agentProfile", "prompt" }` starts one named agent on your text, with **no route
+  and no trigger**. Nothing is matched, nothing is claimed in the dispatch ledger, and
+  no label is moved or comment posted — there is no ticket to move one on.
+
+The agent is resolved against the registry before anything is queued, so an agent that
+is unknown (`404`) or disabled (`409`) fails here rather than becoming a command no
+runner ever answers. Prompts are capped at 20,000 characters.
+
+The resulting run is an ordinary run: it appears in `GET /v1/runs`, mirrors to Slack,
+and can be cancelled. It records `trigger_type: "manual"` and `route_name: "manual
+run"`, because there was no route and inventing a plausible id would be worse than
+saying so.
+
+One agent still runs at a time. A manual run against a busy agent is **refused** rather
+than deferred — nothing will retry it, so the caller is owed the reason.
 
 ---
 
@@ -509,8 +544,8 @@ POST  /v1/runner/heartbeat                periodic health, once per poll cycle
 PUT   /v1/runner/inventory                publish discovered agents
 GET   /v1/runner/projects                 pull ticket sources to watch
 GET   /v1/runner/routes                   pull enabled routes
-GET   /v1/runner/commands?cursor=&wait=   long poll, up to 30s
-POST  /v1/runner/commands/ack
+GET   /v1/runner/commands?cursor=&wait=&runner=  long poll, up to 30s
+POST  /v1/runner/commands/ack             { cursor, runner }
 POST  /v1/runner/runs                     mirror a new run
 PATCH /v1/runner/runs/:id                 mirror a status change
 POST  /v1/runner/runs/:id/events          mirror log events
@@ -519,6 +554,13 @@ POST  /v1/runner/runs/:id/events          mirror log events
 `GET /v1/runner/commands` is held open until something arrives or the window closes.
 An empty array is the normal, healthy result — not an error. This is how a runner
 behind NAT receives work without any inbound connection.
+
+Commands are **addressed**. A command carrying a `runner_id` goes only to that runner;
+one carrying none is a broadcast and goes to whoever polls. `runner=<name>` is how the
+poller says which it is, and the ack carries it for the same reason: acking by cursor
+alone would mark another runner's addressed commands delivered before it ever fetched
+them. A runner too old to send the parameter receives every broadcast, exactly as
+before, and claims nothing addressed to a machine it may not be.
 
 ---
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
+import { BrandMark } from './BrandMark.js'
 import { useSession } from '../lib/session.js'
 import { relativeTime } from '../lib/format.js'
 import type { Runner } from '../api/types.js'
@@ -139,12 +140,7 @@ function OrgControl(): ReactNode {
         aria-haspopup="menu"
         onClick={() => setOpen(!open)}
       >
-        <img
-          src="/brand/parallax-icon.svg"
-          alt=""
-          className="px-sidebar__mark"
-          aria-hidden="true"
-        />
+        <BrandMark className="px-sidebar__mark" />
         <span className="px-orgbutton__text">
           <span className="px-orgbutton__name">{name}</span>
           <span className="px-orgbutton__meta">{session?.me.key.name ?? 'organization'}</span>

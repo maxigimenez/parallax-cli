@@ -45,13 +45,35 @@ function db(): ParallaxDatabase {
   return database ?? getDatabase()
 }
 
-function stamp(level: LogLevel, message: string, runId?: string): void {
+/**
+ * When a line was written, as `2026-09-03T10:07:26.481Z`.
+ *
+ * ISO-8601 in UTC rather than a friendlier local time, because these lines are
+ * read out of `runner.stdout.log` days later and lined up against Hermes run
+ * timings and the cloud's `created_at` — both of which are UTC. A local
+ * timestamp with no offset is the one format that cannot be reconciled with
+ * either, and a log file spanning several days needs the date as much as the
+ * time.
+ */
+function timestamp(at: number = Date.now()): string {
+  return new Date(at).toISOString()
+}
+
+/**
+ * @param at When this was recorded, if that is not simply now. A run event
+ *   stamps its own time before it is persisted, and the console line has to
+ *   report that same instant -- otherwise the log and the stored event disagree
+ *   about when an error happened, which is the one thing they are both for.
+ */
+function stamp(level: LogLevel, message: string, runId?: string, at?: number): void {
   if (!currentLogLevels.includes(level)) {
     return
   }
   const icon = level === LOG_LEVEL.WARN ? LOG_ICON.warning : LOG_ICON[level]
   const prefix = runId ? chalk.dim(`[${runId}] `) : ''
-  const line = `${icon} ${prefix}${message}`
+  // The time leads the line so a `sort`, a `grep` for a date, or an eye
+  // scanning the left edge all work. Dimmed because it is context, not content.
+  const line = `${chalk.dim(timestamp(at))} ${icon} ${prefix}${message}`
   if (level === LOG_LEVEL.ERROR) {
     console.error(line)
   } else {
@@ -99,7 +121,12 @@ export const logger: Logger = {
     writeRunEvent(runId, entry)
 
     if (entry.level === RUN_LOG_LEVEL.ERROR) {
-      stamp(LOG_LEVEL.ERROR, `${entry.title ? `${entry.title}: ` : ''}${entry.message}`, runId)
+      stamp(
+        LOG_LEVEL.ERROR,
+        `${entry.title ? `${entry.title}: ` : ''}${entry.message}`,
+        runId,
+        entry.timestamp
+      )
     }
   },
 }

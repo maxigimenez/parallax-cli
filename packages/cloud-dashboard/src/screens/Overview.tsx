@@ -5,10 +5,10 @@ import { useToast } from '@16-bits-design/ui/toast'
 import { api } from '../api/endpoints.js'
 import { useKey } from '../lib/session.js'
 import { useResource } from '../lib/useResource.js'
-import { Alert } from '../components/Alert.js'
-import { EmptyState } from '../components/EmptyState.js'
+import { Alert } from '@16-bits-design/ui/alert'
+import { EmptyState } from '@16-bits-design/ui/empty-state'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel, Section } from '../components/Panel.js'
 import { RunTable } from '../components/RunTable.js'
@@ -73,7 +73,7 @@ export function Overview(): ReactNode {
       />
       <Panel caption="What your agents are doing right now">
         {runs.loading ? (
-          <Loading label="Loading runs" />
+          <Spinner label="Loading runs" />
         ) : runs.error ? (
           <ErrorPanel message={runs.error} onRetry={runs.reload} />
         ) : (

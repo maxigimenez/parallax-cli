@@ -526,3 +526,154 @@ describe('routing decisions are reported before the run', () => {
     await pending
   })
 })
+
+/**
+ * A manual prompt is the one path with no route, no trigger and no tracker item
+ * behind it. What matters is that it still produces an ordinary run — the
+ * dashboard, the cloud mirror and Slack all read the same record — while
+ * skipping every step that only makes sense for a routed one.
+ */
+describe('Dispatcher.dispatchPrompt', () => {
+  it('runs the named agent and records an ordinary completed run', async () => {
+    server = await startFakeHermes({
+      statuses: ['completed'],
+      output: 'PARALLAX_SUMMARY: Done.',
+    })
+    const dispatcher = await makeDispatcher(server)
+
+    const result = await dispatcher.dispatchPrompt({
+      agentProfile: 'product',
+      prompt: 'Summarise this week',
+    })
+
+    expect(result).toEqual({
+      outcome: 'dispatched',
+      runId: 'pxr_1',
+      status: RUN_STATUS.COMPLETED,
+    })
+    expect(db.getRun('pxr_1')).toMatchObject({
+      status: RUN_STATUS.COMPLETED,
+      agentProfile: 'product',
+      triggerType: TRIGGER_TYPE.MANUAL,
+      summary: 'Done.',
+    })
+  })
+
+  it('sends the prompt through verbatim, with no template rendering', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    // A brace pair is a route placeholder, and rendering one here would either
+    // blank it or leave a warning about an unknown variable. An operator's own
+    // text is not a template.
+    const prompt = 'Explain {{ticket.ref}} to me'
+    await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt })
+
+    expect(server.createdBodies[0]).toMatchObject({ input: prompt })
+  })
+
+  it('titles the run from the prompt when no title is given', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    await dispatcher.dispatchPrompt({
+      agentProfile: 'product',
+      prompt: 'Audit the billing export\n\nand then check the invoices',
+    })
+
+    // The first line, not the whole prompt: a run list is a column, not a page.
+    expect(db.getRun('pxr_1')?.title).toBe('Audit the billing export')
+  })
+
+  it('prefers an explicit title', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    await dispatcher.dispatchPrompt({
+      agentProfile: 'product',
+      prompt: 'Audit the billing export',
+      title: 'Billing audit',
+    })
+
+    expect(db.getRun('pxr_1')?.title).toBe('Billing audit')
+  })
+
+  it('truncates a long first line rather than storing a paragraph as a title', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'x'.repeat(200) })
+
+    const title = db.getRun('pxr_1')!.title
+    expect(title).toHaveLength(80)
+    expect(title.endsWith('…')).toBe(true)
+  })
+
+  it('refuses an unknown agent instead of starting anything', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    const result = await dispatcher.dispatchPrompt({ agentProfile: 'ghost', prompt: 'hello' })
+
+    expect(result).toMatchObject({ outcome: 'skipped', reason: 'unknown-agent' })
+    expect(db.getRun('pxr_1')).toBeUndefined()
+  })
+
+  it('refuses a disabled agent', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server, { agents: [agent({ enabled: false })] })
+
+    const result = await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'hello' })
+
+    expect(result).toMatchObject({ outcome: 'skipped', reason: 'unknown-agent' })
+  })
+
+  /**
+   * The one invariant a manual run cannot be allowed to break: Hermes corrupts
+   * a profile's memory when two runs drive it at once. A routed trigger defers
+   * and returns next cycle; nothing will retry this, so it is refused outright
+   * and the reason is reported.
+   */
+  it('refuses to start a second run on a busy agent', async () => {
+    server = await startFakeHermes({ statuses: ['running'] })
+    const dispatcher = await makeDispatcher(server, { ids: ['pxr_1', 'pxr_2'] })
+
+    const inFlight = dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'first' })
+    await vi.waitFor(() => expect(db.getRun('pxr_1')?.status).toBe(RUN_STATUS.RUNNING))
+
+    const second = await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'second' })
+
+    expect(second).toMatchObject({ outcome: 'skipped', reason: 'agent-busy' })
+    expect(db.getRun('pxr_2')).toBeUndefined()
+
+    // Let the first run finish so the fake server can shut down cleanly.
+    server.close()
+    await inFlight.catch(() => undefined)
+  })
+
+  it('claims nothing in the dispatch ledger', async () => {
+    server = await startFakeHermes({ statuses: ['completed'] })
+    const dispatcher = await makeDispatcher(server)
+
+    await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'run me' })
+
+    // The ledger stops an unchanged *ticket* re-firing every poll cycle. A
+    // person pressing the button twice means it twice, so pressing it again
+    // must not be silently swallowed as a duplicate.
+    const again = await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'run me' })
+    expect(again).toMatchObject({ outcome: 'dispatched' })
+  })
+
+  it('records a failure as a failed run rather than throwing', async () => {
+    server = await startFakeHermes({ statuses: ['failed'], runError: 'model unavailable' })
+    const dispatcher = await makeDispatcher(server)
+
+    const result = await dispatcher.dispatchPrompt({ agentProfile: 'product', prompt: 'go' })
+
+    expect(result).toMatchObject({ outcome: 'dispatched', status: RUN_STATUS.FAILED })
+    expect(db.getRun('pxr_1')).toMatchObject({
+      status: RUN_STATUS.FAILED,
+      error: 'model unavailable',
+    })
+  })
+})

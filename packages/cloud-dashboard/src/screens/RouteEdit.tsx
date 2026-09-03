@@ -12,7 +12,7 @@ import {
   toDraft,
 } from '../lib/routeDraft.js'
 import { ErrorPanel } from '../components/ErrorPanel.js'
-import { Loading } from '../components/Loading.js'
+import { Spinner } from '@16-bits-design/ui/spinner'
 import { PageHeader } from '../components/PageHeader.js'
 import { Panel } from '../components/Panel.js'
 import { RouteForm, type RouteDraft } from '../components/RouteForm.js'
@@ -87,7 +87,7 @@ export function RouteEdit(): ReactNode {
       <PageHeader title={route.data?.name ?? 'Route'} parent={{ label: 'Routes', to: '/routes' }} />
       <Panel caption={route.data ? `${route.data.trigger?.type} · ${id}` : 'Loading this route'}>
         {loading ? (
-          <Loading label="Loading route" />
+          <Spinner label="Loading route" />
         ) : failure || !route.data ? (
           <ErrorPanel message={failure ?? `Route "${id}" was not found.`} onRetry={route.reload} />
         ) : (

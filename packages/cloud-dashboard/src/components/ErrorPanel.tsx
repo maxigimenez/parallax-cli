@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button } from '@16-bits-design/ui/button'
-import { Alert } from './Alert.js'
+import { Alert } from '@16-bits-design/ui/alert'
 
 /** A failed load, with the one action that might fix it. */
 export function ErrorPanel({
