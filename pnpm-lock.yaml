@@ -57,10 +57,10 @@ importers:
         specifier: 11.2.0
         version: 11.2.0
       '@parallax/common':
-        specifier: 0.2.1
+        specifier: 0.3.0
         version: link:../common
       '@parallax/orchestrator':
-        specifier: 0.2.1
+        specifier: 0.3.0
         version: link:../orchestrator
       chalk:
         specifier: '4'
