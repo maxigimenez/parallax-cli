@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { CONFIG_VERSION, type StoredConfig } from '@parallax/common'
+import { CONFIG_VERSION, type StoredConfig } from '@sentinel0/common'
 
 const CONFIG_FILE = 'config.json'
 
@@ -50,19 +50,19 @@ export async function readConfigStore(dataDir: string): Promise<StoredConfig> {
 
   const version = typeof obj.version === 'number' ? obj.version : 1
 
-  // Parallax v1 configured one CLI agent per project against a local clone.
+  // Sentinel0 v1 configured one CLI agent per project against a local clone.
   // None of that maps onto Hermes profiles and routing rules, so rather than
   // guess at a migration we say plainly what to re-run.
   if (version < CONFIG_VERSION) {
     throw new Error(
       `Config at ${configPath} is version ${version}; this build requires version ${CONFIG_VERSION}. ` +
         `The v1 format (per-project CLI agents and local clones) has no equivalent here. ` +
-        `Move it aside and run "parallax init" to reconfigure against Hermes.`
+        `Move it aside and run "sentinel0 init" to reconfigure against Hermes.`
     )
   }
   if (version > CONFIG_VERSION) {
     throw new Error(
-      `Config at ${configPath} is version ${version}, newer than this build supports (${CONFIG_VERSION}). Upgrade parallax-cli.`
+      `Config at ${configPath} is version ${version}, newer than this build supports (${CONFIG_VERSION}). Upgrade sentinel0.`
     )
   }
 

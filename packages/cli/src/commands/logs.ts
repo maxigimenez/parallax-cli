@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { sleep, type RunLogEntry, type RunRecord } from '@parallax/common'
+import { sleep, type RunLogEntry, type RunRecord } from '@sentinel0/common'
 import { getJson, runnerUnreachable } from '../api.js'
 import type { CliContext, LogsCommandOptions } from '../types.js'
 

@@ -1,6 +1,6 @@
 # Recorded API payloads
 
-These are responses captured from a running `@parallax/cloud-api` over a real
+These are responses captured from a running `@sentinel0/cloud-api` over a real
 Postgres, not hand-written examples.
 
 That distinction is the point. Fixtures typed from `routes/user.ts` agree with it by

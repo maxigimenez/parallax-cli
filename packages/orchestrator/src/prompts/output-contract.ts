@@ -1,14 +1,14 @@
 /**
- * The one thing Parallax asks every agent to emit.
+ * The one thing Sentinel0 asks every agent to emit.
  *
- * This replaces the old PARALLAX_PR_TITLE / PARALLAX_PR_SUMMARY /
- * PARALLAX_COMMIT_MESSAGE trio, which existed so Parallax could open the pull
+ * This replaces the old SENTINEL0_PR_TITLE / SENTINEL0_PR_SUMMARY /
+ * SENTINEL0_COMMIT_MESSAGE trio, which existed so Sentinel0 could open the pull
  * request itself. Hermes agents do their own git and their own PRs now, so the
- * only thing Parallax still needs back is a human-readable summary to store on
+ * only thing Sentinel0 still needs back is a human-readable summary to store on
  * the run and post to the tracker.
  */
 
-export const SUMMARY_SENTINEL = 'PARALLAX_SUMMARY'
+export const SUMMARY_SENTINEL = 'SENTINEL0_SUMMARY'
 
 /**
  * Lines that mean the agent has stopped summarizing and started dumping.
@@ -86,7 +86,7 @@ export function summarizeFallback(output: string, maxLines = 10): string | undef
   return lines.slice(-maxLines).join('\n')
 }
 
-/** The summary Parallax records, whether or not the agent cooperated. */
+/** The summary Sentinel0 records, whether or not the agent cooperated. */
 export function resolveSummary(output: string): string | undefined {
   return extractSummary(output) ?? summarizeFallback(output)
 }

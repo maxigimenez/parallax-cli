@@ -1,5 +1,5 @@
 {
-  "name": "@parallax/cloud-api",
+  "name": "@sentinel0/cloud-api",
   "version": "0.3.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@fastify/cors": "11.2.0",
-    "@parallax/common": "workspace:*",
+    "@sentinel0/common": "workspace:*",
     "fastify": "5.7.4",
     "pg": "8.13.1"
   },

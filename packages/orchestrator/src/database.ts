@@ -8,7 +8,7 @@ import {
   type RunStatus,
   type RunUsage,
   type TriggerChanges,
-} from '@parallax/common'
+} from '@sentinel0/common'
 
 /** Members of `next` that were not in `previous`, compared case-insensitively. */
 function added(previous: string[], next: string[]): string[] {
@@ -17,15 +17,15 @@ function added(previous: string[], next: string[]): string[] {
 }
 
 export function resolveDbPath(): string {
-  if (process.env.PARALLAX_DB_PATH) {
-    return process.env.PARALLAX_DB_PATH === 'memory'
+  if (process.env.SENTINEL0_DB_PATH) {
+    return process.env.SENTINEL0_DB_PATH === 'memory'
       ? 'memory'
-      : path.resolve(process.env.PARALLAX_DB_PATH)
+      : path.resolve(process.env.SENTINEL0_DB_PATH)
   }
-  if (process.env.PARALLAX_DATA_DIR) {
-    return path.resolve(process.env.PARALLAX_DATA_DIR, 'parallax.db')
+  if (process.env.SENTINEL0_DATA_DIR) {
+    return path.resolve(process.env.SENTINEL0_DATA_DIR, 'sentinel0.db')
   }
-  return path.resolve(process.cwd(), 'parallax.db')
+  return path.resolve(process.cwd(), 'sentinel0.db')
 }
 
 function migrate(db: DatabaseSync): void {
@@ -170,7 +170,7 @@ export interface RunPatch {
   endedAt?: number
 }
 
-export class ParallaxDatabase {
+export class Sentinel0Database {
   constructor(private readonly db: DatabaseSync) {
     migrate(db)
   }
@@ -441,28 +441,28 @@ export class ParallaxDatabase {
   }
 }
 
-export function openDatabase(dbPath: string = resolveDbPath()): ParallaxDatabase {
-  return new ParallaxDatabase(new DatabaseSync(dbPath === 'memory' ? ':memory:' : dbPath))
+export function openDatabase(dbPath: string = resolveDbPath()): Sentinel0Database {
+  return new Sentinel0Database(new DatabaseSync(dbPath === 'memory' ? ':memory:' : dbPath))
 }
 
 export { isTerminalRunStatus }
 
-let singleton: ParallaxDatabase | undefined
+let singleton: Sentinel0Database | undefined
 
 /**
  * Process-wide handle, opened on first use.
  *
  * Lazy on purpose: the previous module-level `const db = new DatabaseSync(...)`
  * created a SQLite file as an import side effect, so merely importing this
- * module from a CLI command or a test wrote a stray `parallax.db` into the cwd.
+ * module from a CLI command or a test wrote a stray `sentinel0.db` into the cwd.
  * Tests should open their own with `openDatabase('memory')`.
  */
-export function getDatabase(): ParallaxDatabase {
+export function getDatabase(): Sentinel0Database {
   singleton ??= openDatabase()
   return singleton
 }
 
 /** Test seam: point the process-wide handle at an explicit database. */
-export function setDatabase(db: ParallaxDatabase): void {
+export function setDatabase(db: Sentinel0Database): void {
   singleton = db
 }

@@ -1,7 +1,7 @@
 # Deploying the control plane to Railway
 
 `packages/cloud-api` is a Fastify service over Postgres. It ships as a Docker image built
-from the repo root, because this is a pnpm workspace and `@parallax/common` is a
+from the repo root, because this is a pnpm workspace and `@sentinel0/common` is a
 workspace dependency.
 
 The `Dockerfile` lives at the **repo root** rather than beside the package it builds,
@@ -40,11 +40,11 @@ Docker build context). Linking inside `packages/cloud-api` leaves the root unlin
 `railway add` there fails with *"No linked project found"*.
 
 ```bash
-cd /path/to/parallax-cli        # repo root — do everything from here
+cd /path/to/sentinel0        # repo root — do everything from here
 
 pnpm install
-pnpm --filter @parallax/common build
-pnpm --filter @parallax/cloud-api build
+pnpm --filter @sentinel0/common build
+pnpm --filter @sentinel0/cloud-api build
 
 railway link                    # once, at the root; pick your project
 ```
@@ -213,7 +213,7 @@ that failed on Railway while succeeding locally.
 To reproduce a Railway build exactly, match its architecture:
 
 ```bash
-docker build --platform linux/amd64 -t parallax-cloud .
+docker build --platform linux/amd64 -t sentinel0-cloud .
 ```
 
 ## Adding a migration
@@ -236,7 +236,7 @@ Its builder and Dockerfile come from `.railway/railway.ts`, alongside the API's:
 const dashboard = service('dashboard', {
   build: { builder: 'DOCKERFILE', dockerfilePath: 'Dockerfile.dashboard' },
   deploy: { startCommand: 'node server.mjs', healthcheckPath: '/health' },
-  env: { PARALLAX_API_URL: preserve() },
+  env: { SENTINEL0_API_URL: preserve() },
 })
 ```
 
@@ -245,7 +245,7 @@ configuration of its own, which is how a dashboard service ends up deploying the
 control plane image — starting cleanly, passing its health check, and serving the
 wrong thing.
 
-Its only required variable is `PARALLAX_API_URL`, pointing at this service's public
+Its only required variable is `SENTINEL0_API_URL`, pointing at this service's public
 URL. It is read at runtime rather than baked into the bundle, so moving the API is a
 variable change and a restart.
 

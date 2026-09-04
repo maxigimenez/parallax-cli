@@ -1,8 +1,8 @@
-import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE, type RunLogEntry } from '@parallax/common'
+import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE, type RunLogEntry } from '@sentinel0/common'
 import type { HermesStreamEvent } from './types.js'
 
 /**
- * Maps Hermes SSE events onto Parallax run-log entries.
+ * Maps Hermes SSE events onto Sentinel0 run-log entries.
  *
  * The exact event names Hermes emits are an open assumption (plan M0), so this
  * deliberately matches on a normalized suffix rather than exact strings, and

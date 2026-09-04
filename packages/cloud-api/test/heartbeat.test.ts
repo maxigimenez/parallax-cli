@@ -7,8 +7,8 @@ beforeAll(() => {
   process.env.LOG_LEVEL = 'silent'
 })
 
-const RUNNER_KEY = 'prx_rnr_daemon'
-const USER_KEY = 'prx_usr_human'
+const RUNNER_KEY = 'snt_rnr_daemon'
+const USER_KEY = 'snt_usr_human'
 
 interface Recorded {
   sql: string

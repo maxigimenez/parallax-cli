@@ -6,7 +6,7 @@ export function printUsage(version: string): void {
   console.log(
     [
       '',
-      `  ${BRAND('parallax')} ${chalk.dim(version)}`,
+      `  ${BRAND('sentinel0')} ${chalk.dim(version)}`,
       chalk.dim('  Triggers Hermes agents from your tickets and pull requests.'),
       '',
       chalk.bold('  Setup'),

@@ -6,8 +6,8 @@ import type {
   ProjectConfig,
   RoutingRule,
   RunStatus,
-} from '@parallax/common'
-import type { ParallaxDatabase } from '../database.js'
+} from '@sentinel0/common'
+import type { Sentinel0Database } from '../database.js'
 import { readRunnerErrors } from './diagnostics.js'
 import { isAllowedBrowserOrigin } from './network-access.js'
 
@@ -18,7 +18,7 @@ export interface ApiServerDeps {
   getRoutes: () => RoutingRule[]
   reload: () => Promise<AppConfig>
   cancelRun: (runId: string) => Promise<boolean>
-  db: ParallaxDatabase
+  db: Sentinel0Database
   dataDir: string
 }
 
@@ -58,7 +58,7 @@ export async function createApiServer(deps: ApiServerDeps): Promise<FastifyInsta
     const config = deps.getConfig()
     return {
       status: 'ok',
-      version: process.env.PARALLAX_VERSION ?? 'dev',
+      version: process.env.SENTINEL0_VERSION ?? 'dev',
       projects: deps.getProjects().length,
       agents: deps.getAgents().length,
       routes: deps.getRoutes().length,

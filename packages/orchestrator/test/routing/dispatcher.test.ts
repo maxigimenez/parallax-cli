@@ -8,15 +8,15 @@ import {
   type Logger,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
-import { openDatabase, type ParallaxDatabase } from '../../src/database.js'
+} from '@sentinel0/common'
+import { openDatabase, type Sentinel0Database } from '../../src/database.js'
 import { HermesClient } from '../../src/hermes/client.js'
 import { HermesAdapter } from '../../src/hermes/adapter.js'
 import { Dispatcher, type OutcomeHandlers } from '../../src/routing/dispatcher.js'
 import { RunLifecycle } from '../../src/routing/run-lifecycle.js'
 import { startFakeHermes, type FakeHermes } from '../hermes/fake-hermes-server.js'
 
-let db: ParallaxDatabase
+let db: Sentinel0Database
 let server: FakeHermes | undefined
 let warnings: string[]
 
@@ -124,7 +124,7 @@ describe('Dispatcher.dispatch', () => {
   it('runs a matching route and records a completed run', async () => {
     server = await startFakeHermes({
       statuses: ['completed'],
-      output: 'PARALLAX_SUMMARY: Worth doing, two weeks.',
+      output: 'SENTINEL0_SUMMARY: Worth doing, two weeks.',
     })
     const outcomes = makeOutcomes()
     const dispatcher = await makeDispatcher(server, { outcomes })
@@ -149,7 +149,7 @@ describe('Dispatcher.dispatch', () => {
   it('posts the agent summary to the tracker', async () => {
     server = await startFakeHermes({
       statuses: ['completed'],
-      output: 'PARALLAX_SUMMARY: Feasible.',
+      output: 'SENTINEL0_SUMMARY: Feasible.',
     })
     const outcomes = makeOutcomes()
 
@@ -353,13 +353,13 @@ describe('Dispatcher.dispatch', () => {
 
     expect(result).toMatchObject({ outcome: 'dispatched', status: RUN_STATUS.FAILED })
     expect(db.getRun('pxr_1')).toMatchObject({ status: RUN_STATUS.FAILED, error: 'tool crashed' })
-    expect(outcomes.comments[0].body).toContain('Parallax run failed: tool crashed')
+    expect(outcomes.comments[0].body).toContain('Sentinel0 run failed: tool crashed')
   })
 
   it('does not fail a good run because an outcome handler threw', async () => {
     server = await startFakeHermes({
       statuses: ['completed'],
-      output: 'PARALLAX_SUMMARY: fine',
+      output: 'SENTINEL0_SUMMARY: fine',
     })
     const outcomes = makeOutcomes()
     outcomes.postComment = vi.fn().mockRejectedValue(new Error('linear is down'))
@@ -537,7 +537,7 @@ describe('Dispatcher.dispatchPrompt', () => {
   it('runs the named agent and records an ordinary completed run', async () => {
     server = await startFakeHermes({
       statuses: ['completed'],
-      output: 'PARALLAX_SUMMARY: Done.',
+      output: 'SENTINEL0_SUMMARY: Done.',
     })
     const dispatcher = await makeDispatcher(server)
 

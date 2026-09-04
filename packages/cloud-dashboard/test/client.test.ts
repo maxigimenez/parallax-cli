@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // before the module under test is imported.
 beforeEach(() => {
   vi.resetModules()
-  ;(window as unknown as { __PARALLAX__?: unknown }).__PARALLAX__ = {
+  ;(window as unknown as { __SENTINEL0__?: unknown }).__SENTINEL0__ = {
     apiUrl: 'https://api.example.com/',
   }
 })
@@ -33,11 +33,11 @@ describe('request', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const { request } = await load()
-    await expect(request('prx_usr_abc', '/v1/me')).resolves.toEqual({ ok: 1 })
+    await expect(request('snt_usr_abc', '/v1/me')).resolves.toEqual({ ok: 1 })
 
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://api.example.com/v1/me')
-    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer prx_usr_abc')
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer snt_usr_abc')
     // No body, so no Content-Type: some proxies reject one on a bodyless GET.
     expect((init?.headers as Record<string, string>)['Content-Type']).toBeUndefined()
   })

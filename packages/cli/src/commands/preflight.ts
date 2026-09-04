@@ -40,7 +40,7 @@ export async function runPreflight(context: CliContext): Promise<void> {
     name: 'Configuration present',
     ok: Boolean(config.hermes && config.cloud),
     required: true,
-    detail: config.hermes && config.cloud ? '~/.parallax/config.json' : 'run "parallax init"',
+    detail: config.hermes && config.cloud ? '~/.sentinel0/config.json' : 'run "sentinel0 init"',
   })
 
   if (config.hermes) {
@@ -72,7 +72,7 @@ export async function runPreflight(context: CliContext): Promise<void> {
     } catch (error: unknown) {
       detail = error instanceof Error ? error.message : String(error)
     }
-    checks.push({ name: 'Parallax cloud reachable', ok, required: true, detail })
+    checks.push({ name: 'Sentinel0 cloud reachable', ok, required: true, detail })
   }
 
   const ghInstalled = await commandSucceeds('gh', ['--version'])

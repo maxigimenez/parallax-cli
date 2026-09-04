@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import type { AgentDescriptor, RoutingRule, RunLogEntry, RunRecord } from '@parallax/common'
+import type { AgentDescriptor, RoutingRule, RunLogEntry, RunRecord } from '@sentinel0/common'
 import { authenticate, newId, parseBearer, type AuthContext } from '../auth.js'
 import type { Database } from '../db.js'
 import { notifyRunEvent } from '../notifications/slack.js'

@@ -183,7 +183,7 @@ export function Settings(): ReactNode {
               <ErrorPanel message={runners.error} onRetry={runners.reload} />
             ) : (runners.data ?? []).length === 0 ? (
               <EmptyState title="No runner has registered">
-                Start one with <code>parallax start</code> on the machine running Hermes. It
+                Start one with <code>sentinel0 start</code> on the machine running Hermes. It
                 registers itself on its first poll.
               </EmptyState>
             ) : (

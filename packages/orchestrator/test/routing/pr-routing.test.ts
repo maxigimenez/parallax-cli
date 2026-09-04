@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  PARALLAX_LABEL,
+  SENTINEL0_LABEL,
   TICKET_PROVIDER,
   TRIGGER_TYPE,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import { dedupeKey, evaluate, matchesRule } from '../../src/routing/rule-engine.js'
-import { openDatabase, type ParallaxDatabase } from '../../src/database.js'
+import { openDatabase, type Sentinel0Database } from '../../src/database.js'
 
 function rule(overrides: Partial<RoutingRule> = {}): RoutingRule {
   return {
@@ -142,28 +142,28 @@ describe('transition matching', () => {
 describe('loop guard', () => {
   it('never matches an item a run is already working on', () => {
     const anyRoute = rule({ guard: { refire: 'per-change', markers: true } })
-    expect(matchesRule(anyRoute, pr({ labels: [PARALLAX_LABEL.IN_PROGRESS] }))).toBe(false)
+    expect(matchesRule(anyRoute, pr({ labels: [SENTINEL0_LABEL.IN_PROGRESS] }))).toBe(false)
   })
 
   it('holds even for a route that opted out of markers', () => {
     // An in-flight run is never a good time to start a second one.
     const noMarkers = rule({ guard: { refire: 'per-change', markers: false } })
-    expect(matchesRule(noMarkers, pr({ labels: [PARALLAX_LABEL.IN_PROGRESS] }))).toBe(false)
+    expect(matchesRule(noMarkers, pr({ labels: [SENTINEL0_LABEL.IN_PROGRESS] }))).toBe(false)
   })
 
   it('declines an item a once-route already finished', () => {
     const once = rule({ guard: { refire: 'once', markers: true } })
-    expect(matchesRule(once, pr({ labels: [PARALLAX_LABEL.DONE] }))).toBe(false)
-    expect(matchesRule(once, pr({ labels: [PARALLAX_LABEL.FAILED] }))).toBe(false)
+    expect(matchesRule(once, pr({ labels: [SENTINEL0_LABEL.DONE] }))).toBe(false)
+    expect(matchesRule(once, pr({ labels: [SENTINEL0_LABEL.FAILED] }))).toBe(false)
   })
 
   it('lets a per-change route run again after a completed one', () => {
     const repeat = rule({ guard: { refire: 'per-change', markers: true } })
-    expect(matchesRule(repeat, pr({ labels: [PARALLAX_LABEL.DONE] }))).toBe(true)
+    expect(matchesRule(repeat, pr({ labels: [SENTINEL0_LABEL.DONE] }))).toBe(true)
   })
 
   it('defaults to once, so a route written without thinking cannot loop', () => {
-    expect(matchesRule(rule(), pr({ labels: [PARALLAX_LABEL.DONE] }))).toBe(false)
+    expect(matchesRule(rule(), pr({ labels: [SENTINEL0_LABEL.DONE] }))).toBe(false)
   })
 
   it('ignores the revision under once, so changes cannot retrigger it', () => {
@@ -204,7 +204,7 @@ describe('review-requested routing still works alongside pr_event', () => {
 })
 
 describe('observation store', () => {
-  let db: ParallaxDatabase
+  let db: Sentinel0Database
 
   beforeEach(() => {
     db = openDatabase('memory')
@@ -324,15 +324,15 @@ describe('the review cycle: request, review, re-request, review again', () => {
 
   it('still refuses to start while a round is in flight', () => {
     const event = review({
-      labels: [PARALLAX_LABEL.IN_PROGRESS],
+      labels: [SENTINEL0_LABEL.IN_PROGRESS],
       changes: changes({ reviewersAdded: ['acme-reviewer'] }),
     })
     expect(matchesRule(reviewRoute, event)).toBe(false)
   })
 
-  it('is not blocked by parallax:done from the previous round', () => {
+  it('is not blocked by sentinel0:done from the previous round', () => {
     const event = review({
-      labels: [PARALLAX_LABEL.DONE],
+      labels: [SENTINEL0_LABEL.DONE],
       revision: 'rev-3',
       changes: changes({ reviewersAdded: ['acme-reviewer'] }),
     })

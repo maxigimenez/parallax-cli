@@ -15,8 +15,8 @@ function fakeDb(rows: Array<Record<string, unknown>>): Database & { queries: str
 
 describe('generateKey', () => {
   it('encodes the scope in the visible prefix', () => {
-    expect(generateKey('runner').key).toMatch(/^prx_rnr_[0-9a-f]{48}$/)
-    expect(generateKey('user').key).toMatch(/^prx_usr_[0-9a-f]{48}$/)
+    expect(generateKey('runner').key).toMatch(/^snt_rnr_[0-9a-f]{48}$/)
+    expect(generateKey('user').key).toMatch(/^snt_usr_[0-9a-f]{48}$/)
   })
 
   it('returns a hash that matches the key and never the key itself', () => {
@@ -51,7 +51,7 @@ describe('authenticate', () => {
 
   it('resolves a valid key of the required scope', async () => {
     const db = fakeDb([activeRunnerKey])
-    await expect(authenticate(db, 'prx_rnr_x', 'runner')).resolves.toEqual({
+    await expect(authenticate(db, 'snt_rnr_x', 'runner')).resolves.toEqual({
       orgId: 'org_1',
       keyId: 'key_1',
       scope: 'runner',
@@ -79,12 +79,12 @@ describe('authenticate', () => {
 
   it('looks the key up by hash, never by the raw value', async () => {
     const db = fakeDb([activeRunnerKey])
-    await authenticate(db, 'prx_rnr_secret', 'runner')
+    await authenticate(db, 'snt_rnr_secret', 'runner')
 
     const call = (db.query as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]
     expect(String(call[0])).toContain('key_hash = $1')
-    expect((call[1] as string[])[0]).toBe(hashKey('prx_rnr_secret'))
-    expect((call[1] as string[])[0]).not.toBe('prx_rnr_secret')
+    expect((call[1] as string[])[0]).toBe(hashKey('snt_rnr_secret'))
+    expect((call[1] as string[])[0]).not.toBe('snt_rnr_secret')
   })
 })
 

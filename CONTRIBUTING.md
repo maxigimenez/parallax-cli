@@ -1,6 +1,6 @@
-# Contributing to Parallax
+# Contributing to Sentinel0
 
-Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
+Sentinel0 is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 
 ## Local prerequisites
 
@@ -15,7 +15,7 @@ Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 - `packages/orchestrator`: polling, task state machine, API.
 - `packages/ui`: dashboard and task observability.
 - `packages/common`: shared models and execution interfaces.
-- `packages/cli`: control CLI (`parallax start|stop|register|pending|logs`).
+- `packages/cli`: control CLI (`sentinel0 init|start|stop|agents|routes|runs|logs`).
 
 ## Contribution expectations
 
@@ -24,37 +24,37 @@ Parallax is a strict plan-first TypeScript monorepo (`pnpm` workspaces).
 - Add unit tests for behavior changes.
 - Keep prompt surfaces bounded to their action (plan vs execution).
 - Avoid hidden compatibility behavior. If required configuration is missing, fail fast with a clear error.
-- Use `pnpm parallax <command>` for local manual testing so development matches the published npm package entrypoint.
+- Use `pnpm sentinel0 <command>` for local manual testing so development matches the published npm package entrypoint.
 
 ## Workflow
 
 ```bash
 pnpm install
-pnpm parallax preflight
+pnpm sentinel0 preflight
 pnpm test
 pnpm build
 pnpm lint
 ```
 
-`pnpm parallax preflight` should pass before runtime changes are tested manually.
+`pnpm sentinel0 preflight` should pass before runtime changes are tested manually.
 
 ### Local runtime
 
 Use the CLI entrypoint for all local runtime checks:
 
 ```bash
-pnpm parallax start --server-api-port 3000 --server-ui-port 8080 --concurrency 2
-pnpm parallax register ./parallax.yml --env-file ./.env
-pnpm parallax pending
-pnpm parallax logs
-pnpm parallax stop
+pnpm sentinel0 start --api-port 9371 --concurrency 2
+pnpm sentinel0 agents
+pnpm sentinel0 runs
+pnpm sentinel0 logs --follow
+pnpm sentinel0 stop
 ```
 
 Do not start the orchestrator or UI directly from package-level scripts for normal development flows.
 
 ### CLI test guidance
 
-Any change to `pending` or config parsing should keep strict errors for malformed input and include/update coverage in `packages/cli/test`.
+Any change to argument or config parsing should keep strict errors for malformed input and include/update coverage in `packages/cli/test`.
 
 ### Adapter test guidance
 

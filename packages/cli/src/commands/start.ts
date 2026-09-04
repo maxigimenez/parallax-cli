@@ -12,9 +12,9 @@ const require = createRequire(import.meta.url)
 /** Locates the built runner entry point across dev and installed layouts. */
 export function resolveRunnerEntryPoint(rootDir: string): string {
   const candidates = [
-    () => require.resolve('@parallax/orchestrator/dist/orchestrator/src/index.js'),
-    () => require.resolve('@parallax/orchestrator/dist/index.js'),
-    () => require.resolve('@parallax/orchestrator'),
+    () => require.resolve('@sentinel0/orchestrator/dist/orchestrator/src/index.js'),
+    () => require.resolve('@sentinel0/orchestrator/dist/index.js'),
+    () => require.resolve('@sentinel0/orchestrator'),
   ]
   for (const candidate of candidates) {
     try {
@@ -34,7 +34,7 @@ export async function runStart(context: CliContext, options: StartCommandOptions
 
   const config = await context.loadStoredConfig()
   if (!config.hermes) {
-    throw new Error('No Hermes gateway configured. Run "parallax init" first.')
+    throw new Error('No Hermes gateway configured. Run "sentinel0 init" first.')
   }
 
   const manifestPath = path.join(dataDir, context.manifestFile)
@@ -42,7 +42,7 @@ export async function runStart(context: CliContext, options: StartCommandOptions
     const running = await context.loadRunningState()
     process.kill(running.runnerPid, 0)
     throw new Error(
-      `Parallax is already running (pid ${running.runnerPid}, port ${running.apiPort}). Run "parallax stop" first.`
+      `Sentinel0 is already running (pid ${running.runnerPid}, port ${running.apiPort}). Run "sentinel0 stop" first.`
     )
   } catch (error: unknown) {
     // ESRCH means the recorded pid is gone, so the manifest is stale.
@@ -115,12 +115,12 @@ export async function runStart(context: CliContext, options: StartCommandOptions
     )
   )
 
-  console.log(chalk.green(`Parallax runner started (pid ${pid}) on ${apiBase}`))
+  console.log(chalk.green(`Sentinel0 runner started (pid ${pid}) on ${apiBase}`))
   if (options.networkAccess) {
     console.log(
       chalk.yellow('Network access is on: the unauthenticated runner API is exposed to your LAN.')
     )
   }
-  console.log(chalk.dim('  parallax status    see what it is doing'))
-  console.log(chalk.dim('  parallax logs      follow run output'))
+  console.log(chalk.dim('  sentinel0 status    see what it is doing'))
+  console.log(chalk.dim('  sentinel0 logs      follow run output'))
 }

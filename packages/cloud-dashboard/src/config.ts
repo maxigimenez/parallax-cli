@@ -1,19 +1,19 @@
 /**
  * Where the control plane lives.
  *
- * `/env.js` sets `window.__PARALLAX__` before the bundle runs, so the URL is a
+ * `/env.js` sets `window.__SENTINEL0__` before the bundle runs, so the URL is a
  * deployment variable rather than a build artifact — the same image serves
  * staging and production. The build-time fallback exists only for `vite build`
  * previews run without a server.
  */
 declare global {
   interface Window {
-    __PARALLAX__?: { apiUrl?: string }
+    __SENTINEL0__?: { apiUrl?: string }
   }
 }
 
 function readApiUrl(): string {
-  const injected = window.__PARALLAX__?.apiUrl?.trim()
+  const injected = window.__SENTINEL0__?.apiUrl?.trim()
   const fallback = import.meta.env.VITE_API_URL?.trim()
   const url = injected || fallback || ''
   // A trailing slash would produce `//v1/runs` on every request, which some

@@ -1,7 +1,7 @@
 import type { RoutingRule } from './index.js'
 
 /**
- * Ready-made routes covering the cases Parallax actually supports.
+ * Ready-made routes covering the cases Sentinel0 actually supports.
  *
  * The dashboard renders these as starting points, so each one is a complete,
  * valid route rather than a fragment — a template a user picks and then has to
@@ -11,7 +11,7 @@ import type { RoutingRule } from './index.js'
  *
  * `placeholders` names the values a user must supply. They appear in the route
  * as `<ANGLE_BRACKETED>` tokens, deliberately unlike the `{{curly}}` prompt
- * variables Parallax fills in at dispatch: one is answered at creation time by
+ * variables Sentinel0 fills in at dispatch: one is answered at creation time by
  * a human, the other at run time by the runner.
  */
 export interface RouteTemplatePlaceholder {
@@ -40,13 +40,13 @@ const PROJECT: RouteTemplatePlaceholder = {
 const PROFILE: RouteTemplatePlaceholder = {
   token: '<AGENT_PROFILE>',
   label: 'Agent',
-  hint: 'A Hermes profile name, as shown by "parallax agents".',
+  hint: 'A Hermes profile name, as shown by "sentinel0 agents".',
 }
 
 const GITHUB_LOGIN: RouteTemplatePlaceholder = {
   token: '<AGENT_GITHUB_LOGIN>',
   label: "Agent's GitHub account",
-  hint: 'The GitHub username this agent reviews as. Set it on the profile during "parallax init".',
+  hint: 'The GitHub username this agent reviews as. Set it on the profile during "sentinel0 init".',
 }
 
 export const ROUTE_CATALOG: RouteTemplate[] = [

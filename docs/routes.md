@@ -108,22 +108,22 @@ mechanisms prevent that.
 
 ### `guard.markers`
 
-Parallax writes reserved labels around each run:
+Sentinel0 writes reserved labels around each run:
 
 | Label | Meaning |
 |---|---|
-| `parallax:in-progress` | a run is working on this now |
-| `parallax:done` | a run completed |
-| `parallax:failed` | a run failed |
+| `sentinel0:in-progress` | a run is working on this now |
+| `sentinel0:done` | a run completed |
+| `sentinel0:failed` | a run failed |
 
-Everything Parallax writes is `parallax:`-prefixed, so machine-managed labels are
+Everything Sentinel0 writes is `sentinel0:`-prefixed, so machine-managed labels are
 obvious. They are created automatically if the repository or team lacks them.
 
-**No route ever matches an item carrying `parallax:in-progress`** — unconditionally,
+**No route ever matches an item carrying `sentinel0:in-progress`** — unconditionally,
 even for a route with markers off. Starting a second agent on in-flight work is never
 wanted.
 
-A `once` route also declines anything carrying `parallax:done` or `parallax:failed`.
+A `once` route also declines anything carrying `sentinel0:done` or `sentinel0:failed`.
 **Removing that label by hand re-arms the route**, which is also how you retry
 something that failed.
 
@@ -158,15 +158,15 @@ An unrecognized placeholder is **left visible** in the prompt and logged as a wa
 never blanked — a typo silently becoming an empty string produces a confidently wrong
 run.
 
-Parallax appends an instruction asking for a `PARALLAX_SUMMARY:` line, which is what
+Sentinel0 appends an instruction asking for a `SENTINEL0_SUMMARY:` line, which is what
 lands in the ticket comment and the Slack message. If your prompt already mentions
-`PARALLAX_SUMMARY`, yours is used as written.
+`SENTINEL0_SUMMARY`, yours is used as written.
 
 `GET /v1/prompt-templates` returns starter prompts and this variable list.
 
 ### Let the agent fetch its own context
 
-Parallax does not inline diffs or comment threads. The agent has `gh` and its own
+Sentinel0 does not inline diffs or comment threads. The agent has `gh` and its own
 credentials — tell it what to read:
 
 ```
@@ -176,14 +176,14 @@ Read it yourself:
 ```
 
 This is the same boundary that keeps git, worktrees and pull requests on the Hermes
-side: Parallax decides *when, which agent, and with what context*; the agent does the
+side: Sentinel0 decides *when, which agent, and with what context*; the agent does the
 work with the tools it already has.
 
 ---
 
 ## Outcomes
 
-What Parallax does after the run:
+What Sentinel0 does after the run:
 
 ```jsonc
 "outcome": {
@@ -193,7 +193,7 @@ What Parallax does after the run:
 ```
 
 `postComment` posts the agent's summary — **and posts on failure too**, which is why it
-belongs to Parallax rather than the agent: a run that failed cannot report on its own
+belongs to Sentinel0 rather than the agent: a run that failed cannot report on its own
 behalf.
 
 There is no `openPullRequest` outcome. Branches, commits and pull requests belong to
@@ -249,12 +249,12 @@ pause, unlabel to resume.
 poll: 12 event(s) (taplands 12) · dispatched 1 · skipped 11 (no-route 10, duplicate 1)
 ```
 
-`0 event(s)` means the item was never fetched: no projects (`parallax projects`), or
+`0 event(s)` means the item was never fetched: no projects (`sentinel0 projects`), or
 the project's `filters` excluded it. `no-route` means it was fetched and nothing
-matched. `unknown-agent` means the route names a profile absent from `parallax agents`.
+matched. `unknown-agent` means the route names a profile absent from `sentinel0 agents`.
 
 **It fired once and never again.** That is `refire: "once"`. The item now carries
-`parallax:done` — remove it to re-arm, or switch to `per-change` with a transition
+`sentinel0:done` — remove it to re-arm, or switch to `per-change` with a transition
 clause.
 
 **A transition route never fires.** It needs a prior observation. Add and remove the

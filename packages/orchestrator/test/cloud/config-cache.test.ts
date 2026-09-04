@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { TICKET_PROVIDER, type ProjectConfig } from '@parallax/common'
+import { TICKET_PROVIDER, type ProjectConfig } from '@sentinel0/common'
 import {
   loadCachedProjects,
   loadCachedRoutes,
@@ -13,7 +13,7 @@ import {
 let dataDir = ''
 
 beforeEach(async () => {
-  dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-cache-'))
+  dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sentinel0-cache-'))
 })
 
 afterEach(async () => {

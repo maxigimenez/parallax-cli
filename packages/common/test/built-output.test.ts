@@ -8,7 +8,7 @@ const dist = path.resolve(import.meta.dirname, '../dist/index.js')
 /**
  * Imports the compiled package rather than the source.
  *
- * Every other test aliases `@parallax/common` to `src/`, which resolves module
+ * Every other test aliases `@sentinel0/common` to `src/`, which resolves module
  * cycles differently from the real ESM graph. A circular import that throws a
  * TDZ error on load therefore passes the whole suite and only fails once the
  * container starts. This is the guard against that.
@@ -20,7 +20,7 @@ describe('the built package', () => {
     expect(Array.isArray(built.ROUTE_CATALOG)).toBe(true)
     expect(Array.isArray(built.PROMPT_CATALOG)).toBe(true)
     expect(typeof built.validateRoutingRule).toBe('function')
-    expect(typeof built.isParallaxLabel).toBe('function')
+    expect(typeof built.isSentinel0Label).toBe('function')
   })
 
   it.skipIf(!existsSync(dist))(

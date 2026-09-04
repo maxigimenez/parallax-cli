@@ -305,7 +305,7 @@ export interface RouteGuard {
    */
   refire: 'once' | 'per-change'
   /**
-   * Apply `parallax:` marker labels around the run, and skip items already
+   * Apply `sentinel0:` marker labels around the run, and skip items already
    * carrying one. Markers make an in-flight run visible in the tracker and let
    * a human re-arm a route by removing the label.
    */
@@ -364,7 +364,7 @@ export interface RunRecord {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Configuration (~/.parallax/config.json)
+// Configuration (~/.sentinel0/config.json)
 // ─────────────────────────────────────────────────────────────
 
 export interface HermesProfileConfig {
@@ -436,30 +436,30 @@ export const MAX_CONCURRENT_RUNS_PER_AGENT = 1
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Namespace Parallax writes into.
+ * Namespace Sentinel0 writes into.
  *
- * Everything Parallax applies to a ticket or pull request is prefixed, so it is
+ * Everything Sentinel0 applies to a ticket or pull request is prefixed, so it is
  * obvious in the tracker which labels are machine-managed, and so a human can
  * clear them to re-arm a route.
  */
-export const PARALLAX_LABEL_PREFIX = 'parallax:'
+export const SENTINEL0_LABEL_PREFIX = 'sentinel0:'
 
-export const PARALLAX_LABEL = {
-  IN_PROGRESS: 'parallax:in-progress',
-  DONE: 'parallax:done',
-  FAILED: 'parallax:failed',
+export const SENTINEL0_LABEL = {
+  IN_PROGRESS: 'sentinel0:in-progress',
+  DONE: 'sentinel0:done',
+  FAILED: 'sentinel0:failed',
 } as const
 
-export type ParallaxLabel = (typeof PARALLAX_LABEL)[keyof typeof PARALLAX_LABEL]
+export type Sentinel0Label = (typeof SENTINEL0_LABEL)[keyof typeof SENTINEL0_LABEL]
 
-export const PARALLAX_LABELS: ParallaxLabel[] = [
-  PARALLAX_LABEL.IN_PROGRESS,
-  PARALLAX_LABEL.DONE,
-  PARALLAX_LABEL.FAILED,
+export const SENTINEL0_LABELS: Sentinel0Label[] = [
+  SENTINEL0_LABEL.IN_PROGRESS,
+  SENTINEL0_LABEL.DONE,
+  SENTINEL0_LABEL.FAILED,
 ]
 
-export function isParallaxLabel(label: string): boolean {
-  return label.trim().toLowerCase().startsWith(PARALLAX_LABEL_PREFIX)
+export function isSentinel0Label(label: string): boolean {
+  return label.trim().toLowerCase().startsWith(SENTINEL0_LABEL_PREFIX)
 }
 
 export const DEFAULT_ROUTE_GUARD: RouteGuard = { refire: 'once', markers: true }

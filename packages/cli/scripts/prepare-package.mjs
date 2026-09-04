@@ -13,10 +13,10 @@ const cliPackageJsonPath = path.join(cliDir, 'package.json')
 
 const bundledPackages = [
   {
-    name: '@parallax/common',
+    name: '@sentinel0/common',
     sourceDir: path.join(workspaceRoot, 'packages/common'),
     packageJson: {
-      name: '@parallax/common',
+      name: '@sentinel0/common',
       version: '0.0.4',
       type: 'module',
       main: './dist/index.js',
@@ -34,10 +34,10 @@ const bundledPackages = [
     },
   },
   {
-    name: '@parallax/orchestrator',
+    name: '@sentinel0/orchestrator',
     sourceDir: path.join(workspaceRoot, 'packages/orchestrator'),
     packageJson: {
-      name: '@parallax/orchestrator',
+      name: '@sentinel0/orchestrator',
       version: '0.0.4',
       type: 'module',
     },
@@ -103,7 +103,7 @@ async function writeBundledPackage(metadata) {
  * Each bundled package is written a minimal manifest with no `dependencies`, so
  * npm never learns that the orchestrator needs p-limit, fastify and the rest.
  * The host package is the only place they can be declared, and if they are not,
- * the install succeeds and the first `parallax start` dies with
+ * the install succeeds and the first `sentinel0 start` dies with
  * ERR_MODULE_NOT_FOUND. That shipped in 0.2.0.
  *
  * The same rule is asserted in `test/bundled-dependencies.test.ts`, which runs
@@ -116,7 +116,7 @@ function assertBundledDependenciesAreDeclared(cliPackageJson) {
   for (const metadata of bundledPackages) {
     const source = JSON.parse(readFileSync(path.join(metadata.sourceDir, 'package.json'), 'utf8'))
     for (const [name, range] of Object.entries(source.dependencies ?? {})) {
-      if (name.startsWith('@parallax/')) {
+      if (name.startsWith('@sentinel0/')) {
         continue
       }
       if (!declared[name]) {
@@ -138,9 +138,9 @@ function assertBundledDependenciesAreDeclared(cliPackageJson) {
 }
 
 async function main() {
-  runPnpm(['--filter', '@parallax/common', 'build'])
-  runPnpm(['--filter', '@parallax/orchestrator', 'build'])
-  runPnpm(['--filter', 'parallax-cli', 'build'])
+  runPnpm(['--filter', '@sentinel0/common', 'build'])
+  runPnpm(['--filter', '@sentinel0/orchestrator', 'build'])
+  runPnpm(['--filter', 'sentinel0', 'build'])
 
   const cliPackageJson = JSON.parse(await fs.readFile(cliPackageJsonPath, 'utf8'))
   assertBundledDependenciesAreDeclared(cliPackageJson)
@@ -159,8 +159,8 @@ async function main() {
     ...cliPackageJson,
     dependencies: {
       ...cliPackageJson.dependencies,
-      '@parallax/common': bundledPackages[0].packageJson.version,
-      '@parallax/orchestrator': bundledPackages[1].packageJson.version,
+      '@sentinel0/common': bundledPackages[0].packageJson.version,
+      '@sentinel0/orchestrator': bundledPackages[1].packageJson.version,
     },
   }
   await fs.writeFile(cliPackageJsonPath, JSON.stringify(rewrittenCliPackageJson, null, 2) + '\n')

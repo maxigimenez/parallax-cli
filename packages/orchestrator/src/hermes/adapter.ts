@@ -1,10 +1,10 @@
-import { RUN_STATUS, type Logger, type RunStatus, type RunUsage } from '@parallax/common'
+import { RUN_STATUS, type Logger, type RunStatus, type RunUsage } from '@sentinel0/common'
 import type { HermesClient } from './client.js'
 import { mapHermesEvent, extractText } from './event-mapper.js'
 import { isHermesTerminalStatus, type HermesCapabilities, type HermesRunState } from './types.js'
 
 export interface HermesRunJob {
-  /** Parallax run id — used for log correlation, not sent to Hermes. */
+  /** Sentinel0 run id — used for log correlation, not sent to Hermes. */
   runId: string
   prompt: string
   instructions?: string
@@ -36,7 +36,7 @@ export interface HermesAdapterOptions {
 
 const DEFAULT_POLL_INTERVAL_MS = 3_000
 
-/** Hermes says "cancelled"; Parallax says "canceled". Normalize once. */
+/** Hermes says "cancelled"; Sentinel0 says "canceled". Normalize once. */
 export function mapHermesStatus(status: string): RunStatus {
   const normalized = status.toLowerCase()
   if (normalized.includes('approval')) {

@@ -113,7 +113,7 @@ export function Overview(): ReactNode {
 
             {count('failed') > 0 ? (
               <Alert tone="warning" title="Some runs failed">
-                A failed run keeps its <code>parallax:failed</code> label, which stops its route
+                A failed run keeps its <code>sentinel0:failed</code> label, which stops its route
                 firing again. Remove the label on the ticket or pull request to re-arm it.
               </Alert>
             ) : null}

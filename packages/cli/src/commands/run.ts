@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { sleep } from '@parallax/common'
+import { sleep } from '@sentinel0/common'
 import type { CliContext, RunCommandOptions } from '../types.js'
 
 interface RunState {
@@ -35,13 +35,13 @@ function textOf(value: unknown): string {
  *
  * A deliberate shortcut around routes, triggers, and the dispatcher: when
  * something is wrong on the Mac Mini, this answers "can this machine drive that
- * agent at all?" without any Parallax logic in the way. It talks to Hermes
+ * agent at all?" without any Sentinel0 logic in the way. It talks to Hermes
  * directly rather than through the runner, so it works while the runner is down.
  */
 export async function runSmokeTest(context: CliContext, options: RunCommandOptions): Promise<void> {
   const config = await context.loadStoredConfig()
   if (!config.hermes) {
-    throw new Error('No Hermes gateway configured. Run "parallax init" first.')
+    throw new Error('No Hermes gateway configured. Run "sentinel0 init" first.')
   }
 
   const profile = config.hermes.profiles.find((entry) => entry.name === options.agent)

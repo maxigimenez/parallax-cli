@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import { spawn } from 'node:child_process'
-import { sleep } from '@parallax/common'
+import { sleep } from '@sentinel0/common'
 
 export type SpinnerController = {
   stop: () => void

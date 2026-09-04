@@ -10,8 +10,8 @@ export interface AuthContext {
 }
 
 const PREFIXES: Record<KeyScope, string> = {
-  runner: 'prx_rnr_',
-  user: 'prx_usr_',
+  runner: 'snt_rnr_',
+  user: 'snt_usr_',
 }
 
 export function hashKey(key: string): string {

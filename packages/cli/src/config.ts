@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import fsSync from 'node:fs'
 import path from 'node:path'
-import { CONFIG_VERSION, type StoredConfig } from '@parallax/common'
+import { CONFIG_VERSION, type StoredConfig } from '@sentinel0/common'
 import type { RunningState } from './types.js'
 
 export function resolveCliRoot(startDir: string): string {
@@ -11,10 +11,10 @@ export function resolveCliRoot(startDir: string): string {
     const packageJsonPath = path.join(current, 'package.json')
     if (fsSync.existsSync(packageJsonPath)) {
       const content = JSON.parse(fsSync.readFileSync(packageJsonPath, 'utf8'))
-      if (content.name === 'parallax') {
+      if (content.name === 'sentinel0') {
         return current
       }
-      if (content.name === 'parallax-cli') {
+      if (content.name === 'sentinel0') {
         cliPackageRoot = current
       }
     }
@@ -77,7 +77,7 @@ export async function loadRunningState(
 ): Promise<RunningState> {
   const manifestPath = path.join(dataDir, manifestFile)
   if (!(await ensureFileExists(manifestPath))) {
-    throw new Error(`No running instance found at ${manifestPath}. Run parallax start first.`)
+    throw new Error(`No running instance found at ${manifestPath}. Run sentinel0 start first.`)
   }
 
   return parseRunningState(await fs.readFile(manifestPath, 'utf8'), manifestPath)
@@ -110,7 +110,7 @@ function parseStoredConfigFromDisk(raw: string, source: string): StoredConfig {
   if (version !== CONFIG_VERSION) {
     throw new Error(
       `Config at ${source} is version ${version}; this CLI requires version ${CONFIG_VERSION}. ` +
-        `Move it aside and run "parallax init".`
+        `Move it aside and run "sentinel0 init".`
     )
   }
 

@@ -1,7 +1,7 @@
 /**
  * The shapes `packages/cloud-api` actually returns.
  *
- * Declared here rather than imported from `@parallax/common` on purpose: those
+ * Declared here rather than imported from `@sentinel0/common` on purpose: those
  * are the runner's internal types, and several fields the API returns are
  * snake_case Postgres columns that never appear in them. Coupling the browser
  * bundle to the orchestrator's type spine would also drag Node-only

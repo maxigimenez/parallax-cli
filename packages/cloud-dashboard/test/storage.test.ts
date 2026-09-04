@@ -9,8 +9,8 @@ afterEach(() => {
 describe('stored key', () => {
   it('round-trips through localStorage', () => {
     expect(readStoredKey()).toBeUndefined()
-    writeStoredKey('prx_usr_abc')
-    expect(readStoredKey()).toBe('prx_usr_abc')
+    writeStoredKey('snt_usr_abc')
+    expect(readStoredKey()).toBe('snt_usr_abc')
     clearStoredKey()
     expect(readStoredKey()).toBeUndefined()
   })
@@ -30,7 +30,7 @@ describe('stored key', () => {
       },
     })
 
-    expect(() => writeStoredKey('prx_usr_abc')).not.toThrow()
+    expect(() => writeStoredKey('snt_usr_abc')).not.toThrow()
     expect(readStoredKey()).toBeUndefined()
     expect(() => clearStoredKey()).not.toThrow()
   })

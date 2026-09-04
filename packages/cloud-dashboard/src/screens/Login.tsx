@@ -38,7 +38,7 @@ export function Login(): ReactNode {
     } catch (cause) {
       if (cause instanceof ApiError && cause.unauthorized) {
         setError(
-          'That key was rejected. User keys start with prx_usr_ — a runner key will not work here.'
+          'That key was rejected. User keys start with snt_usr_ — a runner key will not work here.'
         )
       } else {
         setError(cause instanceof Error ? cause.message : String(cause))
@@ -80,7 +80,7 @@ export function Login(): ReactNode {
 
           {IS_CONFIGURED ? null : (
             <Alert tone="danger" title="No API URL configured">
-              This dashboard was served without <code>PARALLAX_API_URL</code>, so it has nothing to
+              This dashboard was served without <code>SENTINEL0_API_URL</code>, so it has nothing to
               sign in to. Set it on the service and redeploy.
             </Alert>
           )}
@@ -92,7 +92,7 @@ export function Login(): ReactNode {
               autoComplete="off"
               spellCheck={false}
               autoFocus
-              placeholder="prx_usr_…"
+              placeholder="snt_usr_…"
               value={value}
               onChange={(event) => {
                 setValue(event.target.value)

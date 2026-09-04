@@ -1,13 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import {
   DEFAULT_ROUTE_GUARD,
-  PARALLAX_LABELS,
+  SENTINEL0_LABELS,
   PROMPT_CATALOG,
   PROMPT_VARIABLES,
   ROUTE_CATALOG,
   validateRoutingRule,
   type RoutingRule,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import { authenticate, generateKey, newId, parseBearer, type AuthContext } from '../auth.js'
 import type { Database } from '../db.js'
 
@@ -281,9 +281,9 @@ export function registerUserRoutes(app: FastifyInstance, db: Database): void {
     defaultGuard: DEFAULT_ROUTE_GUARD,
   }))
 
-  /** Labels Parallax manages itself, for a dashboard to render distinctly. */
+  /** Labels Sentinel0 manages itself, for a dashboard to render distinctly. */
   app.get('/v1/reserved-labels', async () => ({
-    labels: PARALLAX_LABELS,
+    labels: SENTINEL0_LABELS,
     defaultGuard: DEFAULT_ROUTE_GUARD,
   }))
 

@@ -66,10 +66,10 @@ export default defineRailway(() => {
     replicas: { 'europe-west4-drams3a': 1 },
     // Read at runtime by server.mjs and served as /env.js, so pointing the
     // dashboard at a different control plane is a restart, not a rebuild.
-    env: { PARALLAX_API_URL: preserve() },
+    env: { SENTINEL0_API_URL: preserve() },
   })
 
-  return project('parallax', {
+  return project('sentinel0', {
     resources: [api, dashboard, Postgres, postgresVolume],
   })
 })

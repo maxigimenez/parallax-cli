@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(fileURLToPath(new URL('./dist', import.meta.url)))
 const PORT = Number.parseInt(process.env.PORT ?? '8080', 10)
-const API_URL = process.env.PARALLAX_API_URL ?? process.env.VITE_API_URL ?? ''
+const API_URL = process.env.SENTINEL0_API_URL ?? process.env.VITE_API_URL ?? ''
 
 const MIME = {
   '.css': 'text/css; charset=utf-8',
@@ -83,7 +83,7 @@ const server = createServer((request, response) => {
     }
 
     if (url.pathname === '/env.js') {
-      return send(response, 200, `window.__PARALLAX__=${JSON.stringify({ apiUrl: API_URL })}\n`, {
+      return send(response, 200, `window.__SENTINEL0__=${JSON.stringify({ apiUrl: API_URL })}\n`, {
         'Content-Type': 'text/javascript; charset=utf-8',
         'Cache-Control': 'no-store',
       })
@@ -114,7 +114,7 @@ const server = createServer((request, response) => {
 })
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Dashboard on :${PORT} — API ${API_URL || '(unset: set PARALLAX_API_URL)'}`)
+  console.log(`Dashboard on :${PORT} — API ${API_URL || '(unset: set SENTINEL0_API_URL)'}`)
 })
 
 const shutdown = () => server.close(() => process.exit(0))

@@ -38,8 +38,8 @@ const ROUTES: Record<string, unknown> = {
 
 beforeEach(() => {
   vi.resetModules()
-  ;(window as unknown as { __PARALLAX__?: unknown }).__PARALLAX__ = { apiUrl: 'https://api.test' }
-  window.localStorage.setItem('parallax.userKey', 'prx_usr_test')
+  ;(window as unknown as { __SENTINEL0__?: unknown }).__SENTINEL0__ = { apiUrl: 'https://api.test' }
+  window.localStorage.setItem('sentinel0.userKey', 'snt_usr_test')
 
   vi.stubGlobal(
     'fetch',
@@ -69,7 +69,7 @@ async function renderAt(path: string) {
 describe('signed-in shell', () => {
   it('restores the stored key and shows the organization', async () => {
     await renderAt('/')
-    expect(await screen.findByText('Parallax Labs')).toBeTruthy()
+    expect(await screen.findByText('Sentinel0 Labs')).toBeTruthy()
     // The nav is present, so the shell rendered rather than the login form.
     expect(screen.getByRole('navigation', { name: 'Primary' })).toBeTruthy()
   })
@@ -142,7 +142,7 @@ describe('overview', () => {
 
   it('warns that a failed run holds its label', async () => {
     await renderAt('/')
-    expect(await screen.findByText(/parallax:failed/)).toBeTruthy()
+    expect(await screen.findByText(/sentinel0:failed/)).toBeTruthy()
   })
 })
 
@@ -218,7 +218,7 @@ describe('signed out', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /unlock workspace/i })).toBeTruthy()
     )
-    expect(window.localStorage.getItem('parallax.userKey')).toBeNull()
+    expect(window.localStorage.getItem('sentinel0.userKey')).toBeNull()
   })
 })
 

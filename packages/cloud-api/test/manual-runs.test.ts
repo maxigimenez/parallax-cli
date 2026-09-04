@@ -55,8 +55,8 @@ function fakeDb(
   return { query, writes } as unknown as Database & { writes: Recorded[] }
 }
 
-const USER_KEY = 'prx_usr_test'
-const RUNNER_KEY = 'prx_rnr_test'
+const USER_KEY = 'snt_usr_test'
+const RUNNER_KEY = 'snt_rnr_test'
 const USER = { authorization: `Bearer ${USER_KEY}` }
 const RUNNER = { authorization: `Bearer ${RUNNER_KEY}` }
 

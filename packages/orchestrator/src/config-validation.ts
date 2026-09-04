@@ -6,7 +6,7 @@ import {
   type ProjectConfig,
   type StoredConfig,
   type TicketProvider,
-} from '@parallax/common'
+} from '@sentinel0/common'
 
 const ALLOWED_TICKET_PROVIDERS = [TICKET_PROVIDER.LINEAR, TICKET_PROVIDER.GITHUB] as const
 

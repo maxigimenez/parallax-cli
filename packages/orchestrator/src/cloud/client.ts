@@ -5,7 +5,7 @@ import type {
   RoutingRule,
   RunLogEntry,
   RunRecord,
-} from '@parallax/common'
+} from '@sentinel0/common'
 
 export interface RunnerCommand {
   id: string
@@ -34,7 +34,7 @@ export class CloudApiError extends Error {
     readonly path: string,
     body: string
   ) {
-    super(`Parallax cloud ${status} at ${path}: ${body.slice(0, 300)}`)
+    super(`Sentinel0 cloud ${status} at ${path}: ${body.slice(0, 300)}`)
     this.name = 'CloudApiError'
   }
 }

@@ -1,4 +1,4 @@
-# Builds @parallax/cloud-dashboard.
+# Builds @sentinel0/cloud-dashboard.
 #
 # A sibling of ./Dockerfile rather than a stage inside it: the two services are
 # deployed and scaled independently, and a shared image would rebuild and
@@ -8,7 +8,7 @@
 # service's builder and dockerfilePath. The build context is the repo root because
 # this is a pnpm workspace and the lockfile lives there.
 #
-#   docker build -f Dockerfile.dashboard -t parallax-dashboard .
+#   docker build -f Dockerfile.dashboard -t sentinel0-dashboard .
 
 # ── build ──────────────────────────────────────────────────────────────────
 # pnpm refuses to remove a node_modules directory without a TTY, and the
@@ -21,10 +21,10 @@ RUN corepack enable
 # Only the manifests first, so the dependency layer survives source edits.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/cloud-dashboard/package.json packages/cloud-dashboard/
-RUN pnpm install --frozen-lockfile --filter @parallax/cloud-dashboard...
+RUN pnpm install --frozen-lockfile --filter @sentinel0/cloud-dashboard...
 
 COPY packages/cloud-dashboard packages/cloud-dashboard
-RUN pnpm --filter @parallax/cloud-dashboard build
+RUN pnpm --filter @sentinel0/cloud-dashboard build
 
 # ── runtime ────────────────────────────────────────────────────────────────
 # No node_modules at all. server.mjs is deliberately dependency-free and the

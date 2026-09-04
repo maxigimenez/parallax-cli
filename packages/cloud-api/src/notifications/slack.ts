@@ -1,4 +1,4 @@
-import type { RunRecord } from '@parallax/common'
+import type { RunRecord } from '@sentinel0/common'
 import type { Database } from '../db.js'
 
 export type NotificationEvent =

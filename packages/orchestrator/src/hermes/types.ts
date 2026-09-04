@@ -76,7 +76,7 @@ export interface HermesStreamEvent {
 
 /**
  * Hermes run statuses, normalized. Hermes spells cancellation "cancelled";
- * Parallax uses "canceled" everywhere, so the mapping happens once, here.
+ * Sentinel0 uses "canceled" everywhere, so the mapping happens once, here.
  */
 export const HERMES_TERMINAL_STATUSES = new Set([
   'completed',

@@ -4,7 +4,7 @@ import {
   TRIGGER_TYPE,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import { dedupeKey, evaluate, matchesRule, matchesSet } from '../../src/routing/rule-engine.js'
 
 function rule(overrides: Partial<RoutingRule> = {}): RoutingRule {

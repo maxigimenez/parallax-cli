@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { RoutingRule } from '@parallax/common'
+import type { RoutingRule } from '@sentinel0/common'
 import { getJson, runnerUnreachable } from '../api.js'
 import type { CliContext } from '../types.js'
 

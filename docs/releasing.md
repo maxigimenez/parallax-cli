@@ -7,7 +7,7 @@ Four workflows. One runs on every change; three ship things.
 | [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24 |
 | [`deploy-cloud-api.yml`](../.github/workflows/deploy-cloud-api.yml) | Manual only | Deploys to Railway and waits for `/health` |
 | [`deploy-dashboard.yml`](../.github/workflows/deploy-dashboard.yml) | Manual only | Deploys to Railway and waits for `/health` |
-| [`publish-cli.yml`](../.github/workflows/publish-cli.yml) | Manual, or a published GitHub release | Verifies, packs, and publishes `parallax-cli` to npm |
+| [`publish-cli.yml`](../.github/workflows/publish-cli.yml) | Manual, or a published GitHub release | Verifies, packs, and publishes `sentinel0` to npm |
 
 ---
 
@@ -29,10 +29,10 @@ declares `^20.19.0 || >=22.12.0`. Vite is a build tool and ships in nothing, so 
 constrains where the repo can be *built*, not where the runner can run.
 
 It builds **before** typechecking and testing, and the order matters twice over.
-`cloud-api` resolves `@parallax/common` through its built `.d.ts` rather than a path
+`cloud-api` resolves `@sentinel0/common` through its built `.d.ts` rather than a path
 alias, so a typecheck against a clean tree cannot see it at all. And one suite imports
 the built package rather than the source — every other test aliases
-`@parallax/common` to `src/`, which resolves module cycles differently from the real
+`@sentinel0/common` to `src/`, which resolves module cycles differently from the real
 ESM graph. A circular import once passed the entire suite and only failed when the
 container started.
 
@@ -105,7 +105,7 @@ restarting on the Mac Mini — *unless* the deploy added an endpoint the runner 
 in which case the runner has to be updated too. Its fallback is deliberately quiet:
 
 ```bash
-grep "Could not fetch" ~/.parallax/runner.stdout.log
+grep "Could not fetch" ~/.sentinel0/runner.stdout.log
 ```
 
 ---
@@ -128,7 +128,7 @@ its config file.
    Skip it and the service falls back to Railway's own detection — which is how a
    dashboard service ends up deploying the API image, starting cleanly, and passing
    its health check while serving the wrong thing.
-3. **Variables**: `PARALLAX_API_URL`, pointing at the API service's public URL. It is
+3. **Variables**: `SENTINEL0_API_URL`, pointing at the API service's public URL. It is
    read at runtime, so changing it later is a restart rather than a rebuild.
 4. Generate a domain.
 5. Optionally add a repository *variable* `DASHBOARD_HEALTH_URL`, for the same reason
@@ -155,12 +155,12 @@ editing a variable rather than by failing the deploy.
 
 ### One-time setup
 
-`parallax-cli` publishes with **npm trusted publishing** — no `NPM_TOKEN` in GitHub.
+`sentinel0` publishes with **npm trusted publishing** — no `NPM_TOKEN` in GitHub.
 On npmjs.com, under the package's **Settings → Trusted Publisher**, set:
 
 | Field | Value |
 |---|---|
-| Repository | `maxigimenez/parallax-cli` |
+| Repository | `maxigimenez/sentinel0` |
 | Workflow | `publish-cli.yml` |
 | Environment | `npm` |
 
@@ -171,13 +171,13 @@ On npmjs.com, under the package's **Settings → Trusted Publisher**, set:
 
 ### Publishing
 
-From the Actions tab — *Publish parallax-cli → Run workflow* — or by publishing a
+From the Actions tab — *Publish sentinel0 → Run workflow* — or by publishing a
 GitHub release.
 
 Inputs:
 
 - **version** — optional. Runs `pnpm version:set`, which moves the root, every
-  `packages/*`, and the internal `@parallax/*` dependency pins together. They must move
+  `packages/*`, and the internal `@sentinel0/*` dependency pins together. They must move
   in lockstep: those packages are unpublished and the CLI links them by version, so a
   stale pin falls through to the npm registry and fails to resolve on a user's machine.
 - **dry_run** — packs, inspects and verifies without publishing.
@@ -186,10 +186,10 @@ Before publishing it runs lint, the full test suite, and a build, then checks tw
 things that only fail on a user's machine:
 
 - **the entry point is executable.** `tsc` emits `0644`, and a global install symlinks
-  `parallax` straight at the compiled file, so without the exec bit the command fails
+  `sentinel0` straight at the compiled file, so without the exec bit the command fails
   with `permission denied`. `pnpm build` sets it; this asserts it.
-- **the internal packages are in the tarball.** `@parallax/common` and
-  `@parallax/orchestrator` are bundled rather than fetched from npm, so if
+- **the internal packages are in the tarball.** `@sentinel0/common` and
+  `@sentinel0/orchestrator` are bundled rather than fetched from npm, so if
   `prepare-package.mjs` misses one the install succeeds and the command then fails at
   runtime.
 
@@ -202,7 +202,7 @@ pnpm lint && pnpm test && pnpm build
 
 cd packages/cli
 pnpm pack:tarball                     # runs prepack, then restores workspace links
-tar -tzf parallax-cli-*.tgz | head    # inspect before shipping
+tar -tzf sentinel0-*.tgz | head    # inspect before shipping
 
 pnpm publish:package
 ```
@@ -215,21 +215,21 @@ To test a tarball without publishing:
 
 ```bash
 mkdir /tmp/t && cd /tmp/t && npm init -y
-npm install /path/to/parallax-cli-0.2.0.tgz
-./node_modules/.bin/parallax --version
+npm install /path/to/sentinel0-0.2.0.tgz
+./node_modules/.bin/sentinel0 --version
 ```
 
 ---
 
 ## The CLI bundle
 
-`@parallax/common` and `@parallax/orchestrator` are unpublished. They ship *inside* the
+`@sentinel0/common` and `@sentinel0/orchestrator` are unpublished. They ship *inside* the
 tarball as `bundleDependencies`, which has one consequence worth internalising:
 
 > **A bundled package ships without its own dependencies.** `prepare-package.mjs` writes
 > each one a minimal manifest carrying no `dependencies` at all, so npm never learns
 > that the orchestrator needs `p-limit`, `fastify`, `@fastify/cors` and `strip-ansi`.
-> Nothing installs them. The install succeeds; the first `parallax start` on a user's
+> Nothing installs them. The install succeeds; the first `sentinel0 start` on a user's
 > machine dies with `ERR_MODULE_NOT_FOUND`.
 
 So **`packages/cli/package.json` must declare every third-party dependency of every

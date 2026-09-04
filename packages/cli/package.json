@@ -1,5 +1,5 @@
 {
-  "name": "parallax-cli",
+  "name": "sentinel0",
   "version": "0.3.0",
   "description": "Trigger Hermes agents from your tickets and pull requests.",
   "type": "module",
@@ -12,10 +12,10 @@
     "linear",
     "github",
     "automation",
-    "parallax"
+    "sentinel0"
   ],
   "bin": {
-    "parallax": "dist/cli/src/index.js"
+    "sentinel0": "dist/cli/src/index.js"
   },
   "scripts": {
     "build": "rm -rf dist && tsc && chmod +x dist/cli/src/index.js",
@@ -35,16 +35,16 @@
   "dependencies": {
     "@clack/prompts": "1.4.0",
     "@fastify/cors": "11.2.0",
-    "@parallax/common": "0.3.0",
-    "@parallax/orchestrator": "0.3.0",
+    "@sentinel0/common": "0.3.0",
+    "@sentinel0/orchestrator": "0.3.0",
     "chalk": "4",
     "fastify": "5.7.4",
     "p-limit": "6.1.0",
     "strip-ansi": "7.1.2"
   },
   "bundleDependencies": [
-    "@parallax/common",
-    "@parallax/orchestrator"
+    "@sentinel0/common",
+    "@sentinel0/orchestrator"
   ],
   "devDependencies": {
     "@types/node": "25.3.0",
@@ -57,6 +57,6 @@
     "dist"
   ],
   "repository": {
-    "url": "https://github.com/maxigimenez/parallax-cli"
+    "url": "https://github.com/maxigimenez/sentinel0"
   }
 }

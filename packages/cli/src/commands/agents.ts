@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { AgentDescriptor } from '@parallax/common'
+import type { AgentDescriptor } from '@sentinel0/common'
 import { getJson, runnerUnreachable } from '../api.js'
 import type { CliContext } from '../types.js'
 
@@ -12,7 +12,7 @@ export async function runAgents(context: CliContext): Promise<void> {
 
   if (agents.length === 0) {
     console.log(chalk.yellow('No agents discovered.'))
-    console.log(chalk.dim('  Check "parallax preflight" — a bad profile key hides that profile.'))
+    console.log(chalk.dim('  Check "sentinel0 preflight" — a bad profile key hides that profile.'))
     return
   }
 

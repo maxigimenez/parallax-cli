@@ -5,8 +5,8 @@ import {
   type RunRecord,
   type RunStatus,
   type RunUsage,
-} from '@parallax/common'
-import type { ParallaxDatabase } from '../database.js'
+} from '@sentinel0/common'
+import type { Sentinel0Database } from '../database.js'
 
 /**
  * Notified whenever a run is created or changes status.
@@ -32,7 +32,7 @@ export interface RunObserver {
  */
 export class RunLifecycle {
   constructor(
-    private readonly db: ParallaxDatabase,
+    private readonly db: Sentinel0Database,
     private readonly logger: Logger,
     private readonly observer: RunObserver = {}
   ) {}

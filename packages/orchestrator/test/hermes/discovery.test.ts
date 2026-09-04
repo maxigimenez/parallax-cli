@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import type { HermesConfig } from '@parallax/common'
+import type { HermesConfig } from '@sentinel0/common'
 import { discoverAgents } from '../../src/hermes/discovery.js'
 import { startFakeHermes, type FakeHermes } from './fake-hermes-server.js'
 

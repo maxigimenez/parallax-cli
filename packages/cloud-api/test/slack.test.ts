@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RUN_STATUS, TRIGGER_TYPE, type RunRecord } from '@parallax/common'
+import { RUN_STATUS, TRIGGER_TYPE, type RunRecord } from '@sentinel0/common'
 import { buildSlackMessage } from '../src/notifications/slack.js'
 
 function run(overrides: Partial<RunRecord> = {}): RunRecord {

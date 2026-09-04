@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE } from '@parallax/common'
+import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE } from '@sentinel0/common'
 import { extractText, mapHermesEvent } from '../../src/hermes/event-mapper.js'
 
 const NOW = 1_700_000_000_000

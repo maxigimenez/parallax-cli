@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto'
 import {
   DEFAULT_ROUTE_GUARD,
-  PARALLAX_LABEL,
+  SENTINEL0_LABEL,
   type RouteGuard,
   type RoutingRule,
   type StringSetMatch,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 
 export function guardOf(rule: RoutingRule): RouteGuard {
   return { ...DEFAULT_ROUTE_GUARD, ...rule.guard }
@@ -71,7 +71,7 @@ export function matchesRule(rule: RoutingRule, event: TriggerEvent): boolean {
   // is unconditional: an agent acting on an item changes it, and without this
   // the change would re-trigger the very route that started the work.
   const present = new Set(normalize(event.labels))
-  if (present.has(PARALLAX_LABEL.IN_PROGRESS)) {
+  if (present.has(SENTINEL0_LABEL.IN_PROGRESS)) {
     return false
   }
 
@@ -79,7 +79,7 @@ export function matchesRule(rule: RoutingRule, event: TriggerEvent): boolean {
   // finished. Removing the marker by hand is how a human re-arms it.
   const guard = guardOf(rule)
   if (guard.refire === 'once' && guard.markers) {
-    if (present.has(PARALLAX_LABEL.DONE) || present.has(PARALLAX_LABEL.FAILED)) {
+    if (present.has(SENTINEL0_LABEL.DONE) || present.has(SENTINEL0_LABEL.FAILED)) {
       return false
     }
   }

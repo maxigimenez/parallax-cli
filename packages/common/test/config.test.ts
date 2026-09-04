@@ -39,7 +39,7 @@ describe('configuration shape', () => {
   it('carries hermes and cloud blocks at the current version', () => {
     const config: StoredConfig = {
       version: CONFIG_VERSION,
-      cloud: { baseUrl: 'https://cloud', apiKey: 'prx_rnr_x', runnerName: 'cerebro' },
+      cloud: { baseUrl: 'https://cloud', apiKey: 'snt_rnr_x', runnerName: 'cerebro' },
       hermes: {
         baseUrl: 'http://127.0.0.1:8642',
         profiles: [{ name: 'product', apiKey: 'k', enabled: true }],

@@ -13,7 +13,7 @@
  * disabled would be a worse failure than one that simply asks for the key
  * again.
  */
-const KEY_STORAGE = 'parallax.userKey'
+const KEY_STORAGE = 'sentinel0.userKey'
 
 export function readStoredKey(): string | undefined {
   try {

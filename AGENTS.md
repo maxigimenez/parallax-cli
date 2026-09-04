@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Repository-specific Codex guidance for `parallax-cli`.
+Repository-specific Codex guidance for `sentinel0`.
 
 ## Available local skills
 
@@ -10,7 +10,7 @@ Repository-specific Codex guidance for `parallax-cli`.
 ## Trigger rules
 
 - Use `add-tests` for any non-trivial code change unless the change is purely editorial or test-only.
-- Use `update-docs` for any change that may alter how a user installs, configures, runs, approves, reviews, or understands Parallax behavior.
+- Use `update-docs` for any change that may alter how a user installs, configures, runs, approves, reviews, or understands Sentinel0 behavior.
 - If a change does not require tests or docs, say so explicitly in the final summary.
 
 ## Repo expectations

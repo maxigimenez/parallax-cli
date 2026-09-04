@@ -3,7 +3,7 @@ import { CloudClient } from '../../src/cloud/client.js'
 
 const config = {
   baseUrl: 'https://cloud.example',
-  apiKey: 'prx_rnr_test',
+  apiKey: 'snt_rnr_test',
   runnerName: 'cerebro',
 }
 
@@ -47,7 +47,7 @@ describe('CloudClient.heartbeat', () => {
   it('authenticates as the runner', async () => {
     await new CloudClient(config).heartbeat(health)
     const headers = calls[0].init.headers as Record<string, string>
-    expect(headers.authorization).toBe('Bearer prx_rnr_test')
+    expect(headers.authorization).toBe('Bearer snt_rnr_test')
     expect(headers['content-type']).toBe('application/json')
   })
 

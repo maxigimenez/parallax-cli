@@ -7,10 +7,10 @@ import {
   TRIGGER_TYPE,
   type RunLogEntry,
   type RunRecord,
-} from '@parallax/common'
-import { openDatabase, type ParallaxDatabase } from '../src/database.js'
+} from '@sentinel0/common'
+import { openDatabase, type Sentinel0Database } from '../src/database.js'
 
-let db: ParallaxDatabase
+let db: Sentinel0Database
 
 beforeEach(() => {
   db = openDatabase('memory')

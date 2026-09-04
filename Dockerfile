@@ -1,11 +1,11 @@
-# Builds @parallax/cloud-api.
+# Builds @sentinel0/cloud-api.
 #
 # Lives at the repo root, not beside the package it builds, for two reasons: the
-# build context must be the root (this is a pnpm workspace and @parallax/common
+# build context must be the root (this is a pnpm workspace and @sentinel0/common
 # is a workspace dependency), and Railway auto-detects ./Dockerfile, so no
 # builder configuration is required for a deploy to work.
 #
-#   docker build -t parallax-cloud-api .
+#   docker build -t sentinel0-cloud-api .
 
 # ── base ───────────────────────────────────────────────────────────────────
 # pnpm refuses to remove a node_modules directory without a TTY, and the
@@ -26,17 +26,17 @@ COPY packages/cloud-api/package.json packages/cloud-api/
 # tear down and rebuild node_modules, which is the step that failed on Railway.
 # Resolving the production set from scratch never removes anything.
 FROM base AS prod-deps
-RUN pnpm install --frozen-lockfile --prod --filter @parallax/cloud-api...
+RUN pnpm install --frozen-lockfile --prod --filter @sentinel0/cloud-api...
 
 # ── build ──────────────────────────────────────────────────────────────────
 FROM base AS build
-RUN pnpm install --frozen-lockfile --filter @parallax/cloud-api...
+RUN pnpm install --frozen-lockfile --filter @sentinel0/cloud-api...
 
 COPY tsconfig.base.json ./
 COPY packages/common packages/common
 COPY packages/cloud-api packages/cloud-api
 
-RUN pnpm --filter @parallax/common build && pnpm --filter @parallax/cloud-api build
+RUN pnpm --filter @sentinel0/common build && pnpm --filter @sentinel0/cloud-api build
 
 # ── runtime ────────────────────────────────────────────────────────────────
 FROM node:23-slim AS runtime

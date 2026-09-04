@@ -133,7 +133,7 @@ async function main(): Promise<void> {
       '    Use for the management API (routes, projects, Slack, runs).',
       '',
       '  runner key: ' + runnerKey,
-      '    Give this to the runner on cerebro during "parallax init".',
+      '    Give this to the runner on cerebro during "sentinel0 init".',
       '',
       'Neither key is recoverable. Store them now.',
       '',
