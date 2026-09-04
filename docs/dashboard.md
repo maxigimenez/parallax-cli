@@ -240,9 +240,10 @@ Application code uses `--bits-*` semantic variables and never hardcodes a colour
 the whole dashboard follows the theme. `src/styles.css` holds layout only: the shell,
 the sidebar, the run dialog, and the few surfaces the library does not ship.
 
-At 0.1.0 that file also carried local implementations of an alert, an empty state, a
-loading indicator, a segmented filter, a code block and a table, each filed upstream as
-an issue. **0.2.0 shipped all six**, and they are now imported rather than reimplemented:
+At `@16-bits-design/ui` 0.1.0 that file also carried local implementations of an
+alert, an empty state, a loading indicator, a segmented filter, a code block and a
+table, each filed upstream as an issue. **The library's 0.2.0 shipped all six**, and
+they are now imported rather than reimplemented:
 
 | Was | Now |
 |---|---|
@@ -295,9 +296,9 @@ The library styles bare elements — `a`, `h1`–`h6`, `p`, `code` — as defaul
 `:where()`, so they contribute no specificity and a single application class overrides
 them.
 
-That was not always true. At 0.1.0 those rules were `.bits-theme a` at specificity
-(0,1,1), which silently out-specified a one-class app rule: every breadcrumb and idle
-sidebar link rendered primary orange instead of muted grey, and every section heading
+That was not always true. At the library's 0.1.0 those rules were `.bits-theme a` at
+specificity (0,1,1), which silently out-specified a one-class app rule: every breadcrumb
+and idle sidebar link rendered primary orange instead of muted grey, and every heading
 rendered as 24px display type. It survived review because the result looks deliberate —
 an all-orange nav reads as a styling choice until you hold it next to the design.
 

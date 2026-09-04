@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 0.2.0). Leave blank to publish the current one.'
+        description: 'Version to publish (e.g. 0.0.2). Leave blank to publish the current one.'
         required: false
       dry_run:
         description: Pack and inspect without publishing
@@ -89,10 +89,10 @@ jobs:
               || { echo "::error::@sentinel0/$pkg is missing from the tarball."; exit 1; }
           done
 
-      # The check that would have caught 0.2.0. Everything above passes on a
-      # tarball whose bundled packages cannot resolve their own dependencies,
-      # because `--version` never reaches the orchestrator's entry point, so the
-      # import that fails is never evaluated.
+      # The check that would have caught parallax-cli 0.2.0. Everything above
+      # passes on a tarball whose bundled packages cannot resolve their own
+      # dependencies, because `--version` never reaches the orchestrator's entry
+      # point, so the import that fails is never evaluated.
       #
       # This installs the tarball the way a user does — a directory with no
       # workspace, no pnpm store and no hoisting — and checks that every package

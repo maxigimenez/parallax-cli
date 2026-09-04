@@ -17,7 +17,7 @@ const bundledPackages = [
     sourceDir: path.join(workspaceRoot, 'packages/common'),
     packageJson: {
       name: '@sentinel0/common',
-      version: '0.0.4',
+      version: '0.0.0', // overwritten below, from the workspace manifest
       type: 'module',
       main: './dist/index.js',
       types: './dist/index.d.ts',
@@ -38,7 +38,7 @@ const bundledPackages = [
     sourceDir: path.join(workspaceRoot, 'packages/orchestrator'),
     packageJson: {
       name: '@sentinel0/orchestrator',
-      version: '0.0.4',
+      version: '0.0.0', // overwritten below, from the workspace manifest
       type: 'module',
     },
   },
@@ -104,7 +104,7 @@ async function writeBundledPackage(metadata) {
  * npm never learns that the orchestrator needs p-limit, fastify and the rest.
  * The host package is the only place they can be declared, and if they are not,
  * the install succeeds and the first `sentinel0 start` dies with
- * ERR_MODULE_NOT_FOUND. That shipped in 0.2.0.
+ * ERR_MODULE_NOT_FOUND. That shipped in `parallax-cli` 0.2.0.
  *
  * The same rule is asserted in `test/bundled-dependencies.test.ts`, which runs
  * on every PR. This is the last gate before a tarball is written.

@@ -196,7 +196,7 @@ things that only fail on a user's machine:
 ### Doing it by hand
 
 ```bash
-pnpm version:set 0.3.0                 # every package, and the cli's internal pins
+pnpm version:set 0.0.2                 # every package, and the cli's internal pins
 pnpm install --lockfile-only           # the lockfile records those pins
 pnpm lint && pnpm test && pnpm build
 
@@ -215,7 +215,7 @@ To test a tarball without publishing:
 
 ```bash
 mkdir /tmp/t && cd /tmp/t && npm init -y
-npm install /path/to/sentinel0-0.2.0.tgz
+npm install /path/to/sentinel0-0.0.1.tgz
 ./node_modules/.bin/sentinel0 --version
 ```
 
@@ -243,9 +243,9 @@ package it bundles**, at the same version. Three things enforce it:
   checks that every package the bundled code imports is actually there.
 
 That last one is the only check that sees the tarball the way a user does. It exists
-because 0.2.0 shipped broken past a pack-install-and-run test: `--version` and
-`preflight` never reach the orchestrator's entry point, so the import that fails is
-never evaluated.
+because `parallax-cli` 0.2.0 — this package under its former name — shipped broken
+past a pack-install-and-run test: `--version` and `preflight` never reach the
+orchestrator's entry point, so the import that fails is never evaluated.
 
 ### Adding another internal package
 
