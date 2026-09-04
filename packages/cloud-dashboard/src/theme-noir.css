@@ -1,0 +1,69 @@
+/*
+ * Noir — the dashboard's own theme.
+ *
+ * `@16-bits-design/ui` ships `ember` (orange) and `ocean` (cyan), and takes any
+ * other name as a custom theme: `ThemeProvider` writes it to `data-bits-theme`,
+ * and everything the library draws reads `--bits-*` from whatever that selector
+ * defines. So a theme is a palette and nothing else — no build step, no
+ * JavaScript, no fork.
+ *
+ * Only colour is redefined here. Geometry, type and spacing come from the
+ * library's `:root` block, because those are the visual language rather than
+ * the palette, and a theme that moved them would stop looking like this system.
+ *
+ * Noir is neutral where its predecessor was purple: the surfaces carry no hue
+ * at all, and the violet appears only where something is interactive. That is
+ * what makes the red core of the sentinel0 mark, and a failed run, the two
+ * things on screen with any warmth in them.
+ *
+ * The ramp is calibrated against ember's rather than picked by eye: each text
+ * step lands within a few tenths of the corresponding ember step's contrast
+ * against `--bits-panel` (17.0 / 10.5 / 7.3 / 5.2 / 3.6, versus ember's
+ * 15.6 / 10.4 / 7.3 / 5.3 / 3.4). Body text clears 4.5:1 and the accent clears
+ * it at 6.0:1; `--bits-text-faint` sits at 3.6:1 and is only ever used for
+ * de-emphasised labels, exactly as it is in the built-in themes.
+ */
+[data-bits-theme='noir'] {
+  --bits-surface: #08080a;
+  --bits-panel: #101013;
+  --bits-raised: #15151a;
+  --bits-muted: #1e1e24;
+  --bits-line: #2a2a31;
+  --bits-line-strong: #3b3b45;
+
+  /*
+   * The foreground on a primary-filled surface — a badge, a segmented option,
+   * a primary button. Ocean leaves this inherited from ember, where it is a
+   * warm brown; against violet that reads as a mistake, so it is set here. It
+   * is a step off `--bits-surface` rather than equal to it, so a filled control
+   * sitting directly on the page background still has an edge.
+   */
+  --bits-ink: #0a0a0c;
+
+  --bits-primary: #9b7fe8;
+  --bits-primary-soft: #c7b4ff;
+  --bits-primary-shadow: #3d2b7a;
+
+  --bits-amber: #f0913a;
+  --bits-success: #46d39b;
+
+  /*
+   * Red, not the rose that would sit more comfortably beside the accent. A
+   * failed run has to read as failed at a glance, and a danger colour close to
+   * the primary reads as a second accent instead. `--bits-danger` is a fill
+   * behind `--bits-ink`; `--bits-danger-soft` is the tone danger *text* uses,
+   * because the fill on its own only reaches 4.5:1.
+   */
+  --bits-danger: #e23e22;
+  --bits-danger-soft: #ff8f75;
+  --bits-danger-shadow: #7a1a0d;
+
+  --bits-text: #f2f2f4;
+  --bits-text-soft: #c0c0c8;
+  --bits-text-dim: #a0a0aa;
+  --bits-text-muted: #85858f;
+  --bits-text-faint: #6b6b76;
+
+  --bits-shadow: rgba(0, 0, 0, 0.5);
+  --bits-backdrop: rgba(8, 8, 10, 0.72);
+}

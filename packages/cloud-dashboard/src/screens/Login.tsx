@@ -56,8 +56,8 @@ export function Login(): ReactNode {
             <div className="px-login__brand">
               <BrandMark className="px-sidebar__mark" />
               <img
-                src="/brand/parallax-wordmark.svg"
-                alt="Parallax"
+                src="/brand/sentinel0-wordmark.svg"
+                alt="sentinel0"
                 className="px-sidebar__wordmark"
               />
             </div>
@@ -117,7 +117,7 @@ export function Login(): ReactNode {
           </div>
         </div>
         <div className="px-login__foot">
-          <span>parallax_</span>
+          <span>sentinel0_</span>
           <span style={{ textTransform: 'none', letterSpacing: '0.04em' }}>
             {API_URL || 'no api url'}
           </span>
