@@ -5,16 +5,16 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "paths": {
-      "@parallax/common": [
+      "@sentinel0/common": [
         "packages/common/src/index.ts"
       ],
-      "@parallax/common/executor": [
+      "@sentinel0/common/executor": [
         "packages/common/src/executor.ts"
       ],
-      "@parallax/orchestrator": [
+      "@sentinel0/orchestrator": [
         "packages/orchestrator/src/index.ts"
       ],
-      "@parallax/cloud-api": [
+      "@sentinel0/cloud-api": [
         "packages/cloud-api/src/index.ts"
       ]
     },

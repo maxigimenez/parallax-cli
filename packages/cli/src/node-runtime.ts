@@ -11,10 +11,10 @@ import path from 'node:path'
 const require = createRequire(import.meta.url)
 
 /**
- * Finding a Node that can actually run Parallax.
+ * Finding a Node that can actually run Sentinel0.
  *
  * Installing globally under a version manager scopes the command to whichever
- * Node was active at install time. Switch versions and `parallax` either
+ * Node was active at install time. Switch versions and `sentinel0` either
  * vanishes from PATH or — worse — runs under an interpreter that cannot load
  * `node:sqlite`, failing deep inside the database layer with an error that says
  * nothing about Node versions.
@@ -29,7 +29,7 @@ const require = createRequire(import.meta.url)
 export const SQLITE_FLAG = '--experimental-sqlite'
 
 /** Set on a re-exec so a broken probe cannot loop forever. */
-const REEXEC_GUARD = 'PARALLAX_RUNTIME_REEXEC'
+const REEXEC_GUARD = 'SENTINEL0_RUNTIME_REEXEC'
 
 /**
  * Script a candidate must run to prove it is a Node with node:sqlite.
@@ -40,7 +40,7 @@ const REEXEC_GUARD = 'PARALLAX_RUNTIME_REEXEC'
  * like `/bin/echo`. Only a process that actually evaluated this can print a
  * value it was never given on the command line.
  */
-const PROBE_ENV = 'PARALLAX_PROBE_NONCE'
+const PROBE_ENV = 'SENTINEL0_PROBE_NONCE'
 const PROBE = `if (typeof require("node:sqlite").DatabaseSync === "function") console.log(process.env.${PROBE_ENV})`
 
 export function currentRuntimeIsCapable(): boolean {
@@ -229,14 +229,14 @@ export function resolveRunnerNode(dataDir: string): ResolvedRuntime {
 
 export function unsupportedRuntimeMessage(afterReexec = false): string {
   return [
-    `This Node (${process.version}) cannot load node:sqlite, which Parallax needs.`,
+    `This Node (${process.version}) cannot load node:sqlite, which Sentinel0 needs.`,
     '',
     afterReexec
-      ? 'Parallax already switched interpreters once and still could not load it,'
+      ? 'Sentinel0 already switched interpreters once and still could not load it,'
       : 'No usable Node was found on this machine,',
     'so it is giving up rather than failing later somewhere less obvious.',
     '',
-    'Node 22.5 or newer works (22.x needs --experimental-sqlite, which Parallax',
+    'Node 22.5 or newer works (22.x needs --experimental-sqlite, which Sentinel0',
     'passes for you). Install or select one, for example:',
     '',
     '  nvm install 24 && nvm use 24',

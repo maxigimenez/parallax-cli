@@ -4,7 +4,7 @@ import {
   type CommentTarget,
   type ProjectConfig,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import type { TrackerWriter, TriggerSource } from '../triggers/types.js'
 
 type GraphqlResponse<T> = {
@@ -211,7 +211,7 @@ export class LinearService implements TriggerSource, TrackerWriter {
       next.delete(id as string)
     }
     for (const name of labels.add ?? []) {
-      // Create it rather than fail: the parallax:* markers are applied
+      // Create it rather than fail: the sentinel0:* markers are applied
       // automatically, so requiring someone to pre-create them by hand would
       // make the loop guard silently ineffective on a new team.
       const id = byName.get(name.toLowerCase()) ?? (await this.ensureTeamLabel(event.ref, name))

@@ -12,18 +12,18 @@ pnpm lint             # lint all packages
 pnpm lint:fix         # auto-fix lint issues
 
 # run a single package's tests
-pnpm --filter @parallax/orchestrator test
-pnpm --filter @parallax/cloud-api test
-pnpm --filter parallax-cli test
-pnpm --filter @parallax/cloud-dashboard test
+pnpm --filter @sentinel0/orchestrator test
+pnpm --filter @sentinel0/cloud-api test
+pnpm --filter sentinel0 test
+pnpm --filter @sentinel0/cloud-dashboard test
 
 # local development — use this entrypoint for all manual testing
-pnpm parallax preflight
-pnpm parallax init
-pnpm parallax start --api-port 9371 --concurrency 2
-pnpm parallax agents
-pnpm parallax runs
-pnpm parallax stop
+pnpm sentinel0 preflight
+pnpm sentinel0 init
+pnpm sentinel0 start --api-port 9371 --concurrency 2
+pnpm sentinel0 agents
+pnpm sentinel0 runs
+pnpm sentinel0 stop
 
 # railway — plan/apply reconcile .railway/railway.ts, deploy ships source
 pnpm railway:plan
@@ -32,18 +32,18 @@ pnpm railway:deploy:api
 pnpm railway:deploy:dashboard
 
 # cloud, against a local or Railway Postgres
-DATABASE_URL=... pnpm --filter @parallax/cloud-api dev
-DATABASE_URL=... pnpm --filter @parallax/cloud-api db:migrate
+DATABASE_URL=... pnpm --filter @sentinel0/cloud-api dev
+DATABASE_URL=... pnpm --filter @sentinel0/cloud-api db:migrate
 
 # dashboard, against a local or deployed cloud-api
-PARALLAX_API_URL=http://127.0.0.1:8080 pnpm --filter @parallax/cloud-dashboard dev
+SENTINEL0_API_URL=http://127.0.0.1:8080 pnpm --filter @sentinel0/cloud-dashboard dev
 ```
 
 Node.js >= 23.7.0 and pnpm 10.x are required.
 
 ## Architecture
 
-Parallax is a **trigger and dispatch layer over [Hermes Agent](https://hermes-agent.nousresearch.com)**.
+Sentinel0 is a **trigger and dispatch layer over [Hermes Agent](https://hermes-agent.nousresearch.com)**.
 It watches tickets and pull requests, decides which Hermes agent should start and with
 what context, and records what happened. It does not run agents itself.
 
@@ -51,12 +51,12 @@ what context, and records what happened. It does not run agents itself.
 
 Everything else follows from this split:
 
-- **Parallax owns** deciding *when* an agent should start, *which* agent, and *with
+- **Sentinel0 owns** deciding *when* an agent should start, *which* agent, and *with
   what context*; recording the outcome; announcing it.
 - **Hermes owns** everything from the moment a run starts — the filesystem, git,
   worktrees, tooling, credentials, and the agent's own GitHub identity.
 
-Parallax creates no worktrees, runs no git commands, and opens no pull requests. The
+Sentinel0 creates no worktrees, runs no git commands, and opens no pull requests. The
 agent does that work under its own identity and reports back. Consequently the runner
 needs **no local clone** of any repository, and `ProjectConfig` has no `workspaceDir`.
 
@@ -67,7 +67,7 @@ needs **no local clone** of any repository, and `ProjectConfig` has no `workspac
   types live here.
 - **`packages/orchestrator`** — the runner. Polls trigger sources, evaluates routes,
   dispatches to Hermes, mirrors runs to the cloud. Runs on the same machine as Hermes.
-- **`packages/cli`** — the published `parallax-cli` package, the only user entry point.
+- **`packages/cli`** — the published `sentinel0` package, the only user entry point.
 - **`packages/cloud-api`** — the Railway-deployed control plane. Fastify + Postgres.
   Stores config, the agent registry, and run history; sends Slack notifications.
 - **`packages/cloud-dashboard`** — the React app over the cloud user API. Vite +
@@ -75,17 +75,17 @@ needs **no local clone** of any repository, and `ProjectConfig` has no `workspac
   both are hosted; the runner also serves an API, so an unqualified `api` would be
   ambiguous. Deployed to Railway as its own service; see `docs/dashboard.md`.
 
-### Runtime state (`~/.parallax/`)
+### Runtime state (`~/.sentinel0/`)
 
 | File | Purpose |
 |---|---|
 | `config.json` | Cloud credentials, Hermes profiles and keys, secrets (v2 schema) |
 | `routes.json` | Last known good routes; the offline fallback, and the whole route table when no cloud is configured |
 | `running.json` | Pid and port of the running runner |
-| `parallax.db` | SQLite — runs, run events, dispatch ledger |
+| `sentinel0.db` | SQLite — runs, run events, dispatch ledger |
 | `runner.{stdout,stderr}.log` | Runner output |
 
-Override the directory with `PARALLAX_DATA_DIR`.
+Override the directory with `SENTINEL0_DATA_DIR`.
 
 ### Hermes integration (`packages/orchestrator/src/hermes/`)
 
@@ -134,8 +134,8 @@ ship in a shape the API would reject. `docs/routes.md` is the prose counterpart.
 
 ### Cloud (`packages/cloud-api`)
 
-Two API-key scopes, separated from day one: `prx_rnr_` for the runner
-(`/v1/runner/*`), `prx_usr_` for humans and the future dashboard (`/v1/*`). Presenting
+Two API-key scopes, separated from day one: `snt_rnr_` for the runner
+(`/v1/runner/*`), `snt_usr_` for humans and the future dashboard (`/v1/*`). Presenting
 one where the other is required is a 401.
 
 The runner **long-polls** `GET /v1/runner/commands` rather than accepting inbound
@@ -206,7 +206,7 @@ as well.
   silent fallbacks.
 - **Strict parsing**: all CLI arg and request parsing goes through dedicated parser
   functions in `args.ts`; never parse inline. An unknown flag is an error.
-- **`pnpm parallax <command>`** is the canonical local testing entrypoint.
+- **`pnpm sentinel0 <command>`** is the canonical local testing entrypoint.
 - Runner console lines are stamped with an ISO-8601 UTC instant, and a run event's
   echoed line reports the time the event was *recorded* rather than a fresh clock read,
   so the log and the stored event never disagree about when something failed.

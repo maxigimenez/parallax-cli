@@ -11,11 +11,11 @@ standing between an unattended daemon's credential and a human's.
 
 | Scope | Prefix | Used by | Reaches |
 |---|---|---|---|
-| `user` | `prx_usr_` | You and the dashboard | `/v1/*` management endpoints |
-| `runner` | `prx_rnr_` | The runner on the Mac Mini | `/v1/runner/*` only |
+| `user` | `snt_usr_` | You and the dashboard | `/v1/*` management endpoints |
+| `runner` | `snt_rnr_` | The runner on the Mac Mini | `/v1/runner/*` only |
 
 ```
-Authorization: Bearer prx_usr_…
+Authorization: Bearer snt_usr_…
 ```
 
 Keys are stored as SHA-256 hashes. The plaintext is shown once, at creation, and is
@@ -42,7 +42,7 @@ Or from a local checkout, against the database's **public** URL — Railway's
 `DATABASE_URL` points at an internal host that only resolves inside the platform:
 
 ```bash
-pnpm --filter @parallax/common build && pnpm --filter @parallax/cloud-api build
+pnpm --filter @sentinel0/common build && pnpm --filter @sentinel0/cloud-api build
 cd packages/cloud
 DATABASE_URL="$(railway variables --service Postgres --kv | grep DATABASE_PUBLIC_URL | cut -d= -f2-)" \
   node dist/org-cli.js --name "Your Company"
@@ -77,7 +77,7 @@ Resolves the presented key to the organization behind it.
 ```json
 {
   "org": { "id": "org_abc123", "name": "Your Company", "createdAt": "2026-08-01T00:00:00.000Z" },
-  "key": { "id": "key_abc123", "name": "dashboard", "prefix": "prx_usr_9f2a41c8", "scope": "user" }
+  "key": { "id": "key_abc123", "name": "dashboard", "prefix": "snt_usr_9f2a41c8", "scope": "user" }
 }
 ```
 
@@ -102,7 +102,7 @@ DELETE /v1/keys/:id    revokes; the row stays for the audit trail
 `POST` responds with the plaintext key. It is never shown again.
 
 ```json
-{ "id": "key_…", "key": "prx_rnr_…", "scope": "runner", "prefix": "prx_rnr_a1b2c3d4" }
+{ "id": "key_…", "key": "snt_rnr_…", "scope": "runner", "prefix": "snt_rnr_a1b2c3d4" }
 ```
 
 ---
@@ -112,7 +112,7 @@ DELETE /v1/keys/:id    revokes; the row stays for the audit trail
 What the runner should watch. A project is a ticket source, nothing more — there is no
 local clone and no agent attached to it.
 
-Projects live here, not in the runner's local config: `parallax init` never writes
+Projects live here, not in the runner's local config: `sentinel0 init` never writes
 them. A runner with no projects polls nothing, so nothing can ever trigger.
 
 ```http
@@ -160,7 +160,7 @@ DELETE /v1/routes/:id
 
   "guard": {
     "refire": "once",               // once | per-change
-    "markers": true                 // apply parallax:* labels around the run
+    "markers": true                 // apply sentinel0:* labels around the run
   },
 
   "trigger": {
@@ -228,14 +228,14 @@ rather than blanked. A typo like `{{ticket.titel}}` silently becoming an empty s
 produces a confidently wrong run; leaving it visible makes the mistake obvious in the
 transcript.
 
-Parallax appends its own closing instruction asking for a `PARALLAX_SUMMARY:` line —
+Sentinel0 appends its own closing instruction asking for a `SENTINEL0_SUMMARY:` line —
 that summary is what lands in the ticket comment and the Slack message. If your prompt
-already mentions `PARALLAX_SUMMARY`, yours is used as written.
+already mentions `SENTINEL0_SUMMARY`, yours is used as written.
 
 ```http
 GET /v1/route-templates      complete routes for every supported case
 GET /v1/prompt-templates     starter prompts and the placeholder list
-GET /v1/reserved-labels      the parallax:* labels and the default guard
+GET /v1/reserved-labels      the sentinel0:* labels and the default guard
 ```
 
 These are what a dashboard builds its "new route" flow from. `route-templates` returns
@@ -309,9 +309,9 @@ That is safe here because `reviewersAdded` only matches when a reviewer is newly
 requested: the agent posting comments, or you pushing commits, adds no reviewer and so
 cannot re-summon it.
 
-**Parallax does not fetch the diff or the conversation.** The agent has `gh` and gets
+**Sentinel0 does not fetch the diff or the conversation.** The agent has `gh` and gets
 them itself, which is why the prompt tells it to. Inlining that context would put
-Parallax back in the business of fetching things the agent can already reach — the same
+Sentinel0 back in the business of fetching things the agent can already reach — the same
 boundary that keeps git, worktrees and pull requests on the Hermes side.
 
 `{{repo.slug}}` renders as `owner/repo`, so those commands are copy-pasteable.
@@ -338,23 +338,23 @@ once, whatever happens to it afterwards; the item's revision is excluded from th
 dedupe key entirely. `per-change` restores fire-on-every-change and is only safe with
 markers on, which the API enforces.
 
-**`guard.markers`** — Parallax writes reserved labels around the run:
+**`guard.markers`** — Sentinel0 writes reserved labels around the run:
 
 | Label | Meaning |
 |---|---|
-| `parallax:in-progress` | a run is working on this right now |
-| `parallax:done` | a run completed |
-| `parallax:failed` | a run failed |
+| `sentinel0:in-progress` | a run is working on this right now |
+| `sentinel0:done` | a run completed |
+| `sentinel0:failed` | a run failed |
 
-Everything Parallax writes is prefixed `parallax:`, so machine-managed labels are
+Everything Sentinel0 writes is prefixed `sentinel0:`, so machine-managed labels are
 obvious in the tracker. They are created automatically if the repo or team does not
 have them.
 
-**No route ever matches an item carrying `parallax:in-progress`** — unconditionally,
+**No route ever matches an item carrying `sentinel0:in-progress`** — unconditionally,
 even for a route that turned markers off. Starting a second agent on something already
 being worked on is never what you want.
 
-A `once` route also declines anything carrying `parallax:done` or `parallax:failed`.
+A `once` route also declines anything carrying `sentinel0:done` or `sentinel0:failed`.
 **Removing that label by hand is how you re-arm a route** — which is also how you retry
 something that failed.
 
@@ -374,7 +374,7 @@ closed: that route matches nothing rather than everything.
 
 There is no `workspace` field and no `openPullRequest` outcome. Branches, commits, and
 pull requests belong to the agent, which does them under its own identity. Outcomes
-cover only what Parallax owns: the summary comment — which must land even when the run
+cover only what Sentinel0 owns: the summary comment — which must land even when the run
 *failed*, so it cannot be delegated to the thing that failed — and tracker labels.
 
 ### Firing once

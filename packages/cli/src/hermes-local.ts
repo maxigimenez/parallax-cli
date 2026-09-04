@@ -5,7 +5,7 @@ import path from 'node:path'
 /**
  * Reads the Hermes installation on this machine.
  *
- * `parallax init` runs on the same host as Hermes, so the profiles and their
+ * `sentinel0 init` runs on the same host as Hermes, so the profiles and their
  * API server keys are already on disk. Reading them beats asking an operator to
  * copy four keys out of four dotfiles by hand, and it removes the most likely
  * setup mistake: pasting the default profile's key against a named profile,

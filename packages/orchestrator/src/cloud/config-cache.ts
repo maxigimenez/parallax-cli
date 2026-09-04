@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { ProjectConfig, RoutingRule } from '@parallax/common'
+import type { ProjectConfig, RoutingRule } from '@sentinel0/common'
 
 const ROUTES_FILE = 'routes.json'
 const PROJECTS_FILE = 'projects.json'

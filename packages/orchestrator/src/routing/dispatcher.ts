@@ -1,7 +1,7 @@
 import {
   COMMENT_TARGET,
   MAX_CONCURRENT_RUNS_PER_AGENT,
-  PARALLAX_LABEL,
+  SENTINEL0_LABEL,
   RUN_STATUS,
   type AgentDescriptor,
   type CommentTarget,
@@ -10,8 +10,8 @@ import {
   type RoutingRule,
   type RunRecord,
   type TriggerEvent,
-} from '@parallax/common'
-import type { ParallaxDatabase } from '../database.js'
+} from '@sentinel0/common'
+import type { Sentinel0Database } from '../database.js'
 import type { HermesAdapter } from '../hermes/adapter.js'
 import { renderRoutePrompt } from '../prompts/render.js'
 import { resolveSummary } from '../prompts/output-contract.js'
@@ -39,7 +39,7 @@ export interface PromptRunRequest {
 }
 
 /**
- * Side effects Parallax owns after a run finishes.
+ * Side effects Sentinel0 owns after a run finishes.
  *
  * Injected rather than imported so the dispatcher is testable without GitHub or
  * Linear, and so the tracker write path stays in one place.
@@ -50,7 +50,7 @@ export interface OutcomeHandlers {
 }
 
 export interface DispatcherDeps {
-  db: ParallaxDatabase
+  db: Sentinel0Database
   logger: Logger
   lifecycle: RunLifecycle
   outcomes: OutcomeHandlers
@@ -74,7 +74,7 @@ const MANUAL_ROUTE_ID = 'manual'
 const MANUAL_ROUTE_NAME = 'manual run'
 
 /**
- * How long a manual run may take before Parallax stops it.
+ * How long a manual run may take before Sentinel0 stops it.
  *
  * The same 30 minutes every route template defaults to. A route can be tuned
  * because it runs unattended and forever; a manual run is watched by the person
@@ -236,7 +236,7 @@ export class Dispatcher {
       // while work is in flight.
       if (guard.markers) {
         await this.safely(
-          () => this.deps.outcomes.updateLabels(event, { add: [PARALLAX_LABEL.IN_PROGRESS] }),
+          () => this.deps.outcomes.updateLabels(event, { add: [SENTINEL0_LABEL.IN_PROGRESS] }),
           'mark in progress'
         )
       }
@@ -264,11 +264,11 @@ export class Dispatcher {
       switch (result.status) {
         case RUN_STATUS.COMPLETED:
           this.deps.lifecycle.completed(runId, summary, result.usage)
-          await this.clearMarker(guard, event, PARALLAX_LABEL.DONE)
+          await this.clearMarker(guard, event, SENTINEL0_LABEL.DONE)
           await this.applyOutcomes(route, event, summary ?? 'Run completed with no summary.')
           break
         case RUN_STATUS.AWAITING_APPROVAL:
-          // Deliberately keeps parallax:in-progress: the item is still claimed
+          // Deliberately keeps sentinel0:in-progress: the item is still claimed
           // by this run while a human decides.
           this.deps.lifecycle.awaitingApproval(runId)
           break
@@ -278,7 +278,7 @@ export class Dispatcher {
           break
         default:
           this.deps.lifecycle.failed(runId, result.error ?? 'Agent run failed.', result.usage)
-          await this.clearMarker(guard, event, PARALLAX_LABEL.FAILED)
+          await this.clearMarker(guard, event, SENTINEL0_LABEL.FAILED)
           // The tracker still hears about it: a failure the humans never see is
           // the worst outcome, and it is exactly the case an agent cannot report
           // on its own behalf.
@@ -296,7 +296,7 @@ export class Dispatcher {
         await this.clearMarker(guard, event, undefined)
         // The adapter's own cancel path did not get to run, so stopping the
         // Hermes side is this branch's job -- otherwise the agent keeps working
-        // on a run Parallax has already written off.
+        // on a run Sentinel0 has already written off.
         if (hermesRunId) {
           await adapter.cancel(hermesRunId).catch((stopError: unknown) => {
             this.deps.logger.warn(
@@ -315,7 +315,7 @@ export class Dispatcher {
       }
       const reason = error instanceof Error ? error.message : String(error)
       this.deps.lifecycle.failed(runId, reason)
-      await this.clearMarker(guard, event, PARALLAX_LABEL.FAILED)
+      await this.clearMarker(guard, event, SENTINEL0_LABEL.FAILED)
       await this.postFailure(route, event, reason)
       return { outcome: 'failed', runId, reason }
     } finally {
@@ -461,7 +461,7 @@ export class Dispatcher {
       () =>
         this.deps.outcomes.updateLabels(event, {
           add: terminal ? [terminal] : [],
-          remove: [PARALLAX_LABEL.IN_PROGRESS],
+          remove: [SENTINEL0_LABEL.IN_PROGRESS],
         }),
       'clear in-progress marker'
     )
@@ -490,7 +490,7 @@ export class Dispatcher {
       return
     }
     await this.safely(
-      () => this.deps.outcomes.postComment(target, event, `Parallax run failed: ${error}`),
+      () => this.deps.outcomes.postComment(target, event, `Sentinel0 run failed: ${error}`),
       'post failure comment'
     )
   }

@@ -8,12 +8,12 @@ dist
 .next
 
 # Local state
-packages/orchestrator/parallax.db
-packages/orchestrator/parallax.db-journal
+packages/orchestrator/sentinel0.db
+packages/orchestrator/sentinel0.db-journal
 packages/orchestrator/worktrees/
-.parallax
+.sentinel0
 .release
-parallax.*.*yml
+sentinel0.*.*yml
 packages/cli/.npm-cache/
 packages/cli/*.tgz
 

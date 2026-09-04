@@ -5,24 +5,24 @@ import {
   DEFAULT_CONCURRENCY,
   type AppConfig,
   type ServerConfig,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import { readConfigStore } from './config-store.js'
 import { validateStoredConfig } from './config-validation.js'
 
 export function resolveDataDir(): string {
-  return process.env.PARALLAX_DATA_DIR
-    ? path.resolve(process.env.PARALLAX_DATA_DIR)
-    : path.join(os.homedir(), '.parallax')
+  return process.env.SENTINEL0_DATA_DIR
+    ? path.resolve(process.env.SENTINEL0_DATA_DIR)
+    : path.join(os.homedir(), '.sentinel0')
 }
 
 function parseRuntimeConcurrency(): number {
-  const raw = process.env.PARALLAX_CONCURRENCY
+  const raw = process.env.SENTINEL0_CONCURRENCY
   if (raw === undefined) {
     return DEFAULT_CONCURRENCY
   }
   const parsed = Number.parseInt(raw, 10)
   if (!Number.isInteger(parsed) || parsed < 1 || parsed > 16) {
-    throw new Error('PARALLAX_CONCURRENCY must be an integer between 1 and 16.')
+    throw new Error('SENTINEL0_CONCURRENCY must be an integer between 1 and 16.')
   }
   return parsed
 }
@@ -40,18 +40,18 @@ function parseRuntimePort(raw: string | undefined, label: string, fallback: numb
 
 function parseRuntimeServerConfig(): ServerConfig {
   const apiPort = parseRuntimePort(
-    process.env.PARALLAX_SERVER_API_PORT,
-    'PARALLAX_SERVER_API_PORT',
+    process.env.SENTINEL0_SERVER_API_PORT,
+    'SENTINEL0_SERVER_API_PORT',
     DEFAULT_API_PORT
   )
 
-  const rawNetworkAccess = process.env.PARALLAX_NETWORK_ACCESS
+  const rawNetworkAccess = process.env.SENTINEL0_NETWORK_ACCESS
   if (
     rawNetworkAccess !== undefined &&
     rawNetworkAccess !== 'true' &&
     rawNetworkAccess !== 'false'
   ) {
-    throw new Error('PARALLAX_NETWORK_ACCESS must be "true" or "false".')
+    throw new Error('SENTINEL0_NETWORK_ACCESS must be "true" or "false".')
   }
 
   return { apiPort, networkAccess: rawNetworkAccess === 'true' }

@@ -1,5 +1,5 @@
 {
-  "name": "@parallax/orchestrator",
+  "name": "@sentinel0/orchestrator",
   "version": "0.3.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@parallax/common": "workspace:*",
+    "@sentinel0/common": "workspace:*",
     "@fastify/cors": "11.2.0",
     "chalk": "4",
     "fastify": "5.7.4",

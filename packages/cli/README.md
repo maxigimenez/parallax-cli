@@ -1,65 +1,104 @@
-# parallax-cli
+<p align="center">
+  <img src="https://raw.githubusercontent.com/maxigimenez/sentinel0/main/.github/banner.png" alt="sentinel0" width="760">
+</p>
 
-> WARNING: Parallax is currently in alpha. Expect rough edges, missing polish, and occasional breaking changes.
+Trigger your [Hermes](https://hermes-agent.nousresearch.com) agents from your tickets and
+pull requests.
 
-Parallax is a local-first AI orchestrator for software development tasks. It pulls work from Linear or GitHub Issues, creates isolated worktrees, generates a plan first, waits for approval, then executes changes and opens or updates the related branch and PR while keeping control on your machine.
+> **Alpha.** Expect rough edges and occasional breaking changes.
 
-## Requirements
+You already run a fleet of Hermes profiles — a product reviewer, a code reviewer, an
+implementer, each with its own memory, model, and GitHub account. sentinel0 is the layer
+that decides **which one should start, when, and with what context**, then records what
+happened and tells your team about it.
 
-- Node.js `>= 23.7.0`
-- `git`
-- `pnpm`
-- `gh`
-- at least one supported agent CLI (`codex`, `gemini`, or `claude`)
+**It never runs an agent itself and never touches a repository.** It decides; Hermes does
+the work. The runner needs no clone of your code — only API access to your tracker and
+HTTP access to Hermes on the same machine. It makes outbound connections only, so it
+works behind NAT with no tunnel and no port forwarding.
 
 ## Install
 
 ```bash
-npm i -g parallax-cli
+npm install -g sentinel0
 ```
 
 ## Quick start
 
-```bash
-parallax preflight
-parallax init
-parallax start
-parallax open
-```
-
-What this flow does:
-
-- `parallax preflight` checks your local tooling before you start
-- `parallax init` runs the interactive setup wizard (project, issue source, agent, optional Slack)
-- `parallax start` launches the background runtime and dashboard
-- `parallax open` opens the dashboard in your browser
-
-The dashboard is at `http://localhost:9372` after `parallax start`.
-
-For a trusted internal network, `parallax start --network-access` also exposes the dashboard through
-the machine hostname or LAN IP. This mode is unauthenticated; localhost-only access remains the
-default.
-
-## How it works
-
-- Parallax stores all configuration and runtime state under `~/.parallax`
-- Tasks run in isolated worktrees so changes stay scoped and reviewable
-- The dashboard is where you review plans, inspect logs, retry work, and follow PR results
-- When a PR receives human review comments, you can trigger:
+On the machine that runs Hermes:
 
 ```bash
-parallax pr-review <task-id>
+sentinel0 init          # cloud key, Hermes profiles — each key is probed as you enter it
+sentinel0 preflight     # Node, Hermes, cloud, gh auth
+sentinel0 start
+sentinel0 runner install  # survive reboots (launchd)
 ```
 
-## Learn more
+Then:
 
-Full docs:
+```bash
+sentinel0 agents               # profiles it discovered, with models and toolsets
+sentinel0 routes               # what it will act on
+sentinel0 runs                 # recent runs
+sentinel0 logs --follow        # watch one happen
+sentinel0 cancel <id>          # stop it here and on Hermes
+```
 
-- [Getting Started](https://parallax.maxigimenez.xyz/docs/getting-started)
-- [CLI Reference](https://parallax.maxigimenez.xyz/docs/cli-reference)
+Debugging a machine rather than a workflow:
 
-## Feedback and issues
+```bash
+sentinel0 run --agent product --prompt "Reply with the word ready."
+```
 
-Parallax is still in alpha. If you hit bugs, rough UX, or unclear docs, please open an issue or feature request here:
+`sentinel0 help` lists every command.
 
-- [https://github.com/maxigimenez/parallax-cli](https://github.com/maxigimenez/parallax-cli)
+## Routes are data
+
+A route says which trigger starts which agent, with what prompt, and what to do with the
+result. A new workflow is a row, not a release — and because the prompt lives on the
+route, rewording what an agent is asked to do never needs one either.
+
+```jsonc
+// "When a Linear ticket gets the feasibility label,
+//  have the product agent assess it and comment back."
+{
+  "name": "Product review on feasibility label",
+  "trigger": { "type": "ticket", "provider": "linear", "projectId": "taplands" },
+  "match":   { "labels": { "any": ["feasibility"] } },
+  "target":  { "agentRef": { "profile": "product" } },
+  "execution": { "prompt": "Assess {{ticket.ref}}: {{ticket.title}}\n\n{{ticket.body}}",
+                 "timeoutSeconds": 1800 },
+  "outcome": {
+    "postComment": { "target": "ticket" },
+    "labels": { "add": ["reviewed"], "remove": ["feasibility"] }
+  }
+}
+```
+
+Ready-made routes for every supported case, including multi-round pull request review,
+ship with the control plane and are served from `GET /v1/route-templates`.
+
+## State
+
+Everything this CLI keeps lives under `~/.sentinel0` — cloud credentials and Hermes keys
+in `config.json`, the last known good routes in `routes.json`, run history in
+`sentinel0.db`, and the runner's logs. `SENTINEL0_DATA_DIR` moves it.
+
+## Requirements
+
+- **Hermes Agent** with its API server enabled and `gateway.multiplex_profiles` on, and a
+  distinct `API_SERVER_KEY` per profile
+- **Node.js >= 22.5** — the CLI re-executes itself under a compatible interpreter if the
+  active one cannot load `node:sqlite`
+- A **sentinel0 control plane** to point at, and a `snt_usr_` key for it
+- `gh`, authenticated, if any project pulls from GitHub
+
+## Documentation
+
+Full docs, including the control plane, the dashboard and every route option, are in the
+repository: **[github.com/maxigimenez/sentinel0](https://github.com/maxigimenez/sentinel0)**
+
+## Feedback
+
+Bugs, rough edges and unclear docs are all worth an issue:
+**[github.com/maxigimenez/sentinel0/issues](https://github.com/maxigimenez/sentinel0/issues)**

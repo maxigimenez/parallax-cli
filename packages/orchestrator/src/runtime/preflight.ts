@@ -1,5 +1,5 @@
-import { TICKET_PROVIDER, type AppConfig } from '@parallax/common'
-import type { LocalExecutor } from '@parallax/common/executor'
+import { TICKET_PROVIDER, type AppConfig } from '@sentinel0/common'
+import type { LocalExecutor } from '@sentinel0/common/executor'
 import { HermesClient } from '../hermes/client.js'
 
 /**
@@ -15,7 +15,7 @@ export async function validateRuntimeRequirements(
   executor: LocalExecutor
 ): Promise<void> {
   if (!config.hermes) {
-    throw new Error('No Hermes gateway configured. Run "parallax init".')
+    throw new Error('No Hermes gateway configured. Run "sentinel0 init".')
   }
 
   const enabled = config.hermes.profiles.filter((profile) => profile.enabled)

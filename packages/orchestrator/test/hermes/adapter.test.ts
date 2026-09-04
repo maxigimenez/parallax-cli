@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { RUN_LOG_KIND, RUN_STATUS, type Logger, type RunLogKind } from '@parallax/common'
+import { RUN_LOG_KIND, RUN_STATUS, type Logger, type RunLogKind } from '@sentinel0/common'
 import { HermesClient } from '../../src/hermes/client.js'
 import { HermesAdapter, mapHermesStatus } from '../../src/hermes/adapter.js'
 import { startFakeHermes, type FakeHermes } from './fake-hermes-server.js'
@@ -41,7 +41,7 @@ function adapterFor(fake: FakeHermes, logger: Logger, profile = 'default') {
 }
 
 describe('mapHermesStatus', () => {
-  it('normalizes British cancellation to the Parallax spelling', () => {
+  it('normalizes British cancellation to the Sentinel0 spelling', () => {
     expect(mapHermesStatus('cancelled')).toBe(RUN_STATUS.CANCELED)
     expect(mapHermesStatus('canceled')).toBe(RUN_STATUS.CANCELED)
   })

@@ -8,8 +8,8 @@ import {
   type Logger,
   type LogLevel,
   type RunLogEntry,
-} from '@parallax/common'
-import { getDatabase, type ParallaxDatabase } from './database.js'
+} from '@sentinel0/common'
+import { getDatabase, type Sentinel0Database } from './database.js'
 
 const LOG_ICON = {
   info: chalk.blue('i'),
@@ -35,13 +35,13 @@ export function setLogLevels(levels: LogLevel[]): void {
  * Injectable so tests can capture events without touching disk, and so the
  * logger does not force a database open just by being imported.
  */
-let database: ParallaxDatabase | undefined
+let database: Sentinel0Database | undefined
 
-export function setLoggerDatabase(db: ParallaxDatabase | undefined): void {
+export function setLoggerDatabase(db: Sentinel0Database | undefined): void {
   database = db
 }
 
-function db(): ParallaxDatabase {
+function db(): Sentinel0Database {
   return database ?? getDatabase()
 }
 
@@ -85,7 +85,7 @@ function stamp(level: LogLevel, message: string, runId?: string, at?: number): v
  * Persists one run-scoped event and echoes it to the console.
  *
  * Every event lands in SQLite, which is the runner's source of truth and what
- * `parallax logs` reads. Persistence failures are reported but never thrown:
+ * `sentinel0 logs` reads. Persistence failures are reported but never thrown:
  * a full disk should degrade observability, not kill a run mid-flight.
  */
 function writeRunEvent(runId: string, entry: RunLogEntry): void {

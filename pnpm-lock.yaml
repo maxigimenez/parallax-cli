@@ -56,10 +56,10 @@ importers:
       '@fastify/cors':
         specifier: 11.2.0
         version: 11.2.0
-      '@parallax/common':
+      '@sentinel0/common':
         specifier: 0.3.0
         version: link:../common
-      '@parallax/orchestrator':
+      '@sentinel0/orchestrator':
         specifier: 0.3.0
         version: link:../orchestrator
       chalk:
@@ -87,7 +87,7 @@ importers:
       '@fastify/cors':
         specifier: 11.2.0
         version: 11.2.0
-      '@parallax/common':
+      '@sentinel0/common':
         specifier: workspace:*
         version: link:../common
       fastify:
@@ -158,7 +158,7 @@ importers:
       '@fastify/cors':
         specifier: 11.2.0
         version: 11.2.0
-      '@parallax/common':
+      '@sentinel0/common':
         specifier: workspace:*
         version: link:../common
       chalk:

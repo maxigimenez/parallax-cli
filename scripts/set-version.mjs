@@ -3,9 +3,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Sets a single version across the whole workspace: the root package, every
-// package under packages/*, and the internal @parallax/* dependency pins in the
+// package under packages/*, and the internal @sentinel0/* dependency pins in the
 // published cli package. Keeping these in lockstep is required because the
-// @parallax/* packages are unpublished — the cli links them from the workspace
+// @sentinel0/* packages are unpublished — the cli links them from the workspace
 // by version (link-workspace-packages=true), so a stale pin would fall back to
 // the npm registry and fail to resolve.
 //
@@ -29,7 +29,7 @@ const packageJsonPaths = [
     .filter((p) => fs.existsSync(p)),
 ]
 
-const internalPrefix = '@parallax/'
+const internalPrefix = '@sentinel0/'
 
 for (const pkgPath of packageJsonPaths) {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))

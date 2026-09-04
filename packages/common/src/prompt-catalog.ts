@@ -44,9 +44,9 @@ export const PROMPT_CATALOG: PromptTemplate[] = [
     id: 'pr-review',
     name: 'Pull request review',
     description: 'Review a pull request you were requested on. Fetches its own diff and thread.',
-    // Parallax says which pull request and what to do; the agent has gh and
+    // Sentinel0 says which pull request and what to do; the agent has gh and
     // gets the diff and the conversation itself. Inlining them here would put
-    // Parallax back in the business of fetching context the agent can reach.
+    // Sentinel0 back in the business of fetching context the agent can reach.
     prompt: [
       'You have been requested as a reviewer on a pull request.',
       '',

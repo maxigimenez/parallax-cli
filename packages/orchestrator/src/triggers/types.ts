@@ -1,4 +1,4 @@
-import type { CommentTarget, ProjectConfig, TriggerEvent } from '@parallax/common'
+import type { CommentTarget, ProjectConfig, TriggerEvent } from '@sentinel0/common'
 
 /**
  * A source of things that might warrant starting an agent.
@@ -12,10 +12,10 @@ export interface TriggerSource {
 }
 
 /**
- * The tracker writes Parallax performs on its own behalf.
+ * The tracker writes Sentinel0 performs on its own behalf.
  *
  * Deliberately narrow. Agents do their own git, their own PRs, and their own
- * commits under their own identity; what Parallax still owns is telling the
+ * commits under their own identity; what Sentinel0 still owns is telling the
  * humans what happened -- including when the agent failed and cannot speak for
  * itself -- and moving the ticket's labels along.
  */

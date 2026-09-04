@@ -1,4 +1,4 @@
-import type { AgentDescriptor, HermesConfig, HermesProfileConfig } from '@parallax/common'
+import type { AgentDescriptor, HermesConfig, HermesProfileConfig } from '@sentinel0/common'
 import { HermesClient } from './client.js'
 
 export interface DiscoveryFailure {

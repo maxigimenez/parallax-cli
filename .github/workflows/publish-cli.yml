@@ -1,4 +1,4 @@
-name: Publish parallax-cli
+name: Publish sentinel0
 
 on:
   workflow_dispatch:
@@ -31,7 +31,7 @@ jobs:
 
     env:
       NODE_OPTIONS: --experimental-sqlite
-      PARALLAX_DB_PATH: memory
+      SENTINEL0_DB_PATH: memory
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
         if: inputs.version != ''
         run: |
           pnpm version:set "${{ inputs.version }}"
-          # The internal @parallax/* packages are unpublished and linked by
+          # The internal @sentinel0/* packages are unpublished and linked by
           # version, so they move in lockstep or the published CLI cannot
           # resolve them. set-version.mjs is what keeps them aligned.
           git --no-pager diff --stat
@@ -80,13 +80,13 @@ jobs:
           cd packages/cli
           pnpm pack:tarball
           echo "::group::Tarball contents"
-          tar -tzf parallax-cli-*.tgz | head -40
+          tar -tzf sentinel0-*.tgz | head -40
           echo "::endgroup::"
           # The internal packages are bundled, not fetched from npm, so their
           # absence would only surface on a user's machine at install time.
           for pkg in common orchestrator; do
-            tar -tzf parallax-cli-*.tgz | grep -q "node_modules/@parallax/$pkg/" \
-              || { echo "::error::@parallax/$pkg is missing from the tarball."; exit 1; }
+            tar -tzf sentinel0-*.tgz | grep -q "node_modules/@sentinel0/$pkg/" \
+              || { echo "::error::@sentinel0/$pkg is missing from the tarball."; exit 1; }
           done
 
       # The check that would have caught 0.2.0. Everything above passes on a
@@ -103,7 +103,7 @@ jobs:
       - name: Verify a clean install has everything the bundle imports
         run: |
           set -euo pipefail
-          TARBALL="$(ls "$PWD"/packages/cli/parallax-cli-*.tgz)"
+          TARBALL="$(ls "$PWD"/packages/cli/sentinel0-*.tgz)"
           WORK="$(mktemp -d)"
           cp .github/scripts/verify-bundled-imports.mjs "$WORK/"
           cd "$WORK"

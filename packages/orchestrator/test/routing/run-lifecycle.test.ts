@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { RUN_STATUS, TRIGGER_TYPE, type Logger, type RunRecord } from '@parallax/common'
-import { openDatabase, type ParallaxDatabase } from '../../src/database.js'
+import { RUN_STATUS, TRIGGER_TYPE, type Logger, type RunRecord } from '@sentinel0/common'
+import { openDatabase, type Sentinel0Database } from '../../src/database.js'
 import { RunLifecycle } from '../../src/routing/run-lifecycle.js'
 
-let db: ParallaxDatabase
+let db: Sentinel0Database
 
 const logger: Logger = {
   info: () => undefined,

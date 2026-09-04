@@ -41,7 +41,7 @@ export function Agents(): ReactNode {
         ) : (agents.data ?? []).length === 0 ? (
           <EmptyState title="No agents reported">
             The runner pushes its Hermes profiles when it starts. If this stays empty, check that
-            the runner is running and that <code>parallax agents</code> lists something locally.
+            the runner is running and that <code>sentinel0 agents</code> lists something locally.
           </EmptyState>
         ) : (
           <Table scrollLabel="Agents" containerClassName="px-tablewrap">

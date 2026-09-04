@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PARALLAX_LABEL,
+  SENTINEL0_LABEL,
   ROUTE_CATALOG,
   TICKET_PROVIDER,
   TRIGGER_TYPE,
@@ -9,7 +9,7 @@ import {
   validateRoutingRule,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import { renderPromptText } from '../../src/prompts/render.js'
 import { matchesRule } from '../../src/routing/rule-engine.js'
 
@@ -149,7 +149,7 @@ describe('the templates actually fire on what they describe', () => {
     expect(
       matchesRule(route, {
         ...base,
-        labels: [PARALLAX_LABEL.DONE],
+        labels: [SENTINEL0_LABEL.DONE],
         changes: changes(['acme-reviewer']),
       })
     ).toBe(true)
@@ -200,7 +200,7 @@ describe('the templates actually fire on what they describe', () => {
       const busy = event({
         type: route.trigger.type,
         provider: TICKET_PROVIDER.GITHUB,
-        labels: [PARALLAX_LABEL.IN_PROGRESS],
+        labels: [SENTINEL0_LABEL.IN_PROGRESS],
       })
       expect(matchesRule(route, busy)).toBe(false)
     }

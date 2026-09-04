@@ -2,15 +2,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
-import { CONFIG_VERSION } from '@parallax/common'
+import { CONFIG_VERSION } from '@sentinel0/common'
 import { loadConfig } from '../src/config-loader.js'
 import { readConfigStore, writeConfigStore, emptyStoredConfig } from '../src/config-store.js'
 
 const ENV_KEYS = [
-  'PARALLAX_DATA_DIR',
-  'PARALLAX_CONCURRENCY',
-  'PARALLAX_SERVER_API_PORT',
-  'PARALLAX_NETWORK_ACCESS',
+  'SENTINEL0_DATA_DIR',
+  'SENTINEL0_CONCURRENCY',
+  'SENTINEL0_SERVER_API_PORT',
+  'SENTINEL0_NETWORK_ACCESS',
 ] as const
 
 const saved = new Map<string, string | undefined>()
@@ -21,8 +21,8 @@ beforeEach(async () => {
     saved.set(key, process.env[key])
     delete process.env[key]
   }
-  dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'parallax-config-'))
-  process.env.PARALLAX_DATA_DIR = dataDir
+  dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'sentinel0-config-'))
+  process.env.SENTINEL0_DATA_DIR = dataDir
 })
 
 afterEach(async () => {
@@ -65,7 +65,7 @@ describe('readConfigStore', () => {
   it('refuses a v1 config with an actionable message rather than guessing a migration', async () => {
     await writeRaw({ version: 1, projects: [], slack: null, secrets: {} })
     await expect(readConfigStore(dataDir)).rejects.toThrow(/version 1.*requires version 2/s)
-    await expect(readConfigStore(dataDir)).rejects.toThrow(/parallax init/)
+    await expect(readConfigStore(dataDir)).rejects.toThrow(/sentinel0 init/)
   })
 
   it('treats a config with no version field as v1', async () => {
@@ -189,9 +189,9 @@ describe('loadConfig', () => {
 
   it('reads runtime knobs from the environment', async () => {
     await writeRaw(validConfig())
-    process.env.PARALLAX_CONCURRENCY = '5'
-    process.env.PARALLAX_SERVER_API_PORT = '9999'
-    process.env.PARALLAX_NETWORK_ACCESS = 'true'
+    process.env.SENTINEL0_CONCURRENCY = '5'
+    process.env.SENTINEL0_SERVER_API_PORT = '9999'
+    process.env.SENTINEL0_NETWORK_ACCESS = 'true'
 
     const config = await loadConfig()
 
@@ -201,11 +201,11 @@ describe('loadConfig', () => {
 
   it('rejects out-of-range runtime knobs instead of silently clamping', async () => {
     await writeRaw(validConfig())
-    process.env.PARALLAX_CONCURRENCY = '99'
+    process.env.SENTINEL0_CONCURRENCY = '99'
     await expect(loadConfig()).rejects.toThrow(/between 1 and 16/)
 
-    process.env.PARALLAX_CONCURRENCY = '2'
-    process.env.PARALLAX_NETWORK_ACCESS = 'yes'
+    process.env.SENTINEL0_CONCURRENCY = '2'
+    process.env.SENTINEL0_NETWORK_ACCESS = 'yes'
     await expect(loadConfig()).rejects.toThrow(/must be "true" or "false"/)
   })
 })

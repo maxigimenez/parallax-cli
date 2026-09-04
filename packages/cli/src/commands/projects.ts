@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import type { ProjectConfig } from '@parallax/common'
+import type { ProjectConfig } from '@sentinel0/common'
 import { getJson, runnerUnreachable } from '../api.js'
 import type { CliContext } from '../types.js'
 
@@ -15,7 +15,7 @@ export async function runProjects(context: CliContext): Promise<void> {
   if (projects.length === 0) {
     console.log(chalk.yellow('No projects. Nothing can trigger.'))
     console.log(chalk.dim('  Projects are cloud configuration: POST /v1/projects'))
-    console.log(chalk.dim('  Then "parallax reload" to pick them up without a restart.'))
+    console.log(chalk.dim('  Then "sentinel0 reload" to pick them up without a restart.'))
     return
   }
 

@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { DEFAULT_API_PORT, DEFAULT_CONCURRENCY } from '@parallax/common'
+import { DEFAULT_API_PORT, DEFAULT_CONCURRENCY } from '@sentinel0/common'
 import type {
   CancelCommandOptions,
   EmptyOptions,

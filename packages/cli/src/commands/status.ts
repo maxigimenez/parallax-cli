@@ -18,15 +18,15 @@ export async function runStatus(context: CliContext): Promise<void> {
   try {
     running = await context.loadRunningState()
   } catch {
-    console.log(chalk.yellow('Parallax is not running.'))
-    console.log(chalk.dim('  parallax start'))
+    console.log(chalk.yellow('Sentinel0 is not running.'))
+    console.log(chalk.dim('  sentinel0 start'))
     process.exitCode = 1
     return
   }
 
   if (!isProcessAlive(running.runnerPid)) {
     console.log(chalk.yellow(`Manifest points at pid ${running.runnerPid}, which is gone.`))
-    console.log(chalk.dim('  parallax stop     clear it, then start again'))
+    console.log(chalk.dim('  sentinel0 stop     clear it, then start again'))
     process.exitCode = 1
     return
   }

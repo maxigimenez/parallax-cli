@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chalk from 'chalk'
-import { DEFAULT_API_PORT } from '@parallax/common'
+import { DEFAULT_API_PORT } from '@sentinel0/common'
 import {
   parseCancelOptions,
   parseEmptyOptions,
@@ -45,9 +45,9 @@ import { printUsage } from './usage.js'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const DEFAULT_DATA_DIR = process.env.PARALLAX_DATA_DIR
-  ? path.resolve(process.env.PARALLAX_DATA_DIR)
-  : path.join(os.homedir(), '.parallax')
+const DEFAULT_DATA_DIR = process.env.SENTINEL0_DATA_DIR
+  ? path.resolve(process.env.SENTINEL0_DATA_DIR)
+  : path.join(os.homedir(), '.sentinel0')
 const DEFAULT_API_BASE = `http://localhost:${DEFAULT_API_PORT}`
 const ROOT_DIR = resolveCliRoot(__dirname)
 
@@ -117,12 +117,12 @@ const context: CliContext = {
     // because it fires on every boot and says nothing actionable.
     NODE_OPTIONS:
       `${process.env.NODE_OPTIONS ?? ''} ${SQLITE_FLAG} --disable-warning=ExperimentalWarning`.trim(),
-    PARALLAX_DATA_DIR: dataDir,
-    PARALLAX_DB_PATH: path.join(dataDir, 'parallax.db'),
-    PARALLAX_SERVER_API_PORT: String(runtime.apiPort),
-    PARALLAX_CONCURRENCY: String(runtime.concurrency),
-    PARALLAX_NETWORK_ACCESS: String(runtime.networkAccess),
-    PARALLAX_VERSION: PACKAGE_VERSION,
+    SENTINEL0_DATA_DIR: dataDir,
+    SENTINEL0_DB_PATH: path.join(dataDir, 'sentinel0.db'),
+    SENTINEL0_SERVER_API_PORT: String(runtime.apiPort),
+    SENTINEL0_CONCURRENCY: String(runtime.concurrency),
+    SENTINEL0_NETWORK_ACCESS: String(runtime.networkAccess),
+    SENTINEL0_VERSION: PACKAGE_VERSION,
   }),
 }
 
@@ -176,7 +176,7 @@ async function dispatch(command: string | undefined, args: string[]): Promise<vo
       printUsage(PACKAGE_VERSION)
       return
     default:
-      throw new Error(`Unknown command "${command}". Run "parallax help".`)
+      throw new Error(`Unknown command "${command}". Run "sentinel0 help".`)
   }
 }
 

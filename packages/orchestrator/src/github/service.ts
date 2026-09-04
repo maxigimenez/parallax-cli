@@ -5,8 +5,8 @@ import {
   type CommentTarget,
   type ProjectConfig,
   type TriggerEvent,
-} from '@parallax/common'
-import type { LocalExecutor } from '@parallax/common/executor'
+} from '@sentinel0/common'
+import type { LocalExecutor } from '@sentinel0/common/executor'
 import type { TrackerWriter, TriggerSource } from '../triggers/types.js'
 
 export function requireRepo(project: ProjectConfig): { owner: string; repo: string } {
@@ -46,8 +46,8 @@ interface PullRequestSummary extends IssueSummary {
   baseRefName?: string
 }
 
-/** Orange, matching Parallax's own colour, so managed labels read as a set. */
-const PARALLAX_LABEL_COLOR = 'f97316'
+/** Orange, matching Sentinel0's own colour, so managed labels read as a set. */
+const SENTINEL0_LABEL_COLOR = 'f97316'
 
 export class GitHubService implements TriggerSource, TrackerWriter {
   readonly name = 'github'
@@ -220,7 +220,7 @@ export class GitHubService implements TriggerSource, TrackerWriter {
    * Creates a label if the repository does not have it.
    *
    * `gh issue edit --add-label` fails outright on an unknown label, so the
-   * `parallax:` markers would never apply to a repository that has not seen
+   * `sentinel0:` markers would never apply to a repository that has not seen
    * them before -- and the loop guard that depends on them would quietly not
    * work. Already-exists is the expected case and is not an error.
    */
@@ -234,9 +234,9 @@ export class GitHubService implements TriggerSource, TrackerWriter {
         '--repo',
         `${owner}/${repo}`,
         '--color',
-        PARALLAX_LABEL_COLOR,
+        SENTINEL0_LABEL_COLOR,
         '--description',
-        'Managed by Parallax',
+        'Managed by Sentinel0',
       ],
       { cwd: process.cwd() }
     )

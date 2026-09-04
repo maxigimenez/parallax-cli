@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE } from '@parallax/common'
-import { openDatabase, type ParallaxDatabase } from '../src/database.js'
+import { RUN_LOG_KIND, RUN_LOG_LEVEL, RUN_LOG_SOURCE } from '@sentinel0/common'
+import { openDatabase, type Sentinel0Database } from '../src/database.js'
 import { logger, setLoggerDatabase } from '../src/logger.js'
 
 /** An ISO-8601 instant in UTC, anywhere in the line. */
 const ISO = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/
 
-let db: ParallaxDatabase
+let db: Sentinel0Database
 let out: string[]
 let err: string[]
 

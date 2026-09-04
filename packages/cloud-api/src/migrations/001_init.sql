@@ -1,4 +1,4 @@
--- Parallax cloud control plane, initial schema.
+-- Sentinel0 cloud control plane, initial schema.
 
 CREATE TABLE IF NOT EXISTS organizations (
   id          TEXT PRIMARY KEY,

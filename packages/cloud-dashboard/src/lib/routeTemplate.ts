@@ -3,7 +3,7 @@ import type { RouteTemplate, RoutingRule } from '../api/types.js'
 /**
  * Substitutes a template's `<PLACEHOLDER>` tokens.
  *
- * This mirrors `fillRouteTemplate` in `@parallax/common` rather than importing
+ * This mirrors `fillRouteTemplate` in `@sentinel0/common` rather than importing
  * it: that module is part of the runner's type spine and pulls Node-only
  * declarations into a DOM build. The contract it implements is one line of
  * string replacement over the serialized route, and the test alongside this

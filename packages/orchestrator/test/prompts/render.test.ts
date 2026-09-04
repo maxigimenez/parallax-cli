@@ -7,7 +7,7 @@ import {
   TRIGGER_TYPE,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
+} from '@sentinel0/common'
 import {
   renderPromptText,
   renderRoutePrompt,
@@ -117,11 +117,11 @@ describe('renderPromptText', () => {
 
 describe('withSummaryContract', () => {
   it('appends the contract when the prompt does not ask for it', () => {
-    expect(withSummaryContract('do the thing')).toContain('PARALLAX_SUMMARY')
+    expect(withSummaryContract('do the thing')).toContain('SENTINEL0_SUMMARY')
   })
 
   it('leaves a prompt that already words it alone', () => {
-    const custom = 'do it, then write PARALLAX_SUMMARY: <verdict> exactly once'
+    const custom = 'do it, then write SENTINEL0_SUMMARY: <verdict> exactly once'
     expect(withSummaryContract(custom)).toBe(custom)
   })
 })
@@ -132,7 +132,7 @@ describe('renderRoutePrompt', () => {
     const { prompt } = renderRoutePrompt({ ...context, route })
 
     expect(prompt).toContain('Review LIN-1.')
-    expect(prompt).toContain('PARALLAX_SUMMARY')
+    expect(prompt).toContain('SENTINEL0_SUMMARY')
   })
 })
 
@@ -151,7 +151,7 @@ describe('prompt catalog', () => {
 
 describe('summary extraction', () => {
   it('prefers the sentinel and falls back to the tail', () => {
-    expect(extractSummary('x\nPARALLAX_SUMMARY: done')).toBe('done')
+    expect(extractSummary('x\nSENTINEL0_SUMMARY: done')).toBe('done')
     expect(summarizeFallback('first\nlast', 1)).toBe('last')
     expect(resolveSummary('just a conclusion')).toBe('just a conclusion')
   })

@@ -51,7 +51,7 @@ export function PromptField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         error={error}
-        hint="What the agent is asked to do. Parallax appends a request for a PARALLAX_SUMMARY line unless yours already mentions one."
+        hint="What the agent is asked to do. Sentinel0 appends a request for a SENTINEL0_SUMMARY line unless yours already mentions one."
       />
       <div className="px-vars">
         <Text size="caption" tone="muted" as="span" id="px-vars-label">

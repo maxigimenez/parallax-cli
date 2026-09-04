@@ -1,10 +1,12 @@
-# Parallax
+<p align="center">
+  <img src=".github/banner.svg" alt="sentinel0" width="760">
+</p>
 
 Trigger your [Hermes](https://hermes-agent.nousresearch.com) agents from your tickets
 and pull requests.
 
 You already run a fleet of Hermes profiles — a product reviewer, a code reviewer, an
-implementer, each with its own memory, model, and GitHub account. Parallax is the layer
+implementer, each with its own memory, model, and GitHub account. Sentinel0 is the layer
 that decides **which one should start, when, and with what context**, then records what
 happened and tells your team about it.
 
@@ -42,14 +44,14 @@ Mac Mini                                    Railway
 │   owns git, PRs, identity    │      │   run history        │
 │            ▲                 │      │   Slack              │
 │            │ POST /v1/runs   │      │          ▲           │
-│ parallax runner              │─────►│          │           │
+│ sentinel0 runner              │─────►│          │           │
 │   triggers → routes →        │ long │  ┌───────┴────────┐  │
 │   dispatch → outcomes        │ poll │  │ dashboard      │  │
 └──────────────────────────────┘      │  └────────────────┘  │
                                       └──────────────────────┘
 ```
 
-**Parallax never runs an agent itself and never touches a repository.** It decides;
+**Sentinel0 never runs an agent itself and never touches a repository.** It decides;
 Hermes does the work. The runner needs no clone of your code — only API access to your
 tracker and HTTP access to Hermes on the same machine.
 
@@ -59,7 +61,7 @@ tunnel and no port forwarding.
 ## The dashboard
 
 A web UI for the same thing: watch runs, create routes from templates, manage projects,
-keys and Slack. Sign in with a `prx_usr_` key. It deploys to Railway as a second
+keys and Slack. Sign in with a `snt_usr_` key. It deploys to Railway as a second
 service alongside the API.
 
 Full detail: **[docs/dashboard.md](./docs/dashboard.md)**
@@ -70,28 +72,28 @@ Full walkthrough: **[docs/getting-started.md](./docs/getting-started.md)**
 
 ```bash
 # On the Mac Mini, next to Hermes
-npm install -g parallax-cli
+npm install -g sentinel0
 
-parallax init          # cloud key, Hermes profiles — each key is probed as you enter it
-parallax preflight     # Node, Hermes, cloud, gh auth
-parallax start
-parallax runner install  # survive reboots (launchd)
+sentinel0 init          # cloud key, Hermes profiles — each key is probed as you enter it
+sentinel0 preflight     # Node, Hermes, cloud, gh auth
+sentinel0 start
+sentinel0 runner install  # survive reboots (launchd)
 ```
 
 Then:
 
 ```bash
-parallax agents               # profiles it discovered, with models and toolsets
-parallax routes               # what it will act on
-parallax runs                 # recent runs
-parallax logs --follow        # watch one happen
-parallax cancel <id>          # stop it here and on Hermes
+sentinel0 agents               # profiles it discovered, with models and toolsets
+sentinel0 routes               # what it will act on
+sentinel0 runs                 # recent runs
+sentinel0 logs --follow        # watch one happen
+sentinel0 cancel <id>          # stop it here and on Hermes
 ```
 
 Debugging a machine, not a workflow:
 
 ```bash
-parallax run --agent product --prompt "Reply with the word ready."
+sentinel0 run --agent product --prompt "Reply with the word ready."
 ```
 
 ## Documentation
@@ -120,7 +122,7 @@ parallax run --agent product --prompt "Reply with the word ready."
 packages/
   common/         shared types — run status, routing rules, config
   orchestrator/   the runner: triggers, routes, dispatch, outcomes
-  cli/            the published parallax-cli package
+  cli/            the published sentinel0 package
   cloud-api/      Railway control plane (Fastify + Postgres)
 ```
 

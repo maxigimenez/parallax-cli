@@ -11,13 +11,13 @@ export async function runStop(context: CliContext): Promise<void> {
   try {
     running = await context.loadRunningState()
   } catch {
-    console.log('Parallax is not running.')
+    console.log('Sentinel0 is not running.')
     return
   }
 
   if (!isProcessAlive(running.runnerPid)) {
     await fs.rm(manifestPath, { force: true })
-    console.log('Parallax was not running; cleared a stale manifest.')
+    console.log('Sentinel0 was not running; cleared a stale manifest.')
     return
   }
 
@@ -30,5 +30,5 @@ export async function runStop(context: CliContext): Promise<void> {
   }
 
   await fs.rm(manifestPath, { force: true })
-  console.log(chalk.green(`Stopped Parallax runner (pid ${running.runnerPid}).`))
+  console.log(chalk.green(`Stopped Sentinel0 runner (pid ${running.runnerPid}).`))
 }

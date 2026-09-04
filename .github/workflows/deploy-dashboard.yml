@@ -77,7 +77,7 @@ jobs:
                 # nothing, so this is called out rather than passed silently.
                 case "$body" in
                   *'"apiConfigured":false'*)
-                    echo "::warning::The dashboard is up but PARALLAX_API_URL is unset."\
+                    echo "::warning::The dashboard is up but SENTINEL0_API_URL is unset."\
                          "Set it on the service, or sign-in will fail."
                     ;;
                 esac

@@ -1,6 +1,6 @@
 import * as p from '@clack/prompts'
 import chalk from 'chalk'
-import { CONFIG_VERSION, type HermesProfileConfig, type StoredConfig } from '@parallax/common'
+import { CONFIG_VERSION, type HermesProfileConfig, type StoredConfig } from '@sentinel0/common'
 import type { CliContext } from '../types.js'
 import { getJson } from '../api.js'
 import {
@@ -54,25 +54,25 @@ async function probeProfile(
 }
 
 export async function runInit(context: CliContext): Promise<void> {
-  p.intro(BRAND(' Parallax — connect this machine to your agents '))
+  p.intro(BRAND(' Sentinel0 — connect this machine to your agents '))
 
   const existing = await context.loadStoredConfig()
 
   // ── Cloud ────────────────────────────────────────────────
-  p.log.step('Parallax cloud')
+  p.log.step('Sentinel0 cloud')
   const cloudBaseUrl = assertNotCancel(
     await requiredText(
       'Cloud API base URL',
       existing.cloud?.baseUrl ?? '',
-      'https://parallax-cloud.up.railway.app'
+      'https://sentinel0-cloud.up.railway.app'
     )
   ).trim()
 
   const cloudApiKey = assertNotCancel(
     await p.password({
-      message: 'Runner API key (prx_rnr_…)',
+      message: 'Runner API key (snt_rnr_…)',
       validate: (value) =>
-        value?.startsWith('prx_rnr_')
+        value?.startsWith('snt_rnr_')
           ? undefined
           : 'Expected a runner key. Create one with the cloud org:create command.',
     })
@@ -111,7 +111,7 @@ export async function runInit(context: CliContext): Promise<void> {
     (existing.hermes?.profiles ?? []).map((profile) => [profile.name, profile])
   )
 
-  /** Confirms one profile and collects the bits Parallax needs beyond the key. */
+  /** Confirms one profile and collects the bits Sentinel0 needs beyond the key. */
   async function configureProfile(
     name: string,
     discovered?: LocalHermesProfile
@@ -122,7 +122,7 @@ export async function runInit(context: CliContext): Promise<void> {
     let apiKey = discovered?.apiKey ?? remembered?.apiKey
     if (apiKey) {
       p.log.info(
-        `Using the API_SERVER_KEY from ${discovered?.apiKey ? discovered.envPath : 'your existing Parallax config'}`
+        `Using the API_SERVER_KEY from ${discovered?.apiKey ? discovered.envPath : 'your existing Sentinel0 config'}`
       )
     } else {
       apiKey = assertNotCancel(
@@ -271,7 +271,7 @@ export async function runInit(context: CliContext): Promise<void> {
   )
 
   const confirmed = assertNotCancel(
-    await p.confirm({ message: 'Save to ~/.parallax/config.json?', initialValue: true })
+    await p.confirm({ message: 'Save to ~/.sentinel0/config.json?', initialValue: true })
   )
   if (!confirmed) {
     p.cancel('Nothing was written.')
@@ -285,9 +285,9 @@ export async function runInit(context: CliContext): Promise<void> {
       BRAND('Saved.'),
       '',
       'Next:',
-      '  parallax preflight        check this machine can reach everything',
-      '  parallax start            run the orchestrator',
-      '  parallax runner install   keep it running across reboots',
+      '  sentinel0 preflight        check this machine can reach everything',
+      '  sentinel0 start            run the orchestrator',
+      '  sentinel0 runner install   keep it running across reboots',
     ].join('\n')
   )
 }

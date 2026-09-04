@@ -1,5 +1,5 @@
-import { TICKET_PROVIDER, type AppConfig, type ProjectConfig } from '@parallax/common'
-import type { LocalExecutor } from '@parallax/common/executor'
+import { TICKET_PROVIDER, type AppConfig, type ProjectConfig } from '@sentinel0/common'
+import type { LocalExecutor } from '@sentinel0/common/executor'
 import { GitHubService } from '../github/service.js'
 import { LinearService } from '../linear/service.js'
 import type { TrackerWriter, TriggerSource } from '../triggers/types.js'

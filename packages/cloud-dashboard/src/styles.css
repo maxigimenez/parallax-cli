@@ -179,7 +179,7 @@ a:focus-visible,
 
 /* 88x16 is the sentinel0 wordmark's 1056x192 at exactly 1/12, so each cell of
    its 24-unit grid lands on a whole 2 CSS pixels and none of them blur. The
-   Parallax wordmark this replaced was 1/11.26, and did. */
+   Sentinel0 wordmark this replaced was 1/11.26, and did. */
 .px-sidebar__wordmark {
   width: 88px;
   height: 16px;

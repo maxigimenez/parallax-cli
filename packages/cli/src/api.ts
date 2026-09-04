@@ -68,7 +68,7 @@ export async function postJson<T>(
 /** Explains a dead runner in terms of what to do about it. */
 export function runnerUnreachable(apiBase: string): Error {
   return new Error(
-    `The Parallax runner is not responding at ${apiBase}.\n` +
-      `Start it with "parallax start", or check "parallax runner status".`
+    `The Sentinel0 runner is not responding at ${apiBase}.\n` +
+      `Start it with "sentinel0 start", or check "sentinel0 runner status".`
   )
 }

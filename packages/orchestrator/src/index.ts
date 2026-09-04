@@ -7,8 +7,8 @@ import {
   type ProjectConfig,
   type RoutingRule,
   type TriggerEvent,
-} from '@parallax/common'
-import { HostExecutor } from '@parallax/common/executor'
+} from '@sentinel0/common'
+import { HostExecutor } from '@sentinel0/common/executor'
 import { loadConfig, resolveDataDir } from './config-loader.js'
 import { getDatabase } from './database.js'
 import { logger, setLoggerDatabase, setLogLevels } from './logger.js'
@@ -44,7 +44,7 @@ const NO_OUTCOMES: OutcomeHandlers = {
   updateLabels: async () => undefined,
 }
 
-const RUNNER_VERSION = process.env.PARALLAX_VERSION ?? '0.2.0'
+const RUNNER_VERSION = process.env.SENTINEL0_VERSION ?? '0.2.0'
 
 interface Runtime {
   config: AppConfig
@@ -110,7 +110,7 @@ async function refreshInventory(
   cloud?: CloudClient
 ): Promise<AgentDescriptor[]> {
   if (!config.hermes) {
-    logger.warn('No Hermes configuration; no agents available. Run "parallax init".')
+    logger.warn('No Hermes configuration; no agents available. Run "sentinel0 init".')
     return []
   }
 
@@ -142,7 +142,7 @@ async function refreshInventory(
 /**
  * Pulls the projects to watch from the cloud.
  *
- * Projects are cloud-owned configuration, not local config: `parallax init`
+ * Projects are cloud-owned configuration, not local config: `sentinel0 init`
  * never writes them. Any locally configured projects are treated as a fallback
  * for running without a control plane at all.
  */
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
   if (cloud) {
     try {
       const hello = await cloud.hello(os.hostname(), RUNNER_VERSION)
-      logger.success(`Registered with Parallax cloud as runner ${hello.runnerId}`)
+      logger.success(`Registered with Sentinel0 cloud as runner ${hello.runnerId}`)
     } catch (error: unknown) {
       // Not fatal: a runner that cannot reach the cloud still dispatches from
       // its cached routes, which is the whole point of caching them.

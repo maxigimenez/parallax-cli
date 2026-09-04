@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { RUN_STATUS, type RunRecord, type RunStatus } from '@parallax/common'
+import { RUN_STATUS, type RunRecord, type RunStatus } from '@sentinel0/common'
 import { getJson, runnerUnreachable } from '../api.js'
 import type { CliContext, RunsCommandOptions } from '../types.js'
 
@@ -57,6 +57,6 @@ export async function runRuns(context: CliContext, options: RunsCommandOptions):
     }
   }
   console.log('')
-  console.log(chalk.dim('  parallax logs --run <id>    full output for one run'))
+  console.log(chalk.dim('  sentinel0 logs --run <id>    full output for one run'))
   console.log('')
 }

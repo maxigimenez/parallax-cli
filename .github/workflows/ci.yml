@@ -39,7 +39,7 @@ jobs:
     env:
       # A no-op on 24; required on 22 for node:sqlite.
       NODE_OPTIONS: --experimental-sqlite
-      PARALLAX_DB_PATH: memory
+      SENTINEL0_DB_PATH: memory
 
     steps:
       - uses: actions/checkout@v4
@@ -57,7 +57,7 @@ jobs:
         if: matrix.primary
         run: pnpm lint
 
-      # Build first, for two reasons: cloud-api resolves @parallax/common
+      # Build first, for two reasons: cloud-api resolves @sentinel0/common
       # through its built .d.ts rather than a path alias, so a typecheck without
       # dist cannot see it; and one test suite imports the built package to
       # catch circular imports that only fail in the real ESM graph.
@@ -67,7 +67,7 @@ jobs:
       - name: Typecheck
         if: matrix.primary
         run: |
-          for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli @parallax/cloud-dashboard; do
+          for pkg in @sentinel0/common @sentinel0/orchestrator @sentinel0/cloud-api sentinel0 @sentinel0/cloud-dashboard; do
             echo "::group::$pkg"
             pnpm --filter "$pkg" exec tsc --noEmit
             echo "::endgroup::"

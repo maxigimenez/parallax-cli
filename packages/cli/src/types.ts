@@ -1,4 +1,4 @@
-import type { StoredConfig } from '@parallax/common'
+import type { StoredConfig } from '@sentinel0/common'
 
 export type RunningState = {
   startedAt: number

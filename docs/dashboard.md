@@ -6,7 +6,7 @@ watch runs, create routes, and manage projects, keys and Slack — the same thin
 
 It is a **pure client**. It holds no server-side session, has no database of its own,
 and every request it makes is one an operator could make by hand. Everything it can do
-is something a `prx_usr_` key can do.
+is something a `snt_usr_` key can do.
 
 ## Signing in
 
@@ -32,12 +32,12 @@ similar-looking keys is the likeliest mistake.
 
 ## The API URL
 
-The dashboard reads its API URL **at runtime**, from `PARALLAX_API_URL`.
+The dashboard reads its API URL **at runtime**, from `SENTINEL0_API_URL`.
 
 `server.mjs` generates `/env.js` per request, and the page loads it before the bundle:
 
 ```js
-window.__PARALLAX__ = { apiUrl: 'https://api-production-xxxx.up.railway.app' }
+window.__SENTINEL0__ = { apiUrl: 'https://api-production-xxxx.up.railway.app' }
 ```
 
 A `VITE_` variable would have been inlined by the bundler, which would mean rebuilding
@@ -62,7 +62,7 @@ a comma-separated allowlist, and unset means all.
 
 ```bash
 pnpm install
-PARALLAX_API_URL=http://127.0.0.1:8080 pnpm --filter @parallax/cloud-dashboard dev
+SENTINEL0_API_URL=http://127.0.0.1:8080 pnpm --filter @sentinel0/cloud-dashboard dev
 ```
 
 Vite serves `/env.js` itself in dev, from the same variable, so dev and production
@@ -71,26 +71,26 @@ resolve the URL through one code path rather than two that can disagree.
 To run the whole stack locally, with the control plane against a throwaway Postgres:
 
 ```bash
-docker run -d --name parallax-pg -e POSTGRES_PASSWORD=parallax \
-  -e POSTGRES_DB=parallax -p 55433:5432 postgres:16
+docker run -d --name sentinel0-pg -e POSTGRES_PASSWORD=sentinel0 \
+  -e POSTGRES_DB=sentinel0 -p 55433:5432 postgres:16
 
-export DATABASE_URL="postgres://postgres:parallax@127.0.0.1:55433/parallax"
+export DATABASE_URL="postgres://postgres:sentinel0@127.0.0.1:55433/sentinel0"
 export DATABASE_SSL=disable
 
-pnpm --filter @parallax/cloud-api build
+pnpm --filter @sentinel0/cloud-api build
 node packages/cloud-api/dist/migrate-cli.js
 node packages/cloud-api/dist/org-cli.js --name "Your Company"   # prints both keys
 
 PORT=8080 node packages/cloud-api/dist/index.js
 ```
 
-Then sign in with the `prx_usr_` key it printed.
+Then sign in with the `snt_usr_` key it printed.
 
 To exercise the production server rather than Vite's:
 
 ```bash
-pnpm --filter @parallax/cloud-dashboard build
-PORT=8081 PARALLAX_API_URL=http://127.0.0.1:8080 \
+pnpm --filter @sentinel0/cloud-dashboard build
+PORT=8081 SENTINEL0_API_URL=http://127.0.0.1:8080 \
   node packages/cloud-dashboard/server.mjs
 ```
 
@@ -113,7 +113,7 @@ The dashboard is a **second Railway service**, alongside `api`.
    to Railway's own detection, and previously to a root `railway.json` — which is how
    a dashboard service ends up building and deploying the *API* image, starting
    cleanly, and passing its health check while serving the wrong thing.
-3. Under **Variables**, set `PARALLAX_API_URL` to the API service's public URL.
+3. Under **Variables**, set `SENTINEL0_API_URL` to the API service's public URL.
 4. Generate a domain for the service.
 5. On the **api** service, add the dashboard's origin to `CORS_ORIGINS` if you have
    narrowed it from the default.
@@ -226,7 +226,7 @@ be saved into a state the runner would reject.
   machine, not records anyone creates here. The next inventory push would overwrite
   anything the dashboard wrote.
 - **No members, roles or billing.** There is no users table. An organization is a row
-  and a set of keys; anyone holding a `prx_usr_` key has the same access.
+  and a set of keys; anyone holding a `snt_usr_` key has the same access.
 - **No renaming an organization.** Its name is set by `org-cli.js` at creation and
   there is no endpoint to change it.
 

@@ -9,8 +9,8 @@ beforeAll(() => {
   process.env.LOG_LEVEL = 'silent'
 })
 
-const USER_KEY = 'prx_usr_dashboard'
-const RUNNER_KEY = 'prx_rnr_daemon'
+const USER_KEY = 'snt_usr_dashboard'
+const RUNNER_KEY = 'snt_rnr_daemon'
 
 /**
  * Answers the two queries `/v1/me` makes, keyed on the SQL rather than the
@@ -33,10 +33,10 @@ function fakeDb(): Database {
           rows: [
             {
               id: 'org_1',
-              name: 'Parallax Labs',
+              name: 'Sentinel0 Labs',
               created_at: '2026-08-01T00:00:00.000Z',
               key_name: 'dashboard',
-              key_prefix: 'prx_usr_dashboa',
+              key_prefix: 'snt_usr_dashboa',
             },
           ],
           rowCount: 1,
@@ -58,8 +58,8 @@ describe('GET /v1/me', () => {
 
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({
-      org: { id: 'org_1', name: 'Parallax Labs', createdAt: '2026-08-01T00:00:00.000Z' },
-      key: { id: 'key_u', name: 'dashboard', prefix: 'prx_usr_dashboa', scope: 'user' },
+      org: { id: 'org_1', name: 'Sentinel0 Labs', createdAt: '2026-08-01T00:00:00.000Z' },
+      key: { id: 'key_u', name: 'dashboard', prefix: 'snt_usr_dashboa', scope: 'user' },
     })
     await app.close()
   })

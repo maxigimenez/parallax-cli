@@ -1,4 +1,4 @@
-import type { RoutingRule, TriggerEvent } from '@parallax/common'
+import type { RoutingRule, TriggerEvent } from '@sentinel0/common'
 import { SUMMARY_SENTINEL } from './output-contract.js'
 
 export interface PromptContext {
@@ -85,7 +85,7 @@ export function renderPromptText(template: string, context: PromptContext): Rend
 }
 
 /**
- * The contract Parallax needs back from every agent.
+ * The contract Sentinel0 needs back from every agent.
  *
  * Appended automatically unless the operator already asked for it, so a route
  * written without thinking about it still yields a usable ticket comment, and

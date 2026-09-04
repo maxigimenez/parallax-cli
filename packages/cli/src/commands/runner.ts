@@ -93,7 +93,7 @@ async function launchctl(args: string[]): Promise<{ code: number; output: string
 
 export async function runRunner(context: CliContext, options: RunnerCommandOptions): Promise<void> {
   if (process.platform !== 'darwin') {
-    throw new Error('"parallax runner" manages a macOS launchd agent and only works on macOS.')
+    throw new Error('"sentinel0 runner" manages a macOS launchd agent and only works on macOS.')
   }
 
   const target = plistPath()
@@ -107,7 +107,7 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
       .catch(() => false)
     if (!exists) {
       console.log(chalk.yellow('Not installed.'))
-      console.log(chalk.dim('  parallax runner install'))
+      console.log(chalk.dim('  sentinel0 runner install'))
       return
     }
     const { output } = await launchctl(['print', `gui/${uid}/${LAUNCH_AGENT_LABEL}`])
@@ -128,7 +128,7 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
       console.log(chalk.yellow('  Could not determine which Node it was installed with.'))
     } else if (!probeNode(pinned)) {
       console.log(chalk.red(`  Its Node is gone or unusable: ${pinned}`))
-      console.log(chalk.dim('  Run "parallax runner install" again to repin it.'))
+      console.log(chalk.dim('  Run "sentinel0 runner install" again to repin it.'))
     } else {
       console.log(chalk.dim(`  node       ${pinned}`))
     }
@@ -138,20 +138,20 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
   if (options.action === 'uninstall') {
     await launchctl(['bootout', `gui/${uid}/${LAUNCH_AGENT_LABEL}`])
     await fs.rm(target, { force: true })
-    console.log(chalk.green('Uninstalled the Parallax launch agent.'))
+    console.log(chalk.green('Uninstalled the Sentinel0 launch agent.'))
     return
   }
 
   const config = await context.loadStoredConfig()
   if (!config.hermes) {
-    throw new Error('Run "parallax init" before installing the launch agent.')
+    throw new Error('Run "sentinel0 init" before installing the launch agent.')
   }
 
   await fs.mkdir(path.dirname(target), { recursive: true })
   await fs.mkdir(dataDir, { recursive: true })
 
   const env = context.buildEnvConfig(dataDir, {
-    apiPort: Number.parseInt(process.env.PARALLAX_SERVER_API_PORT ?? '9371', 10),
+    apiPort: Number.parseInt(process.env.SENTINEL0_SERVER_API_PORT ?? '9371', 10),
     concurrency: 2,
     networkAccess: false,
   })
@@ -175,5 +175,5 @@ export async function runRunner(context: CliContext, options: RunnerCommandOptio
 
   console.log(chalk.green('Installed. The runner will start now and on every login.'))
   console.log(chalk.dim(`  ${target}`))
-  console.log(chalk.dim('  parallax runner status'))
+  console.log(chalk.dim('  sentinel0 runner status'))
 }
