@@ -164,20 +164,29 @@ Migrations are plain `.sql` files applied in filename order, one transaction eac
 
 ## CI and releasing
 
-Four workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test on Node 22 and
-24, build both images), `deploy-cloud-api.yml` and `deploy-dashboard.yml` (Railway),
-`publish-cli.yml` (npm). `docs/releasing.md` covers secrets and the manual fallbacks.
+Four workflows in `.github/workflows`: `ci.yml` (lint, typecheck, test),
+`deploy-cloud-api.yml` and `deploy-dashboard.yml` (Railway), `publish-cli.yml` (npm).
+`docs/releasing.md` covers secrets and the manual fallbacks.
 
 **Only CI runs on push.** Both deploys are `workflow_dispatch` only — merging and
 shipping are separate decisions, and a deploy interrupts every runner's long poll.
 Neither declares a GitHub environment; `publish-cli` declares `npm` because npm's
 trusted publisher is configured against that name.
 
-The Node matrix is load-bearing: 22 needs `--experimental-sqlite` and 24 ignores it, so
-both must run for the supported range to mean anything. Its floor is 22.12 rather than
-22.11 because Vite 8, which builds the dashboard, requires it. CI builds before testing
-because one suite imports the built package to catch circular imports the source alias
-hides.
+The Node matrix is load-bearing, and only for the tests: 22 needs
+`--experimental-sqlite` and 24 ignores it, so both must run for the supported range to
+mean anything. Lint and typecheck read no runtime API and pin their own `@types/node`,
+so they cannot differ between the two and run on the `primary: true` row alone — the
+flag is on the matrix row rather than matched against a version string, so bumping the
+newest Node cannot silently stop linting. The floor is 22.12 rather than 22.11 because
+Vite 8, which builds the dashboard, requires it. CI builds before testing because one
+suite imports the built package to catch circular imports the source alias hides.
+
+**Nothing in CI builds the Docker images.** `railway up` uploads source and Railway
+builds, so the images were only ever built here to fail early — at a minute apiece on
+every pull request, including the ones that touch no Dockerfile. A broken `Dockerfile`
+or `Dockerfile.dashboard` now surfaces during a manual deploy. Build one locally
+(`docker build -f Dockerfile.dashboard .`) before deploying a change to either.
 
 Both Railway services are declared in `.railway/railway.ts` — Railway's Infrastructure
 as Code, which replaced the per-service `railway.json` files. Config as Code is

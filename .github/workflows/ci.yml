@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lint, typecheck and test (Node ${{ matrix.node }})
+    name: Verify (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -27,7 +27,14 @@ jobs:
         # dashboard, declares `^20.19.0 || >=22.12.0`. It is a build tool and
         # ships in nothing, so this constrains where the repo can be built, not
         # where the runner can run.
-        node: ['22.12.0', '24.x']
+        include:
+          - node: '22.12.0'
+          # Lint and typecheck read no runtime API and pin their own @types/node,
+          # so their result cannot differ between the two. They run on this entry
+          # only. It is flagged rather than matched on the version string so that
+          # bumping the newest Node here cannot silently stop linting.
+          - node: '24.x'
+            primary: true
 
     env:
       # A no-op on 24; required on 22 for node:sqlite.
@@ -47,6 +54,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Lint
+        if: matrix.primary
         run: pnpm lint
 
       # Build first, for two reasons: cloud-api resolves @parallax/common
@@ -57,6 +65,7 @@ jobs:
         run: pnpm build
 
       - name: Typecheck
+        if: matrix.primary
         run: |
           for pkg in @parallax/common @parallax/orchestrator @parallax/cloud-api parallax-cli @parallax/cloud-dashboard; do
             echo "::group::$pkg"
@@ -66,101 +75,3 @@ jobs:
 
       - name: Test
         run: pnpm test
-
-  workflows:
-    name: Validate the workflow files
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # An invalid workflow shows up as a run with no jobs and an error that
-      # appears in no job log, which is a genuinely confusing way to find out.
-      - name: Parse every workflow
-        run: |
-          npm install --no-save js-yaml >/dev/null 2>&1
-          node -e "
-            const yaml = require('js-yaml'), fs = require('fs');
-            let bad = 0;
-            for (const f of fs.readdirSync('.github/workflows')) {
-              try {
-                const w = yaml.load(fs.readFileSync('.github/workflows/' + f, 'utf8'));
-                // Bare \`on\` is YAML 1.1 boolean true, so accept either key.
-                const on = w.on ?? w[true];
-                if (!on || !w.jobs) throw new Error('missing on: or jobs:');
-                console.log(f + ': ' + Object.keys(on).join(', '));
-              } catch (e) {
-                console.log('::error file=.github/workflows/' + f + '::' + e.message);
-                bad++;
-              }
-            }
-            process.exit(bad ? 1 : 0);
-          "
-
-  image:
-    name: Build the cloud-api image
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      # Built for the architecture Railway deploys on, not the runner's, so a
-      # build that passes here is one that will pass there.
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: parallax-cloud-api:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Check the entry points resolve
-        run: |
-          docker run --rm parallax-cloud-api:ci node dist/org-cli.js | grep -q 'Usage:'
-          docker run --rm parallax-cloud-api:ci node dist/migrate-cli.js 2>&1 \
-            | grep -q 'DATABASE_URL is required'
-
-  dashboard-image:
-    name: Build the dashboard image
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile.dashboard
-          platforms: linux/amd64
-          push: false
-          load: true
-          tags: parallax-dashboard:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Starts it for real. The three things that only fail at runtime are the
-      # API URL being injected from the environment, the SPA falling back to
-      # index.html for a client-side route, and the health check Railway polls.
-      - name: Check the container actually serves
-        run: |
-          docker run -d --name dash -p 8080:8080 \
-            -e PARALLAX_API_URL=https://api.example.invalid parallax-dashboard:ci
-          for _ in $(seq 1 30); do
-            curl -sf http://127.0.0.1:8080/health >/dev/null && break
-            sleep 1
-          done
-          curl -s http://127.0.0.1:8080/health | grep -q '"apiConfigured":true'
-          curl -s http://127.0.0.1:8080/env.js | grep -q 'api.example.invalid'
-          curl -sf -o /dev/null http://127.0.0.1:8080/runs/run_1
-          docker rm -f dash

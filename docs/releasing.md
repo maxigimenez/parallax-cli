@@ -4,7 +4,7 @@ Four workflows. One runs on every change; three ship things.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24, build both images |
+| [`ci.yml`](../.github/workflows/ci.yml) | PRs, pushes to `main` | Lint, typecheck, test on Node 22 and 24 |
 | [`deploy-cloud-api.yml`](../.github/workflows/deploy-cloud-api.yml) | Manual only | Deploys to Railway and waits for `/health` |
 | [`deploy-dashboard.yml`](../.github/workflows/deploy-dashboard.yml) | Manual only | Deploys to Railway and waits for `/health` |
 | [`publish-cli.yml`](../.github/workflows/publish-cli.yml) | Manual, or a published GitHub release | Verifies, packs, and publishes `parallax-cli` to npm |
@@ -18,6 +18,12 @@ needs `--experimental-sqlite` for `node:sqlite` and 24 ignores it, so running bo
 what keeps the supported range honest rather than aspirational. `NODE_OPTIONS` carries
 the flag for the whole job.
 
+It is the *tests* that need both. Lint and typecheck read no runtime API and pin their
+own `@types/node`, so their result cannot differ between the two, and they run on the
+row marked `primary: true` alone. The flag lives on the matrix row rather than being
+matched against `'24.x'`, so bumping the newest Node in that list cannot quietly leave
+the repo unlinted.
+
 The floor is 22.12 rather than 22.11 because Vite 8, which builds the dashboard,
 declares `^20.19.0 || >=22.12.0`. Vite is a build tool and ships in nothing, so this
 constrains where the repo can be *built*, not where the runner can run.
@@ -30,16 +36,30 @@ the built package rather than the source — every other test aliases
 ESM graph. A circular import once passed the entire suite and only failed when the
 container started.
 
-A third job parses every workflow file. An invalid one produces a GitHub run with no
-jobs and an error that appears in no job log, which is a genuinely confusing way to
-discover a stray `:` in a `run:` line.
+### What CI does not do
 
-Two more jobs build the Docker images for `linux/amd64`, the architecture Railway
-deploys on. An image that builds here is one that builds there. The cloud-api job
-checks that both CLI entry points inside the image resolve; the dashboard job starts
-the container and checks the three things that can only fail at runtime — the API URL
-reaching `/env.js` from the environment, the SPA falling back to `index.html` for a
-client-side route, and the health check Railway polls.
+It does not build the Docker images, and it does not validate the workflow files.
+
+Both jobs existed and were removed, for the same reason. `railway up` uploads source
+and Railway does the build, so the image jobs never produced an artifact anything
+consumed — they ran a minute apiece on every pull request to fail early on a
+`Dockerfile` that most pull requests do not touch. The workflow parser cost four
+minutes, almost all of it `npm install` resolving a pnpm workspace root, and checked
+only that the YAML parses and has `on:` and `jobs:`.
+
+The exposure that leaves is real but narrow. A broken `Dockerfile` now surfaces during
+a deploy rather than on the pull request, so **build the image locally before deploying
+a change to either one**:
+
+```bash
+docker build --platform linux/amd64 -f Dockerfile .              # cloud-api
+docker build --platform linux/amd64 -f Dockerfile.dashboard .    # dashboard
+```
+
+`linux/amd64` is the architecture Railway deploys on; an image that builds there builds
+in the deploy. An invalid workflow file still shows up the way GitHub shows it — a run
+with no jobs and an error in no job log — which is confusing, and was the reason for
+the parser, but not four minutes a pull request's worth of reason.
 
 ---
 
