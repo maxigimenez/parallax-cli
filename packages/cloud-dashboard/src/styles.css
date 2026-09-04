@@ -177,9 +177,12 @@ a:focus-visible,
   image-rendering: pixelated;
 }
 
+/* 88x16 is the sentinel0 wordmark's 1056x192 at exactly 1/12, so each cell of
+   its 24-unit grid lands on a whole 2 CSS pixels and none of them blur. The
+   Parallax wordmark this replaced was 1/11.26, and did. */
 .px-sidebar__wordmark {
-  width: 113px;
-  height: 17px;
+  width: 88px;
+  height: 16px;
   image-rendering: pixelated;
   display: block;
 }
@@ -833,8 +836,8 @@ a:focus-visible,
   padding: var(--bits-space-5);
   background: var(--bits-surface);
   background-image:
-    repeating-linear-gradient(0deg, rgb(242 237 225 / 3%) 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(90deg, rgb(242 237 225 / 3%) 0 1px, transparent 1px 8px);
+    repeating-linear-gradient(0deg, rgb(236 233 245 / 3%) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgb(236 233 245 / 3%) 0 1px, transparent 1px 8px);
 }
 
 .px-login__card {

@@ -261,11 +261,16 @@ Two behavioural notes from that swap, because both are easy to undo by accident:
 - Block `Code` **renders** its label rather than only announcing it. In a page section
   that is useful; in a table cell it duplicates the row, so those labels are short.
 
-### The nebula theme
+### The noir theme
 
 The dashboard runs on a **custom theme**, not a built-in one. `ThemeProvider` takes any
-name and writes it to `data-bits-theme`; `src/theme-nebula.css` defines what `nebula`
+name and writes it to `data-bits-theme`; `src/theme-noir.css` defines what `noir`
 means. It is loaded after the library stylesheet, which is what lets its palette win.
+
+Noir is neutral where the `nebula` it replaced was purple: the surfaces carry no hue at
+all, and the violet appears only where something is interactive. That is what leaves the
+red core of the sentinel0 mark, and a failed run, as the two things on screen with any
+warmth in them.
 
 Only colour is redefined. Geometry, type and spacing come from the library's `:root`,
 because those are the visual language rather than the palette. The text ramp is
@@ -273,16 +278,16 @@ calibrated against ember's — each step within a few tenths of the correspondin
 contrast against `--bits-panel` — rather than picked by eye.
 
 `--bits-ink` is set explicitly, which the built-in `ocean` does not do: ink is the
-foreground on a primary fill, and inheriting ember's warm brown onto a purple badge is
+foreground on a primary fill, and inheriting ember's warm brown onto a violet badge is
 exactly the kind of silent failure a custom theme invites. `test/theme.test.ts` pins
 that, and that the theme covers every colour a built-in theme defines — a token a theme
 forgets is not an error, it simply inherits ember, and you find out when one hover
 state renders orange.
 
-The mark in the sidebar is drawn by `components/BrandMark.tsx` for the same reason. The
-file it replaced hardcoded ember's palette, and an `<img>` cannot read a custom
-property whatever the SVG says. `public/brand/parallax-icon.svg` stays for the favicon,
-which is outside the document either way.
+The mark in the sidebar is drawn by `components/BrandMark.tsx` for the same reason: the
+brand file carries its own fixed palette, and an `<img>` cannot read a custom property
+whatever the SVG says. `public/brand/sentinel0-icon.svg` stays for the favicon, which is
+outside the document either way.
 
 ### Element defaults, and the test that used to guard them
 

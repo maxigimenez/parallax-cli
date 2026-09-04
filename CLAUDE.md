@@ -203,9 +203,10 @@ as well.
   so the log and the stored event never disagree about when something failed.
 - **Docs updates belong in the same commit** as behavior changes.
 - Tests live in `packages/<name>/test/` and mirror the `src/` structure.
-- The dashboard runs on a custom `@16-bits-design/ui` theme (`nebula`, purple), defined
-  in `src/theme-nebula.css` and pinned by `test/theme.test.ts` — a token a theme forgets
-  silently inherits the library's ember default rather than erroring.
+- The dashboard runs on a custom `@16-bits-design/ui` theme (`noir` — neutral surfaces,
+  violet accent), defined in `src/theme-noir.css` and pinned by `test/theme.test.ts` —
+  a token a theme forgets silently inherits the library's ember default rather than
+  erroring.
 - The dashboard's screen tests run against payloads recorded from a live `cloud-api`
   over real Postgres, in `test/fixtures/`. Hand-written ones agree with the source by
   construction and miss what actually breaks a browser — `run_events.ts` arrives as a

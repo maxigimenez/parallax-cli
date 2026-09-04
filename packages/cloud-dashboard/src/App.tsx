@@ -58,13 +58,13 @@ export function App(): ReactNode {
     // ToastProvider sits inside ThemeProvider so portalled toasts and dialogs
     // inherit the theme rather than rendering unthemed at the document root.
     //
-    // "nebula" is not a built-in theme. The library takes any name and writes
-    // it to data-bits-theme; src/theme-nebula.css defines what it means.
+    // "noir" is not a built-in theme. The library takes any name and writes
+    // it to data-bits-theme; src/theme-noir.css defines what it means.
     //
     // ThemeProvider renders a real div, which would otherwise sit between #root
     // and the app with an auto height — collapsing every percentage height
     // below it. px-root re-establishes the chain.
-    <ThemeProvider theme="nebula" className="px-root">
+    <ThemeProvider theme="noir" className="px-root">
       <ToastProvider>
         <SessionProvider>
           <BrowserRouter>
