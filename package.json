@@ -15,8 +15,8 @@
     "release:publish": "pnpm --dir packages/cli publish:package",
     "railway:plan": "railway config plan",
     "railway:apply": "railway config apply",
-    "railway:deploy:api": "railway up --service api",
-    "railway:deploy:dashboard": "railway up --service dashboard"
+    "railway:deploy:api": "railway up --service api -d",
+    "railway:deploy:dashboard": "railway up --service dashboard -d"
   },
   "devDependencies": {
     "@eslint/js": "9.32.0",
