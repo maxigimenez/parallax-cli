@@ -7,7 +7,8 @@
  * with no `dependencies`. npm therefore never learns that the orchestrator
  * needs p-limit, fastify and the rest: the install succeeds, and the first
  * `sentinel0 start` on a user's machine dies with ERR_MODULE_NOT_FOUND. That is
- * exactly what shipped in 0.2.0.
+ * exactly what shipped in `parallax-cli` 0.2.0, this package under its former
+ * name.
  *
  * Presence, not resolution. Resolving a specifier on another package's behalf
  * needs a resolver rooted at that package — `import.meta.resolve` takes no

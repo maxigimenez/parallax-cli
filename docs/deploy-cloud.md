@@ -172,7 +172,7 @@ Confirm:
 
 ```bash
 curl https://<your-service>.up.railway.app/health
-# {"status":"ok","version":"0.2.0"}
+# {"status":"ok","version":"0.0.1"}
 ```
 
 `/health` is unauthenticated on purpose: the health check has to pass before any key
